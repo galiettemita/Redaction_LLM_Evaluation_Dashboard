@@ -18,6 +18,26 @@ Start with a small modular application plus durable workers. Responsibilities do
 | Protected artifact store | Original/derived artifacts with role-specific access. |
 | Job coordination | Durable dispatch, bounded retry/concurrency, cancellation, progress and usage. |
 
+## Approved redaction-detection direction
+
+The document processor must discover supported text redactions automatically. Treat one visually contiguous blacked-out region in text flow as one immutable RedactionTarget. Normal product use does not ask the user to draw, approve or correct target boxes.
+
+Detection is hybrid and independent:
+1. Parse PDF graphics operators for filled near-black rectangles/polygons and normalize their page coordinates.
+2. Render each page deterministically and run raster dark-region/contour detection for scans or flattened PDFs.
+3. Fuse geometrically equivalent candidates.
+4. Validate text context using native text and/or approved OCR baselines, neighboring visible words, line geometry, paragraph/column structure and region dimensions.
+5. Exclude image/table/whole-page/non-redaction candidates under DEC-002.
+6. If supported targets cannot be established reliably, return a document-processing failure/unsupported state rather than requesting manual target marking.
+
+Detection output is versioned. Improved detectors create a new detection/target version; they do not silently mutate prior experiments. Adjacent physical black boxes stay distinct targets; raster fragments may be merged only when they are evidence of the same physical rectangle.
+
+## Approved baseline prediction-context direction
+
+Prediction workers consume a canonical redacted-document representation generated from the redacted artifact, not provider-specific PDF parsing. Every participating model in one comparative run gets the same frozen visible text/context representation and one specially marked target. Other redactions remain hidden. Each target is predicted in an independent request from the same frozen source; a prior prediction is never inserted into later target context.
+
+The preferred baseline supplies the full canonical redacted document when it fits the common approved context budget of every participating model. The initial comparative condition must not silently truncate differently per provider. Reference content, evaluator feedback, web and retrieval tools are excluded from this baseline. Models may use their existing parametric/pretraining knowledge; the experiment does not claim document-only logical derivability.
+
 ## Research-critical boundaries
 
 The viewer can display both versions, but the prediction path cannot. Reference-derived filenames, hints, summaries, context, caches and evaluator feedback must not leak into prompts. Target detection must not derive the question from the reference answer. Unknown truth and worker errors are separate states. Completed predictions remain immutable when reference mappings are corrected.

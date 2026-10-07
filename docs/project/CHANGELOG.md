@@ -16,6 +16,17 @@ Documentation-only coordination bootstrap, requested by the owner for this repos
 **Affected roles:** all five. **Next acknowledgment:** each role reads AGENTS and current state on its first active task. No acknowledgment is presumed.
 **Verification boundary:** validate documentation content, links and actual committed tree; application tests are not applicable. The delivering session reports its observed commit and verification evidence separately.
 
+## 2026-10-06 | E0002 | system-design approvals
+
+Owner-approved design direction; documentation only, no implementation or empirical validation.
+
+- DEC-007: automatic hybrid detection of visually contiguous black text-redaction boxes; no routine user marking/confirmation; fail unsupported/ambiguous processing rather than ask the user to define targets.
+- DEC-008: one target per model request, same frozen canonical redacted document/context across participating models, other redactions remain hidden, no answer insertion between targets, and no reference/evaluator/web/retrieval access in the baseline condition.
+- DEC-009: model pretraining/parametric knowledge is allowed; claims are reconstruction-under-protocol, not document-only logical derivability.
+- Updated architecture and interface contracts accordingly. D05 still requires research-human sign-off before comparative scientific claims; no exact provider roster, score formula, thresholds or code were approved.
+
+**Affected roles:** Research, Backend, Frontend, QA. **Required next action:** read E0002 at next task checkpoint and incorporate these constraints into proposals/reviews.
+
 ## Entry format
 
 Date / epoch / task or decision ID; approved change vs proposal; affected files/contracts; source/approval evidence; test/benchmark impact; migration/rollback; required receivers; unresolved issues. Never backfill a success claim without evidence.

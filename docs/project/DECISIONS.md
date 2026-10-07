@@ -1,6 +1,6 @@
 # Decision register
 
-Baseline: [MASTER_SPEC.md](MASTER_SPEC.md), imported 2026-10-06. Epoch E0001.
+Baseline: [MASTER_SPEC.md](MASTER_SPEC.md), imported 2026-10-06. Epoch E0002.
 Product decision IDs `DEC-...` are distinct from the source PDF's open-decision IDs `D01`-`D10`.
 
 ## Authority
@@ -19,6 +19,9 @@ A new user instruction can authorize work within its scope, but a chat statement
 | DEC-004 | Missing, partially revealed, unreadable or uncertain truth yields null score / Accuracy unknown, not zero; disclose exclusions. No full-target score from partial truth. | B1 R08 and section 7; owner's unknown-truth rule. Every scoring and display path. |
 | DEC-005 | Assess meaning and important factual detail, including actor/action/object, not mere lexical overlap or a broad topic match. | B1 R07 and sections 9/10; owner's accuracy priority. Rubric, benchmark, evaluator. |
 | DEC-006 | User-friendly professional viewer, release toggles, passage-linked answers and automatic on-demand results. | B1 R04/R06/R10 and sections 4/5/15. UX, orchestration. |
+| DEC-007 | One visually contiguous blacked-out region that covers text is one immutable redaction target. Target discovery is automatic: users do not draw, approve or correct boxes in the normal workflow. Use independent vector-PDF and rendered-image detection, fuse candidates, validate that the region lies in text flow, and exclude images/tables/whole-page omissions. If the system cannot reliably establish supported text targets, fail processing rather than ask the user to mark them. | Product-owner approval during system design, 2026-10-06. Document processor, target identity, fixtures, UX. |
+| DEC-008 | Primary comparative prediction condition uses one target per model request and the same frozen canonical redacted-document representation for every participating model. The target is specially marked; all other redactions remain hidden; prior guesses are never written back into later prompts. Baseline prediction gets no reference, evaluator feedback, web or retrieval tools. Full-document context is preferred when it fits the common approved context budget; the initial comparative baseline does not silently give different context subsets to different models. | Product-owner approval during system design, 2026-10-06. Run definition, canonical input manifest, adapters, benchmark comparability. Research sign-off under D05 is still required before comparative claims. |
+| DEC-009 | Models may use knowledge already present from pretraining/parametric memory. The baseline research claim is therefore “can the model reconstruct this redaction when given this redacted document under the declared protocol,” not “is the answer logically derivable only from evidence inside the uploaded document.” Training exposure remains a confound to record, not something the system claims to eliminate. | Product-owner approval during system design, 2026-10-06. Research protocol, result interpretation, UI/reports. Research sign-off under D05 remains required. |
 
 Source B1 is identified in MASTER_SPEC. These IDs normalize previously stated requirements; they do not approve new numeric methods.
 

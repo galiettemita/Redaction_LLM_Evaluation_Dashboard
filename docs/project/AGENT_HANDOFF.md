@@ -7,6 +7,7 @@ This file is the Lead-maintained routing/index record. Each specialist writes a 
 | Item | Sender -> receiver | State | Next action |
 | --- | --- | --- | --- |
 | E0001 / RL-OPS-001 coordination baseline | Setup -> all roles | AVAILABLE; no receiver acknowledgment recorded | Read current HEAD and instructions on first active task. |
+| E0002 / DEC-007..009 system-design update | Lead -> Research, Backend, Frontend, QA | AVAILABLE; no receiver acknowledgment recorded | At next active task, read the current decisions plus relevant architecture/interfaces; apply automatic target detection and canonical prediction-context rules. |
 | Next S1 packet | Lead -> owner / relevant roles | NOT APPROVED | Resolve blocking decisions and propose one narrow packet. |
 
 No review, implementation completion or running agent is implied by these rows.

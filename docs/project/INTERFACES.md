@@ -7,15 +7,21 @@
 | Record | Required meaning / dependencies |
 | --- | --- |
 | DocumentVersion | Project ID, original hash, role (redacted/reference), type, time, provenance, access policy and derivatives. |
-| RedactionTarget | Stable target ID, redacted-document version, page coordinates, visible-context locator, scope status and detection version. |
+| RedactionTarget | Stable target ID, redacted-document version, normalized page geometry for one contiguous physical black box, visible-context locator, scope status, detection method/evidence and detector version. No routine user-confirmation field is required for normal flow. |
 | ReferenceMapping | Target/version, reference version, exact quoted span and locator, mapping version, completeness, review status/provenance. |
-| RunDefinition | Fixed target versions, model roster, condition, redacted-only input manifest, prompt/settings/attempt policy, budget, creator. |
+| RunDefinition | Fixed target versions, model roster, experiment condition, canonical redacted-document version/hash, common context budget/policy, redacted-only input manifest, prompt/settings/attempt policy, tool permissions, budget and creator. |
 | ModelAttempt | Run/target/model/config IDs, request/response hashes, prediction, outcome, usage/timestamps; frozen when complete. |
 | EvaluationRecord | Frozen attempt, mapping/reference version, evaluator/rubric version, fact comparisons, contradictions, score or null, status/explanation. |
 | SummarySnapshot | Included evaluation IDs, condition/version filters, formula/weights, counts/denominators, time and freshness. |
 | ReviewAuditEvent | Actor, action/reason, old/new version pointers and evidence references. |
 
 Stable IDs must not be just page numbers or mutable offsets. All references are project-scoped; matching hashes do not grant cross-project access. Identity/version changes must be visible to downstream consumers.
+
+## Canonical prediction-input contract
+
+For the baseline comparative condition, serialize one frozen canonical redacted document plus exactly one target marker per model request. Preserve all other redactions as hidden markers. Do not carry a prior model guess into another target request. The manifest must make reference/evaluator/retrieval/web fields structurally unavailable to prediction workers, not merely empty by convention.
+
+A comparative run records the canonical-document hash and common context policy shared by all participating models. If the document cannot fit the approved common budget, the initial baseline must not silently produce provider-specific excerpts and then present those results as directly comparable.
 
 ## Separate state dimensions
 
