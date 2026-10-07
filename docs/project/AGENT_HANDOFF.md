@@ -9,6 +9,7 @@ This file is the Lead-maintained routing/index record. Each specialist writes a 
 | E0001 / RL-OPS-001 coordination baseline | Setup -> all roles | AVAILABLE; no receiver acknowledgment recorded | Read current HEAD and instructions on first active task. |
 | E0002 / DEC-007..009 system-design update | Lead -> Research, Backend, Frontend, QA | AVAILABLE; no receiver acknowledgment recorded | At next active task, read the current decisions plus relevant architecture/interfaces; apply automatic target detection and canonical prediction-context rules. |
 | E0003 / DEC-010 reference-alignment update | Lead -> Research, Backend, Frontend, QA | AVAILABLE; no receiver acknowledgment recorded | Use text-first global+local anchor alignment; preserve exact revealed spans; treat ambiguous/partial/unreadable mappings as unknown/null; D03 criteria still require research sign-off. |
+| E0004 / DEC-011..017 owner-approved design directions | Lead -> Research, Backend, Frontend, QA | AVAILABLE; not acknowledged | Read new decisions and role-relevant contracts; do not treat specialized sign-offs as granted; no extra spending. |
 | Next S1 packet | Lead -> owner / relevant roles | NOT APPROVED | Resolve blocking decisions and propose one narrow packet. |
 
 No review, implementation completion or running agent is implied by these rows.

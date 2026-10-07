@@ -39,6 +39,12 @@ Owner-approved design direction; documentation only.
 
 **Affected roles:** Research, Backend, Frontend, QA. **Next action:** consume E0003 at the next active task checkpoint.
 
+## 2026-10-07 | E0004 | owner-approved design directions
+
+DEC-011..017 record owner approval of conservative truth acceptance, fact-level evaluator direction, one-shot trial protocol, transparent aggregation, local/synthetic data boundary, pragmatic modular MVP and seven-day zero-additional-spend constraint. Research calibration, institutional data authorization, final stack, paid calls and code task authorization are **not** granted. D01 and D03-D07 still have gates; D09/D10 are deferred.
+
+Receivers: Research, Backend, Frontend, QA on next active check. Documentation-only change; no application/benchmark tests.
+
 ## Entry format
 
 Date / epoch / task or decision ID; approved change vs proposal; affected files/contracts; source/approval evidence; test/benchmark impact; migration/rollback; required receivers; unresolved issues. Never backfill a success claim without evidence.

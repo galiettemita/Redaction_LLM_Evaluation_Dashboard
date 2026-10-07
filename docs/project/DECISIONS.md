@@ -1,6 +1,6 @@
 # Decision register
 
-Baseline: [MASTER_SPEC.md](MASTER_SPEC.md), imported 2026-10-06. Epoch E0003.
+Baseline: [MASTER_SPEC.md](MASTER_SPEC.md), imported 2026-10-06. Epoch E0004.
 Product decision IDs `DEC-...` are distinct from the source PDF's open-decision IDs `D01`-`D10`.
 
 ## Authority
@@ -24,6 +24,14 @@ A new user instruction can authorize work within its scope, but a chat statement
 | DEC-009 | Models may use knowledge already present from pretraining/parametric memory. The baseline research claim is therefore “can the model reconstruct this redaction when given this redacted document under the declared protocol,” not “is the answer logically derivable only from evidence inside the uploaded document.” Training exposure remains a confound to record, not something the system claims to eliminate. | Product-owner approval during system design, 2026-10-06. Research protocol, result interpretation, UI/reports. Research sign-off under D05 remains required. |
 | DEC-010 | Reference alignment is text-first and anchor-based. Canonicalize both redacted and reference documents into token streams; globally align stable matching text, then locally use surrounding left/right token anchors around each immutable redaction target to isolate the exact newly revealed span. Page number and geometry are secondary validation evidence only. Mapping must preserve the exact revealed text and algorithm/version evidence. If the span is not unique, complete, readable and reliably aligned—or remains partly redacted—truth is unknown and score is null. No LLM may invent or repair ground truth. | Product-owner approval during system design, 2026-10-06. Document processor, ReferenceMapping, evaluation eligibility, QA fixtures. Exact automatic-confirmation thresholds and research sign-off remain under D03. |
 
+| DEC-011 | Owner approves conservative automatic reference confirmation: only unique, complete, readable, reliably aligned exact revealed text is scoreable; repeated/ambiguous/partly hidden/conflicting mappings are null. Acceptance thresholds and research validation still pending. | Product-owner direction approved 2026-10-07; D03 specialized approval/validation pending. |
+| DEC-012 | Owner approves reference-grounded fact-by-fact evaluator direction: coverage, support, contradictions, deterministic entity/date/quantity/negation checks and semantic relation/paraphrase matching. Predictor cannot solely judge itself. MiniCheck/NLI are candidates only; score formula, weights, caps, thresholds and human benchmark remain unapproved. | Product-owner direction approved 2026-10-07; D04 specialized approval/validation pending. |
+| DEC-013 | Owner approves one frozen independent prediction attempt per target/model with common canonical redacted input, declared prompt/settings, no reference/web/retrieval/evaluator feedback, and pretrained knowledge allowed. Refusal, timeout and malformed answers differ from factual error. Exact model roster and protocol verification pending. | Product-owner direction approved 2026-10-07; D05 specialized approval/validation pending. |
+| DEC-014 | Owner approves reporting target, document and model results with semantic agreement separate from coverage/completion and technical failures. Unknown/uncertain truth stays null and excluded from verified denominators; comparisons use declared common eligible sets. Weighting choices need research sign-off. | Product-owner direction approved 2026-10-07; D06 specialized approval/validation pending. |
+| DEC-015 | Owner approves safe initial local/synthetic or explicitly authorized public-data MVP direction, no private raw documents/secrets in public repo and no external commercial-provider transfer without lab authorization. This is not Columbia data/vendor permission. | Product-owner direction approved 2026-10-07; D02 specialized approval/validation pending. |
+| DEC-016 | Owner approves pragmatic modular local MVP direction: Python document/evaluation modules, lightweight API/workers, durable local persistence, simple UI; FastAPI/React/SQLite are candidate tools, not a final production stack. Engineering/lab approval still required for hosting, auth, operations. | Product-owner direction approved 2026-10-07; D07 specialized approval/validation pending. |
+| DEC-017 | Owner approves a seven-day evaluation-focused working MVP with zero additional spending beyond existing subscriptions. Codex plan does not imply third-party model API credits or cloud services. No paid calls or resource provisioning authorized. | Product-owner direction approved 2026-10-07; D08 specialized approval/validation pending. |
+
 Source B1 is identified in MASTER_SPEC. These IDs normalize previously stated requirements; they do not approve new numeric methods.
 
 ## Installed coordination rules (not research approvals)
@@ -36,20 +44,20 @@ Source B1 is identified in MASTER_SPEC. These IDs normalize previously stated re
 
 **OPS-004:** publish observed evidence, explicit unrun tests and required acknowledgments. No fabricated tests, approvals or completed work. These rules are the operating setup requested by the owner on 2026-10-06, not automated enforcement.
 
-## Open source decisions (unchanged)
+## Open specialized approvals and deferred decisions
 
 | ID | Decision | Human review role | Blocks |
 | --- | --- | --- | --- |
-| D01 | PDF baseline; scanned text, DOCX, handwriting, languages, tested limits | Product + engineering | S1 intake commitment |
-| D02 | Permitted data, vendors, storage, retention, sharing; resolve public repository boundary | Lab/data authority | Any external real-data trial or deployment |
-| D03 | Reference confirmation, reviewer roles, conflicting releases | Research | S1 closure |
-| D04 | Fact rubric, weights, critical errors, labels, numeric mapping, validation bounds | Research | S2 criteria; S4 trusted scores |
-| D05 | Model roster, context, tools, prompts, attempts, nonanswers | Research | S3 trial; S5 ranking |
-| D06 | Equal-target/equal-document means, common subsets, missingness | Research | S5 summaries |
-| D07 | Stack, hosting, authentication, storage and operating ownership | Engineering + lab | S3 persistent service; S7 deployment |
-| D08 | Budgets, spending authority, measured load and latency | Product + engineering | Paid trials; S7 capacity |
-| D09 | UI design/prototype tool, final copy and brand use | Product + engineering | S6 acceptance |
-| D10 | Administrative-text eligibility; retrieval/extra formats opt-in | Research | Dataset inclusion; expansion |
+| D01 | PDF baseline; scanned/OCR reliability, language and size limits need testing; other formats deferred | Product + engineering | S1 intake commitment |
+| D02 | DEC-015 owner direction approved; institutional data/vendor permission pending | Lab / engineering | Not a completed specialist approval |
+| D03 | DEC-011 owner direction approved; auto-confirmation acceptance/validation pending | Research / product as applicable | Not a completed specialist approval |
+| D04 | DEC-012 owner direction approved; rubric, judge, formula and calibration pending | Research / product as applicable | Not a completed specialist approval |
+| D05 | DEC-013 owner direction approved; exact roster and protocol validation pending | Research / product as applicable | Not a completed specialist approval |
+| D06 | DEC-014 owner direction approved; weighting and fairness validation pending | Research / product as applicable | Not a completed specialist approval |
+| D07 | DEC-016 owner direction approved; final stack, hosting, auth and operations pending | Lab / engineering | Not a completed specialist approval |
+| D08 | DEC-017 zero-extra-spend rule approved; paid calls remain unauthorized | Research / product as applicable | Not a completed specialist approval |
+| D09 | Simple professional UI direction approved; final styling/branding/tool deferred | Research / product as applicable | Not a completed specialist approval |
+| D10 | Text-only scope approved; administrative text and retrieval/extra formats deferred | Research / product as applicable | Not a completed specialist approval |
 
 Role holders are not yet named in this register. Do not assign responsibilities to people merely mentioned in prior messages. The owner's choice of this repository resolves its address, not all of D07.
 

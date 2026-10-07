@@ -50,6 +50,10 @@ Use deterministic/versioned sequence-alignment and diff-style methods as the pri
 
 A mapping is eligible for verified scoring only when the exact revealed span is unique, complete, readable and reliably aligned under the approved D03 acceptance criteria. Multiple plausible matches, substantial rewrite, unreadable OCR, conflicting releases, or a still/partly redacted candidate produce an unknown/uncertain mapping and therefore null score. Store the exact revealed quotation plus alignment evidence/version so the mapping is auditable and reproducible.
 
+## Owner-approved MVP direction (DEC-015..017)
+
+Prefer a small local modular Python evaluation/document pipeline, lightweight API/worker and durable local state with a simple web viewer. FastAPI, React and SQLite are candidates, not finalized technology decisions. Use synthetic or explicitly authorized public fixtures, mockable providers and no new paid calls/cloud resources. Preserve reference/prediction isolation, idempotency, immutable versions and recovery.
+
 ## Research-critical boundaries
 
 The viewer can display both versions, but the prediction path cannot. Reference-derived filenames, hints, summaries, context, caches and evaluator feedback must not leak into prompts. Target detection must not derive the question from the reference answer. Unknown truth and worker errors are separate states. Completed predictions remain immutable when reference mappings are corrected.

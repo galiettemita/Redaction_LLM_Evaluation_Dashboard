@@ -14,11 +14,11 @@ Keep the startup acknowledgment to one line: `Role | task | baseline SHA | decis
 
 ## Authority and scope
 
-- Preserve confirmed requirements R01-R12 and decisions DEC-001 through DEC-010. Proposed architecture, interfaces, scoring and thresholds remain proposed until their designated human approvals are recorded.
+- Preserve confirmed requirements R01-R12 and decisions DEC-001 through DEC-017. Proposed architecture, interfaces, scoring and thresholds remain proposed until their designated human approvals are recorded.
 - The redacted PDF is required for prediction; the reference file is optional for prediction. Verified scoring additionally requires fully revealed, readable, reliably aligned reference text for that exact target.
 - Partial, missing, unreadable or uncertain truth means null score / unknown accuracy, not zero. Text targets only; no image, table or whole-page reconstruction. Ordinary multipage viewing is allowed. Provide redaction, document and model score levels.
 - Reference content and hints must not enter prediction inputs. Predictions, mappings and evaluations need versioned provenance. A timeout is not a factual error. Reconnecting must not start a new paid run.
-- No stack, API model version, scoring weights or validation threshold has been selected. Do not fill these in silently.
+- Owner approval of DEC-011..017 is design direction, not research validation or Columbia data authorization. Exact model roster, numeric scoring thresholds/weights and final production stack are not approved. No additional spending is authorized.
 
 ## Task and write protocol
 

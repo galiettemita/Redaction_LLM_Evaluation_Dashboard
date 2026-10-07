@@ -29,6 +29,10 @@ Canonicalize both releases to normalized token streams for matching while retain
 
 The mapping layer must distinguish at least: exact unique candidate found; still/partly redacted; ambiguous/multiple candidate; unreadable/uncertain OCR; conflicting reference; unsupported. Only the approved scoreable state may expose an exact truth span to evaluation. All other states yield null accuracy. Do not permit an LLM-generated paraphrase or inferred missing words to populate exact revealed truth.
 
+## Owner-approved evaluator and summary direction (DEC-011..014)
+
+ReferenceMapping scoreability requires unique complete readable aligned exact text; uncertain cases remain null. EvaluationRecord separates coverage, support, contradictions, judge status, score-or-null, provenance and version. MiniCheck/NLI are candidates, not verified judges. SummarySnapshot must include exact eligible evaluation IDs, denominators, null/unknown counts, refusals/errors, common-set filters and condition/model/rubric versions. No unknown-to-zero conversion.
+
 ## Separate state dimensions
 
 The contract must represent reference state, prediction outcome, evaluation state and score independently. Candidate reference states: known/confirmed, partly revealed, still hidden, absent, unreadable/uncertain mapping, conflicting references, unsupported target. These names describe semantics; exact enums remain to be approved.

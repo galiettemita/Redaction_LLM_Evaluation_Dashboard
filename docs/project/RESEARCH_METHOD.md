@@ -8,6 +8,10 @@ Assess meaning and details: actor/action/object, relation direction, time/place,
 
 Prediction may run without a reference. A verified target score requires the entire target's revealed, readable, reliably aligned reference. Missing, partial or uncertain reference produces null score / Accuracy unknown. Do not infer unknown words, score only the convenient part and present it as full accuracy. Unknowns are excluded from verified denominators and counted.
 
+## Owner-approved evaluation direction (E0004; not research validated)
+
+Use reference-grounded fact-level coverage, support and contradiction evidence; deterministic entity/date/quantity/negation checks plus semantic paraphrase/actor-action-object matching. A predictor cannot solely grade its own answer. MiniCheck/NLI and F1-like scoring remain candidate methods, not approved numeric formulas. Validate against human-adjudicated and held-out examples, prioritizing false high scores. Baseline is one frozen attempt per model/target. Report verified eligible denominators, unknown/null, refusal/failure and fair common-set comparisons. No extra spend in the seven-day MVP.
+
 ## Proposed evaluation sequence
 
 1. Check scope and scoreability; stop with unknown/review status when necessary.
