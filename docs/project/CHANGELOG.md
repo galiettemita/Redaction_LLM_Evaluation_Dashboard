@@ -27,6 +27,18 @@ Owner-approved design direction; documentation only, no implementation or empiri
 
 **Affected roles:** Research, Backend, Frontend, QA. **Required next action:** read E0002 at next task checkpoint and incorporate these constraints into proposals/reviews.
 
+## 2026-10-06 | E0003 | reference-alignment design approval
+
+Owner-approved design direction; documentation only.
+
+- DEC-010: text-first reference alignment using canonical token streams, global monotonic alignment, then local left/right anchor alignment to isolate the exact newly revealed span.
+- Page number and geometry are secondary evidence rather than primary alignment authority.
+- Ambiguous, incomplete, unreadable, partly hidden or conflicting mappings remain unknown and score null; no LLM may invent ground truth.
+- D03 still requires research approval of the exact automatic-confirmation criteria and validation evidence before trusted scoring.
+- Coordination preference updated: ask the owner only urgent/necessary design questions that materially affect correctness, research validity, security/data policy, contracts, authority or sequencing.
+
+**Affected roles:** Research, Backend, Frontend, QA. **Next action:** consume E0003 at the next active task checkpoint.
+
 ## Entry format
 
 Date / epoch / task or decision ID; approved change vs proposal; affected files/contracts; source/approval evidence; test/benchmark impact; migration/rollback; required receivers; unresolved issues. Never backfill a success claim without evidence.

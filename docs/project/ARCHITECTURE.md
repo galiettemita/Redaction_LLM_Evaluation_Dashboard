@@ -38,6 +38,18 @@ Prediction workers consume a canonical redacted-document representation generate
 
 The preferred baseline supplies the full canonical redacted document when it fits the common approved context budget of every participating model. The initial comparative condition must not silently truncate differently per provider. Reference content, evaluator feedback, web and retrieval tools are excluded from this baseline. Models may use their existing parametric/pretraining knowledge; the experiment does not claim document-only logical derivability.
 
+## Approved reference-alignment direction
+
+Reference alignment is content-first, not page-first. Build a canonical token stream for the redacted release and for the uploaded reference release while retaining exact source text/locators separately.
+
+Alignment runs in two stages:
+1. Compute a global monotonic alignment over stable matching token sequences across the two canonical streams. This establishes broad correspondence despite inserted covers, page-number changes, line wrapping, punctuation differences, or modest OCR noise.
+2. For each RedactionTarget, take stable left/right token windows surrounding the target in the redacted stream, locate their aligned counterparts in the reference stream, widen context when needed, and extract only the intervening reference span as the candidate reveal.
+
+Use deterministic/versioned sequence-alignment and diff-style methods as the primary authority. Page number, geometry and layout may corroborate or reject a candidate but are not the primary locator. An LLM must not manufacture ground truth.
+
+A mapping is eligible for verified scoring only when the exact revealed span is unique, complete, readable and reliably aligned under the approved D03 acceptance criteria. Multiple plausible matches, substantial rewrite, unreadable OCR, conflicting releases, or a still/partly redacted candidate produce an unknown/uncertain mapping and therefore null score. Store the exact revealed quotation plus alignment evidence/version so the mapping is auditable and reproducible.
+
 ## Research-critical boundaries
 
 The viewer can display both versions, but the prediction path cannot. Reference-derived filenames, hints, summaries, context, caches and evaluator feedback must not leak into prompts. Target detection must not derive the question from the reference answer. Unknown truth and worker errors are separate states. Completed predictions remain immutable when reference mappings are corrected.

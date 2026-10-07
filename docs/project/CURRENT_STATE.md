@@ -1,6 +1,6 @@
 # Current state
 
-Updated: 2026-10-06 (America/New_York). Coordination epoch: **E0002**.
+Updated: 2026-10-06 (America/New_York). Coordination epoch: **E0003**.
 Integration branch: `main`. Canonical writer: **Lead/Architect**, within the owner's approved scope.
 Resolve the actual HEAD with GitHub; do not infer a current SHA from this file's timestamp.
 
@@ -16,7 +16,7 @@ The eight shared files and root agent instructions define a coordination protoco
 
 ## Holds and urgent changes
 
-No specific urgent amendment is recorded at E0002. Standing hold: no application code, live model calls, migrations, cloud resources or deployment without the relevant approved task and decisions. Private data must not be put in this public repository.
+No specific urgent amendment is recorded at E0003. Standing hold: no application code, live model calls, migrations, cloud resources or deployment without the relevant approved task and decisions. Private data must not be put in this public repository.
 
 On a critical new change, the Lead records affected task IDs here as `ON_HOLD`, increments the epoch and links the decision. This stops work only when an active agent next checks; it is not a remote kill switch.
 
@@ -33,7 +33,7 @@ These proposed items are not claimed, running or approved to execute. The Lead a
 
 ## Decisions the owner needs to resolve next
 
-Resolve repository/data visibility and the authorized data boundary before real data (D02); identify research and data-handling approvers; select the initial text/PDF limits and reference-confirmation procedure (D01/D03). D05 now has owner-approved context direction (DEC-008/DEC-009) but still needs research sign-off for comparative claims. Then approve one S1 packet. Stack, exact model roster, score formula and numeric cutoffs remain open.
+Resolve repository/data visibility and the authorized data boundary before real data (D02); identify research and data-handling approvers; select the initial text/PDF limits and approve the exact automatic reference-confirmation criteria/validation evidence for D03; the alignment architecture itself is now DEC-010. D05 now has owner-approved context direction (DEC-008/DEC-009) but still needs research sign-off for comparative claims. Then approve one S1 packet. Stack, exact model roster, score formula and numeric cutoffs remain open.
 
 ## What is present / absent
 
@@ -42,7 +42,7 @@ Absent: application code, schemas/migrations, APIs, workers, provider integratio
 
 ## Latest important change
 
-E0002 records owner-approved system-design rules for automatic text-redaction detection and the baseline prediction context: contiguous black text boxes become immutable targets; no routine user marking/confirmation; hybrid vector+raster detection with text-flow validation; one target per request; one frozen canonical redacted representation across participating models; no prediction-to-prediction answer insertion; parametric/pretraining knowledge is allowed. Research approval of the comparative protocol under D05 is still required before scientific ranking claims. See [CHANGELOG.md](CHANGELOG.md).
+E0003 adds owner-approved text-first reference alignment: canonical token streams for both releases, global monotonic text alignment, local left/right anchor matching around each target, exact-span extraction, and null/unknown when a unique complete mapping cannot be established. Page/geometry are secondary evidence. The Lead will surface only urgent/necessary design questions that materially affect correctness, research validity, security/data policy, contracts, authority, or sequencing. D03 still needs research sign-off for exact auto-confirmation criteria. See [CHANGELOG.md](CHANGELOG.md).
 
 ## Maintenance rule
 

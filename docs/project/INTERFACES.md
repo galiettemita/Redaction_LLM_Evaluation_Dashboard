@@ -8,7 +8,7 @@
 | --- | --- |
 | DocumentVersion | Project ID, original hash, role (redacted/reference), type, time, provenance, access policy and derivatives. |
 | RedactionTarget | Stable target ID, redacted-document version, normalized page geometry for one contiguous physical black box, visible-context locator, scope status, detection method/evidence and detector version. No routine user-confirmation field is required for normal flow. |
-| ReferenceMapping | Target/version, reference version, exact quoted span and locator, mapping version, completeness, review status/provenance. |
+| ReferenceMapping | Target/version, reference version, exact quoted revealed span and token locators, canonical-stream versions/hashes, global-alignment version, left/right anchor evidence, candidate uniqueness/completeness/readability state, mapping version and provenance. Page/geometry evidence is optional secondary corroboration. |
 | RunDefinition | Fixed target versions, model roster, experiment condition, canonical redacted-document version/hash, common context budget/policy, redacted-only input manifest, prompt/settings/attempt policy, tool permissions, budget and creator. |
 | ModelAttempt | Run/target/model/config IDs, request/response hashes, prediction, outcome, usage/timestamps; frozen when complete. |
 | EvaluationRecord | Frozen attempt, mapping/reference version, evaluator/rubric version, fact comparisons, contradictions, score or null, status/explanation. |
@@ -22,6 +22,12 @@ Stable IDs must not be just page numbers or mutable offsets. All references are 
 For the baseline comparative condition, serialize one frozen canonical redacted document plus exactly one target marker per model request. Preserve all other redactions as hidden markers. Do not carry a prior model guess into another target request. The manifest must make reference/evaluator/retrieval/web fields structurally unavailable to prediction workers, not merely empty by convention.
 
 A comparative run records the canonical-document hash and common context policy shared by all participating models. If the document cannot fit the approved common budget, the initial baseline must not silently produce provider-specific excerpts and then present those results as directly comparable.
+
+## Reference-alignment contract
+
+Canonicalize both releases to normalized token streams for matching while retaining the exact source quotation and source locator used as truth evidence. First establish a global monotonic correspondence between stable matching token regions. Then, per target, align left/right context anchors and extract only the reference tokens between those anchors.
+
+The mapping layer must distinguish at least: exact unique candidate found; still/partly redacted; ambiguous/multiple candidate; unreadable/uncertain OCR; conflicting reference; unsupported. Only the approved scoreable state may expose an exact truth span to evaluation. All other states yield null accuracy. Do not permit an LLM-generated paraphrase or inferred missing words to populate exact revealed truth.
 
 ## Separate state dimensions
 

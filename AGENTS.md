@@ -14,7 +14,7 @@ Keep the startup acknowledgment to one line: `Role | task | baseline SHA | decis
 
 ## Authority and scope
 
-- Preserve confirmed requirements R01-R12 and decisions DEC-001 through DEC-009. Proposed architecture, interfaces, scoring and thresholds remain proposed until their designated human approvals are recorded.
+- Preserve confirmed requirements R01-R12 and decisions DEC-001 through DEC-010. Proposed architecture, interfaces, scoring and thresholds remain proposed until their designated human approvals are recorded.
 - The redacted PDF is required for prediction; the reference file is optional for prediction. Verified scoring additionally requires fully revealed, readable, reliably aligned reference text for that exact target.
 - Partial, missing, unreadable or uncertain truth means null score / unknown accuracy, not zero. Text targets only; no image, table or whole-page reconstruction. Ordinary multipage viewing is allowed. Provide redaction, document and model score levels.
 - Reference content and hints must not enter prediction inputs. Predictions, mappings and evaluations need versioned provenance. A timeout is not a factual error. Reconnecting must not start a new paid run.
@@ -27,6 +27,8 @@ Work only on a task packet with an owner, file scope, acceptance evidence and st
 Lead/Architect is the single integration writer for the eight shared project files, under the owner's authorized scope. Specialists propose changes on their task branch or in a unique handoff. They do not independently rewrite canonical state on `main`. An agent role is not a human approval identity.
 
 Use one isolated branch/worktree per writing task. Before publishing, refresh HEAD and reconcile overlap. Use current blob SHAs or an expected-head lease for API writes; use normal non-force Git pushes. A stale-head rejection requires rereading and reconciliation, not a blind retry. Keep a related decision, state and handoff update in one commit where possible. Never force-push or overwrite another writer's work.
+
+During architecture/design work, do not burden the owner with nonessential questions. Escalate only decisions that materially affect correctness, research validity, security/data policy, shared contracts, cost/deployment authority, or implementation sequencing. For nonblocking details, make the best explicit recommendation, mark it proposed where approval is still required, and continue to the next necessary design issue.
 
 At completion, create or extend your task-scoped handoff under `docs/project/handoffs/` using the template in `AGENT_HANDOFF.md`. Include actual artifacts, commit/revision, tests run or not run, decisions used, blockers, affected consumers and next action. If writing is unavailable or unauthorized, provide the exact proposed filename and content, labeled `NOT PUBLISHED`. No handoff is delivered merely because it was written in chat.
 
