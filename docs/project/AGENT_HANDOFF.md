@@ -10,6 +10,7 @@ This file is the Lead-maintained routing/index record. Each specialist writes a 
 | E0002 / DEC-007..009 system-design update | Lead -> Research, Backend, Frontend, QA | AVAILABLE; no receiver acknowledgment recorded | At next active task, read the current decisions plus relevant architecture/interfaces; apply automatic target detection and canonical prediction-context rules. |
 | E0003 / DEC-010 reference-alignment update | Lead -> Research, Backend, Frontend, QA | AVAILABLE; no receiver acknowledgment recorded | Use text-first global+local anchor alignment; preserve exact revealed spans; treat ambiguous/partial/unreadable mappings as unknown/null; D03 criteria still require research sign-off. |
 | E0004 / DEC-011..017 owner-approved design directions | Lead -> Research, Backend, Frontend, QA | AVAILABLE; not acknowledged | Read new decisions and role-relevant contracts; do not treat specialized sign-offs as granted; no extra spending. |
+| E0005 / RL-MVP-PLAN-001 Oct 14 checkpoint | Lead -> Research, Backend, Frontend, QA | AVAILABLE; NOT ACKNOWLEDGED | Read DEC-018, [proposed MVP design](../../docs/superpowers/specs/2026-10-07-oct14-mvp-design.md), [roadmap](plans/2026-10-07-weekly-implementation-roadmap.md) and relevant packet. Do not code before owner design/plan approval. |
 | Next S1 packet | Lead -> owner / relevant roles | NOT APPROVED | Resolve blocking decisions and propose one narrow packet. |
 
 No review, implementation completion or running agent is implied by these rows.

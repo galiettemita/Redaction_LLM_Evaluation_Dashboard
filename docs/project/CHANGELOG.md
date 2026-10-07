@@ -45,6 +45,12 @@ DEC-011..017 record owner approval of conservative truth acceptance, fact-level 
 
 Receivers: Research, Backend, Frontend, QA on next active check. Documentation-only change; no application/benchmark tests.
 
+## 2026-10-07 | E0005 | RL-MVP-PLAN-001
+
+Recorded DEC-018 owner-defined October 14 MVP milestone. Published proposed [MVP design](../../docs/superpowers/specs/2026-10-07-oct14-mvp-design.md), [weekly delivery roadmap](plans/2026-10-07-weekly-implementation-roadmap.md), and [RL-MVP-001 proposed packet](task_packets/RL-MVP-001-contracts-and-synthetic-fixtures.md). These are planning documents awaiting written design review and detailed Codex plan approval, not evidence of implementation. No paid calls, live models, production data or deployments authorized. No application tests run (documentation only).
+
+Affected roles: Research, Backend, Frontend, QA. Receivers read at next active checkpoint; no automatic cross-chat messages or acknowledgments.
+
 ## Entry format
 
 Date / epoch / task or decision ID; approved change vs proposal; affected files/contracts; source/approval evidence; test/benchmark impact; migration/rollback; required receivers; unresolved issues. Never backfill a success claim without evidence.
