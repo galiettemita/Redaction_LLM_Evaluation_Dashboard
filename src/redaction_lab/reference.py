@@ -333,6 +333,30 @@ def _candidate_contains_marker(
     return bool(_MARKER_RE.search(reference_text, start, end))
 
 
+def _has_unbound_boundary_punctuation(
+    reference_text: str,
+    reference_tokens: tuple[_Token, ...],
+    candidate: _Candidate,
+) -> bool:
+    if candidate.source_start is not None and candidate.source_end is not None:
+        return False
+    first = reference_tokens[candidate.start]
+    last = reference_tokens[candidate.end - 1]
+    left_edge = (
+        reference_tokens[candidate.start - 1].end
+        if candidate.start > 0
+        else reference_text.rfind("\n", 0, first.start) + 1
+    )
+    right_edge = (
+        reference_tokens[candidate.end].start
+        if candidate.end < len(reference_tokens)
+        else len(reference_text)
+    )
+    left_gap = reference_text[left_edge:first.start]
+    right_gap = reference_text[last.end:right_edge]
+    return bool(left_gap.strip() or right_gap.strip())
+
+
 def _globally_supported(
     candidate: _Candidate,
     marker_start: int,
@@ -928,6 +952,24 @@ def align_reference(
             ),
             candidate,
         )
+        if _has_unbound_boundary_punctuation(
+            exact_reference_text, reference_tokens, candidate
+        ):
+            results.append(
+                _unconfirmed(
+                    redacted,
+                    target,
+                    status=ReferenceStatus.AMBIGUOUS,
+                    mapping_version=mapping_version,
+                    reference_document_version_id=reference_document_version_id,
+                    reference_canonical_version_id=reference_canonical_version_id,
+                    reference_hash=exact_reference_hash,
+                    candidate_unique=True,
+                    complete_revelation=False,
+                    readable=True,
+                )
+            )
+            continue
         if not _globally_supported(
             candidate,
             marker[0],

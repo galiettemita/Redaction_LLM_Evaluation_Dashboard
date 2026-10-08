@@ -308,7 +308,7 @@ def test_reflow_punctuation_and_page_number_changes_do_not_shift_target() -> Non
     def draw_reference(canvas: Canvas) -> None:
         canvas.drawString(72, 740, "Page 9")
         canvas.drawString(72, 700, f"{prefix}Agent")
-        canvas.drawString(72, 680, "Cedar, at noon.")
+        canvas.drawString(72, 680, "Cedar at noon.")
 
     canonical, targets = _redacted_context(_pdf_bytes(draw_redacted))
 
@@ -317,6 +317,27 @@ def test_reflow_punctuation_and_page_number_changes_do_not_shift_target() -> Non
     assert mapping.status is ReferenceStatus.CONFIRMED
     assert mapping.exact_revealed_text == "Agent\nCedar"
     assert mapping.reference_token_locator is not None
+
+
+def test_reflowed_boundary_punctuation_fails_closed_without_exact_span() -> None:
+    prefix = "The courier was "
+    secret = "(Agent Cedar),"
+
+    def draw_redacted(canvas: Canvas) -> None:
+        canvas.drawString(72, 700, f"{prefix}{secret} at noon.")
+        _overlay(canvas, 72, 700, prefix, secret)
+
+    def draw_reference(canvas: Canvas) -> None:
+        canvas.drawString(72, 700, f"{prefix}(Agent")
+        canvas.drawString(72, 680, "Cedar), at noon.")
+
+    canonical, targets = _redacted_context(_pdf_bytes(draw_redacted))
+
+    mapping = _align(canonical, targets, _pdf_bytes(draw_reference))[0]
+
+    assert mapping.status is ReferenceStatus.AMBIGUOUS
+    assert mapping.exact_revealed_text is None
+    assert secret not in str(mapping)
 
 
 @pytest.mark.parametrize(
