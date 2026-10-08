@@ -143,6 +143,12 @@ Published [fresh QA and Research review packet](task_packets/RL-MVP-002-CORRECTI
 
 Independent QA FAIL and Research Task-2 PASS on Correction 04 were reconciled. Codex published Correction 05 implementation `736fa18419340b9fcb8dd5e121e8eebcc24b22f7` with handoff branch head `395d2321012092bd619a34711cb0b4ca4855abf2`. Delta is limited to detector, tests and one handoff; Codex reports 120 tests passed, not independently rerun by Lead. Published [review packet](task_packets/RL-MVP-002-CORRECTION-05-REVIEW.md). No merge, Task 3, paid calls, scientific approval or deployment.
 
+## 2026-10-08 | E0022 | Correction 05 independent reviews reconciled
+
+QA handoff `986c525778db7229315940da638d724267a4407b` reports PASS and Research handoff `38dacef1091a4849fda0acce9444873a87499401` reports PASS for Task-2 semantics, both reviewing exact implementation `736fa18419340b9fcb8dd5e121e8eebcc24b22f7`. QA independently probed artwork, occlusion, layouts, IDs and markers; Research ran 12+10 independent isolated checks and a hidden-token/marker probe. Neither reran the full 120-test repository suite; 120 passes remain Codex-reported. This is scoped software review, not scientific or real-document validation.
+
+**Disposition:** REVIEW_PASSED_AWAITING_MERGE_APPROVAL. No merge, Task 3, provider calls, paid services or deployment. October 12 deadline remains at risk.
+
 ## Entry format
 
 Date / epoch / task or decision ID; approved change vs proposal; affected files/contracts; source/approval evidence; test/benchmark impact; migration/rollback; required receivers; unresolved issues. Never backfill a success claim without evidence.
