@@ -87,6 +87,12 @@ Following the reviewed RL-MVP-001 merge, the owner directed continued Codex impl
 
 Affected roles: Backend/Codex (implement), QA and Research (review exact candidate). No ACK presumed.
 
+## 2026-10-08 | E0012 | RL-MVP-002 candidate intake and review routing
+
+Verified Codex branch `codex/rl-mvp-002-detection-canonicalization` at `a6a603f6b11472df5cf36d2acd9eeec215fe81af`, implementation `430467314ca992f36cf3eaab9d49cde45a9805ac`, with five approved source/test/dependency files and one Backend handoff. Codex reports 35 focused and 78 full tests passed, compileall and diff check; Lead inspected code and did not rerun tests.
+
+Published exact-candidate QA and Research review packets. Key review focus: hidden PDF-layer text leakage, unsupported graphics/paint operations, redacted-only canonical context, deterministic target identity and failure reporting. No independent verdict, merge, Task 3, provider call, scientific approval or deployment.
+
 ## Entry format
 
 Date / epoch / task or decision ID; approved change vs proposal; affected files/contracts; source/approval evidence; test/benchmark impact; migration/rollback; required receivers; unresolved issues. Never backfill a success claim without evidence.
