@@ -312,8 +312,8 @@ def _hidden_reference_match_count(
         hidden_left, hidden_right, _, _, _ = _line_context(
             reference_text, marker.start(), marker.end()
         )
-        left_matches = bool(left) and hidden_left[-len(left) :] == left
-        right_matches = bool(right) and hidden_right[: len(right)] == right
+        left_matches = bool(left) and bool(_occurrences(hidden_left, left))
+        right_matches = bool(right) and bool(_occurrences(hidden_right, right))
         if left_matches or right_matches:
             matches += 1
     return matches

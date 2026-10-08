@@ -209,6 +209,27 @@ def test_reflowed_still_hidden_reference_marker_cannot_be_confirmed() -> None:
     assert secret not in str(mapping)
 
 
+def test_reflowed_partially_revealed_reference_cannot_confirm_visible_prefix() -> None:
+    prefix = "The relocated synthetic authorization was "
+    secret = "ORCHARD SEVEN"
+
+    def draw_redacted(canvas: Canvas) -> None:
+        canvas.drawString(72, 700, f"{prefix}{secret}.")
+        _overlay(canvas, 72, 700, prefix, secret)
+
+    def draw_reference(canvas: Canvas) -> None:
+        canvas.drawString(72, 680, f"{prefix}{secret}.")
+        _overlay(canvas, 72, 680, f"{prefix}ORCHARD ", "SEVEN")
+
+    canonical, targets = _redacted_context(_pdf_bytes(draw_redacted))
+
+    mapping = _align(canonical, targets, _pdf_bytes(draw_reference))[0]
+
+    assert mapping.status is ReferenceStatus.PARTIAL
+    assert mapping.exact_revealed_text is None
+    assert secret not in str(mapping)
+
+
 def test_reflow_punctuation_and_page_number_changes_do_not_shift_target() -> None:
     prefix = "The courier was "
     secret = "Agent Cedar"
