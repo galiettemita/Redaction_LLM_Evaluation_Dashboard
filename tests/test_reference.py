@@ -160,6 +160,49 @@ def test_wrong_document_is_conflicting_and_hides_reference_text(
     assert "Unrelated synthetic release" not in str(mappings)
 
 
+def test_globally_reordered_target_passages_invalidate_every_mapping() -> None:
+    first_prefix = "The first synthetic value was "
+    second_prefix = "The second synthetic value was "
+
+    def draw_redacted(canvas: Canvas) -> None:
+        canvas.drawString(72, 700, f"{first_prefix}ALPHA.")
+        canvas.drawString(72, 664, f"{second_prefix}BRAVO.")
+        _overlay(canvas, 72, 700, first_prefix, "ALPHA")
+        _overlay(canvas, 72, 664, second_prefix, "BRAVO")
+
+    def draw_reference(canvas: Canvas) -> None:
+        canvas.drawString(72, 700, f"{second_prefix}BRAVO.")
+        canvas.drawString(72, 664, f"{first_prefix}ALPHA.")
+
+    canonical, targets = _redacted_context(_pdf_bytes(draw_redacted))
+
+    mappings = _align(canonical, targets, _pdf_bytes(draw_reference))
+
+    assert {mapping.status for mapping in mappings} == {
+        ReferenceStatus.CONFLICTING
+    }
+    assert all(mapping.exact_revealed_text is None for mapping in mappings)
+
+
+def test_one_sided_anchor_cannot_invent_target_endpoint() -> None:
+    prefix = "Visible context "
+
+    def draw_redacted(canvas: Canvas) -> None:
+        canvas.drawString(72, 700, f"{prefix}SECRET")
+        _overlay(canvas, 72, 700, prefix, "SECRET")
+
+    def draw_reference(canvas: Canvas) -> None:
+        canvas.drawString(72, 700, f"{prefix}WRONG EXTRA")
+
+    canonical, targets = _redacted_context(_pdf_bytes(draw_redacted))
+
+    mapping = _align(canonical, targets, _pdf_bytes(draw_reference))[0]
+
+    assert mapping.status is ReferenceStatus.CONFLICTING
+    assert mapping.exact_revealed_text is None
+    assert "WRONG" not in str(mapping)
+
+
 @pytest.mark.parametrize(
     "case,hidden_text",
     [
@@ -251,6 +294,30 @@ def test_reflow_punctuation_and_page_number_changes_do_not_shift_target() -> Non
     assert mapping.status is ReferenceStatus.CONFIRMED
     assert mapping.exact_revealed_text == "Agent\nCedar"
     assert mapping.reference_token_locator is not None
+
+
+@pytest.mark.parametrize(
+    "secret",
+    ["(Agent-Cedar),", "Agent  Cedar"],
+)
+def test_exact_reference_preserves_covered_punctuation_and_whitespace(
+    secret: str,
+) -> None:
+    prefix = "The exact synthetic value was "
+
+    def draw_redacted(canvas: Canvas) -> None:
+        canvas.drawString(72, 700, f"{prefix}{secret} at noon.")
+        _overlay(canvas, 72, 700, prefix, secret)
+
+    def draw_reference(canvas: Canvas) -> None:
+        canvas.drawString(72, 700, f"{prefix}{secret} at noon.")
+
+    canonical, targets = _redacted_context(_pdf_bytes(draw_redacted))
+
+    mapping = _align(canonical, targets, _pdf_bytes(draw_reference))[0]
+
+    assert mapping.status is ReferenceStatus.CONFIRMED
+    assert mapping.exact_revealed_text == secret
 
 
 def test_adjacent_targets_are_extracted_independently(tmp_path: Path) -> None:

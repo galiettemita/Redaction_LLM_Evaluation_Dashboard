@@ -49,6 +49,10 @@ class _Candidate:
     right: tuple[str, ...]
     left_boundary: bool
     right_boundary: bool
+    geometry_bounded_left: bool = False
+    geometry_bounded_right: bool = False
+    source_start: int | None = None
+    source_end: int | None = None
 
 
 def _normalize(value: str) -> str:
@@ -383,6 +387,114 @@ def _absolute_box(
     return x0 * width, y0 * height, x1 * width, y1 * height
 
 
+def _exact_page_text(page: object, targets: tuple[RedactionTarget, ...]) -> str:
+    page_width = float(page.width)  # type: ignore[attr-defined]
+    page_height = float(page.height)  # type: ignore[attr-defined]
+    target_boxes = tuple(
+        (target, _absolute_box(target, page_width, page_height))
+        for target in targets
+    )
+    events: list[tuple[float, float, float, float, int, str]] = []
+    for char_index, char in enumerate(page.chars):  # type: ignore[attr-defined]
+        char_box = (
+            float(char["x0"]),
+            float(char["y0"]),
+            float(char["x1"]),
+            float(char["y1"]),
+        )
+        if any(_intersects(char_box, box) for _, box in target_boxes):
+            continue
+        events.append(
+            (
+                float(char["top"]),
+                float(char["x0"]),
+                float(char["x1"]),
+                float(char["bottom"]) - float(char["top"]),
+                char_index,
+                str(char.get("text", "")),
+            )
+        )
+    marker_offset = len(events) + 1
+    for target_index, (target, box) in enumerate(target_boxes):
+        occluded = [
+            char
+            for char in page.chars  # type: ignore[attr-defined]
+            if str(char.get("text", "")).strip()
+            and _intersects(
+                (
+                    float(char["x0"]),
+                    float(char["y0"]),
+                    float(char["x1"]),
+                    float(char["y1"]),
+                ),
+                box,
+            )
+        ]
+        if not occluded:
+            raise ValueError("reference target has no occluded text")
+        top = sum(float(char["top"]) for char in occluded) / len(occluded)
+        height = sum(
+            float(char["bottom"]) - float(char["top"]) for char in occluded
+        ) / len(occluded)
+        events.append(
+            (
+                top,
+                box[0],
+                box[2],
+                height,
+                marker_offset + target_index,
+                f" [[TARGET:{target.target_id}]] ",
+            )
+        )
+
+    lines: list[list[tuple[float, float, float, float, int, str]]] = []
+    for event in sorted(events, key=lambda item: (item[0], item[1], item[2])):
+        if not lines or abs(lines[-1][0][0] - event[0]) > 3.0:
+            lines.append([event])
+        else:
+            lines[-1].append(event)
+    rendered_lines: list[str] = []
+    for line in lines:
+        pieces: list[str] = []
+        previous: tuple[float, float, float, float, int, str] | None = None
+        for event in sorted(line, key=lambda item: (item[1], item[4])):
+            if previous is not None:
+                gap = event[1] - previous[2]
+                threshold = max(1.5, min(previous[3], event[3]) * 0.2)
+                if (
+                    gap > threshold
+                    and not previous[5].endswith((" ", "\t"))
+                    and not event[5].startswith((" ", "\t"))
+                ):
+                    pieces.append(" ")
+            pieces.append(event[5])
+            previous = event
+        rendered = "".join(pieces).strip()
+        if rendered:
+            rendered_lines.append(rendered)
+    return "\n".join(rendered_lines)
+
+
+def _safe_exact_reference_text(
+    reference_pdf: bytes,
+    detection: DetectionResult,
+) -> str | None:
+    try:
+        with _suppress_parser_debug_logs():
+            with pdfplumber.open(BytesIO(reference_pdf)) as pdf:
+                pages = []
+                for page_index, page in enumerate(pdf.pages):
+                    targets = tuple(
+                        target
+                        for target in detection.targets
+                        if target.page_index == page_index
+                    )
+                    pages.append(_exact_page_text(page, targets))
+        return "\n\n".join(pages)
+    except Exception:
+        return None
+
+
 def _reference_boxes_overlap(
     target: RedactionTarget,
     detection: DetectionResult,
@@ -419,7 +531,11 @@ def _geometry_quote(
                         float(char["x1"]),
                         float(char["y1"]),
                     )
-                    if not _intersects(char_box, box):
+                    horizontal_center = (char_box[0] + char_box[2]) / 2
+                    if (
+                        not _intersects(char_box, box)
+                        or not box[0] <= horizontal_center <= box[2]
+                    ):
                         continue
                     if any(_intersects(char_box, hidden) for hidden in reference_boxes):
                         continue
@@ -441,6 +557,7 @@ def _geometry_candidate(
     reference_pdf: bytes,
     target: RedactionTarget,
     detection: DetectionResult,
+    reference_text: str,
     reference_tokens: tuple[_Token, ...],
     left: tuple[str, ...],
     right: tuple[str, ...],
@@ -456,6 +573,10 @@ def _geometry_candidate(
     candidates: list[_Candidate] = []
     for start in occurrences:
         end = start + len(quote_words)
+        if left_boundary and start != 0:
+            continue
+        if right_boundary and end != len(words):
+            continue
         left_evidence: tuple[str, ...] = ()
         right_evidence: tuple[str, ...] = ()
         for width in range(1, len(left) + 1):
@@ -477,6 +598,14 @@ def _geometry_candidate(
         has_right = bool(right_evidence) or (right_boundary and end == len(words))
         if not (has_left or has_right):
             continue
+        first = reference_tokens[start]
+        last = reference_tokens[end - 1]
+        line_start = reference_text.rfind("\n", 0, first.start) + 1
+        next_newline = reference_text.find("\n", last.end)
+        line_end = len(reference_text) if next_newline < 0 else next_newline
+        source_start = reference_text.find(quote, line_start, line_end)
+        if source_start < 0:
+            continue
         candidates.append(
             _Candidate(
                 start=start,
@@ -485,13 +614,13 @@ def _geometry_candidate(
                 right=right_evidence,
                 left_boundary=left_boundary and start == 0,
                 right_boundary=right_boundary and end == len(words),
+                geometry_bounded_left=True,
+                geometry_bounded_right=True,
+                source_start=source_start,
+                source_end=source_start + len(quote),
             )
         )
     return list(dict.fromkeys(candidates))
-
-
-def _line_boundary_evidence(side: str) -> tuple[str, ...]:
-    return (f"visible-{side}-line-boundary",)
 
 
 def _confirmed(
@@ -508,13 +637,15 @@ def _confirmed(
 ) -> ReferenceMapping:
     first = reference_tokens[candidate.start]
     last = reference_tokens[candidate.end - 1]
-    exact = reference_text[first.start : last.end]
-    left = candidate.left or (
-        () if candidate.left_boundary else _line_boundary_evidence("left")
-    )
-    right = candidate.right or (
-        () if candidate.right_boundary else _line_boundary_evidence("right")
-    )
+    source_start = candidate.source_start if candidate.source_start is not None else first.start
+    source_end = candidate.source_end if candidate.source_end is not None else last.end
+    exact = reference_text[source_start:source_end]
+    left = candidate.left
+    if not left and not candidate.left_boundary and candidate.geometry_bounded_left:
+        left = ("geometry-bounded-left-endpoint",)
+    right = candidate.right
+    if not right and not candidate.right_boundary and candidate.geometry_bounded_right:
+        right = ("geometry-bounded-right-endpoint",)
     return ReferenceMapping(
         mapping_id=_mapping_id(
             redacted,
@@ -536,7 +667,7 @@ def _confirmed(
         exact_revealed_text=exact,
         reference_token_locator=(
             f"tokens:{candidate.start}-{candidate.end};"
-            f"chars:{first.start}-{last.end}"
+            f"chars:{source_start}-{source_end}"
         ),
         redacted_canonical_version_id=redacted.canonical_document_version_id,
         reference_canonical_version_id=reference_canonical_version_id,
@@ -647,7 +778,22 @@ def align_reference(
         ]
 
     detection, reference = parsed
-    reference_tokens = _tokens(reference.canonical_text)
+    exact_reference_text = _safe_exact_reference_text(reference_pdf, detection)
+    if exact_reference_text is None:
+        return [
+            _unconfirmed(
+                redacted,
+                target,
+                status=ReferenceStatus.UNREADABLE,
+                mapping_version=mapping_version,
+                reference_document_version_id=reference_document_version_id,
+                reference_canonical_version_id=reference_canonical_version_id,
+                reference_hash=reference.canonical_hash,
+                readable=False,
+            )
+            for target in targets
+        ]
+    reference_tokens = _tokens(exact_reference_text)
     redacted_tokens = _tokens(redacted.canonical_text)
     global_pairs = _monotonic_pairs(redacted_tokens, reference_tokens)
     if not reference_tokens or not global_pairs:
@@ -687,11 +833,12 @@ def align_reference(
         left, right, left_boundary, right_boundary, adjacent = _line_context(
             redacted.canonical_text, marker[0], marker[1]
         )
-        if adjacent:
+        if adjacent or not left or not right:
             candidates = _geometry_candidate(
                 reference_pdf,
                 target,
                 detection,
+                exact_reference_text,
                 reference_tokens,
                 left,
                 right,
@@ -706,12 +853,10 @@ def align_reference(
                 left_boundary,
                 right_boundary,
             )
-        hidden_matches = _hidden_reference_match_count(
-            reference.canonical_text, left, right
-        )
+        hidden_matches = _hidden_reference_match_count(exact_reference_text, left, right)
         if hidden_matches or any(
             _candidate_contains_marker(
-                reference.canonical_text, reference_tokens, candidate
+                exact_reference_text, reference_tokens, candidate
             )
             for candidate in candidates
         ):
@@ -751,6 +896,25 @@ def align_reference(
             )
             continue
         candidate = candidates[0]
+        geometry_matches = _geometry_candidate(
+            reference_pdf,
+            target,
+            detection,
+            exact_reference_text,
+            reference_tokens,
+            left,
+            right,
+            left_boundary,
+            right_boundary,
+        )
+        candidate = next(
+            (
+                geometry
+                for geometry in geometry_matches
+                if geometry.start == candidate.start and geometry.end == candidate.end
+            ),
+            candidate,
+        )
         if not _globally_supported(
             candidate,
             marker[0],
@@ -778,7 +942,7 @@ def align_reference(
                 redacted,
                 target,
                 candidate,
-                reference.canonical_text,
+                exact_reference_text,
                 reference_tokens,
                 mapping_version=mapping_version,
                 reference_document_version_id=reference_document_version_id,
@@ -788,13 +952,17 @@ def align_reference(
         )
         confirmed_ranges.append((index, candidate.start, candidate.end))
 
-    previous_end = -1
-    for index, start, end in confirmed_ranges:
-        if start < previous_end:
-            target = targets[index]
+    globally_coherent = all(
+        confirmed_ranges[position - 1][2] <= confirmed_ranges[position][1]
+        for position in range(1, len(confirmed_ranges))
+    )
+    if not globally_coherent:
+        for index, mapping in enumerate(results):
+            if mapping.status is not ReferenceStatus.CONFIRMED:
+                continue
             results[index] = _unconfirmed(
                 redacted,
-                target,
+                targets[index],
                 status=ReferenceStatus.CONFLICTING,
                 mapping_version=mapping_version,
                 reference_document_version_id=reference_document_version_id,
@@ -804,5 +972,4 @@ def align_reference(
                 complete_revelation=True,
                 readable=True,
             )
-        previous_end = max(previous_end, end)
     return results
