@@ -1,23 +1,22 @@
 # Redaction Lab — weekly delivery roadmap
 
-Status: PROPOSED FOR OWNER REVIEW. Created 2026-10-07. See MVP design in docs/superpowers/specs/2026-10-07-oct14-mvp-design.md.
+Status: OWNER-APPROVED ROADMAP, first checkpoint date amended by DEC-020 on 2026-10-08. Created 2026-10-07. See MVP design in docs/superpowers/specs/2026-10-07-oct14-mvp-design.md.
 This is a target schedule, not a guarantee of bug-free completion or scientific validity. No extra spending.
 
-## Checkpoint 1 — October 14: first working vertical slice
+## Checkpoint 1 — October 12: first working vertical slice (AT RISK)
 
 Two PDF uploads (redacted and reference), automatic detection of all supported text black boxes, canonical text, conservative reference alignment, one real prediction model through a reusable adapter, a different local evaluation model, provisional/unknown results per target, and simple per-document/model summaries in a local UI.
 
-Proposed daily sequence:
-- Oct 7: freeze written MVP design, confirm local hardware and license constraints, approve bounded task packets and synthetic fixture contract.
-- Oct 8: implement PDF intake, redaction manifest and safe canonical text extraction with leakage tests.
-- Oct 9: implement global/local text-anchor reference alignment with null/unknown behavior.
-- Oct 10: implement generic prediction adapter, frozen run records and one local model smoke test.
-- Oct 11: implement independent local evaluator and a versioned experimental rubric, with Research review.
-- Oct 12: connect minimal web upload/viewer, progress and summaries.
-- Oct 13: run QA adversarial fixtures, end-to-end test, failure recovery, documentation and fixes.
-- Oct 14: controlled local demonstration and checkpoint review. No public deployment implied.
+Revised critical-path sequence (conditional; task-by-task approvals still required):
+- **Oct 8:** complete Task 2 Correction 02, publish exact SHA, obtain independent QA/Research review; perform no-cost local model feasibility preflight if available.
+- **Oct 9:** after Task 2 approved integration, Task 3 reference alignment; Research rubric proposal and Frontend contract preparation may run in separate approved scopes.
+- **Oct 10:** Task 4 one real local predictor/adapter if hardware/license permits; Task 5 versioned provisional rubric review.
+- **Oct 11:** Task 6 separate local evaluator and summaries; Task 7 minimal two-upload UI/API, only after stable interfaces and scoped authorizations.
+- **Oct 12:** independent end-to-end QA and local demo (Tasks 8/9) if all gates pass; otherwise disclose PARTIAL/BLOCKED and actual tested capabilities.
 
-## Later checkpoints (conditional)
+**Schedule risk:** As of October 8, only Task 1 is merged; Task 2 is under correction and Tasks 3–8 remain unbuilt. No guarantee of a working real-model demo or research-validated scoring by October 12. Do not skip safety, review, or no-spend requirements. Keep the scope unchanged; defer only features already outside the approved first MVP.
+
+## Later checkpoints (conditional; dates not automatically changed by DEC-020)
 
 - Oct 21: additional provider adapters and fair multi-model comparison, only after vendor/data/cost authorization; keep shared context and versioned attempts.
 - Oct 28: human benchmark, score calibration, contradictions/abstention, research-reviewed aggregation and model comparison validity.
@@ -34,10 +33,10 @@ RL-MVP-005 Research: provisional evaluator rubric and benchmark/adversarial case
 RL-MVP-006 Backend: independent evaluator worker, evidence and summaries.
 RL-MVP-007 Frontend: two-upload local UI, target selection, statuses and summaries.
 RL-MVP-008 QA: independent security/leakage, alignment, scoring and end-to-end review.
-RL-MVP-009 Lead: integration, reproducibility evidence and Oct 14 demo decision.
+RL-MVP-009 Lead: integration, reproducibility evidence and Oct 12 demo decision.
 
 Backend packets are sequential where they share contracts; Research and Frontend proposals may proceed in parallel after their approved scopes. Specialists publish unique handoffs; Lead alone integrates canonical docs. A task is not approved merely by appearing in this roadmap.
 
 ## Gates and stop conditions
 
-Before any product code: owner reviews written MVP design and detailed task plan. Before real model: machine hardware, model license, memory, latency and no-cost access verified. Before numeric score: versioned provisional rubric and explicit experimental labeling; verified scoring requires research-human calibration. Before external APIs/real sensitive documents: institutional authorization. Before deployment: engineering/lab approval. No fake test results, paid calls or silent unsupported fallbacks.
+Written MVP design and detailed task plan are owner-approved; each subsequent task packet and merge still requires its own authorization. Before real model: machine hardware, model license, memory, latency and no-cost access verified. Before numeric score: versioned provisional rubric and explicit experimental labeling; verified scoring requires research-human calibration. Before external APIs/real sensitive documents: institutional authorization. Before deployment: engineering/lab approval. No fake test results, paid calls or silent unsupported fallbacks.
