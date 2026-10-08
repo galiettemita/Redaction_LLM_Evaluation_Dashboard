@@ -167,6 +167,12 @@ Verified exact Codex implementation `931fb1c0012d3b530b837f204d922f0aaa95a602`, 
 
 No independent verdict, merge, Task 4, paid calls, research-human scoring approval or deployment. October 12 deadline remains at risk.
 
+## 2026-10-08 | E0026 | RL-MVP-003 Correction 01 approved
+
+Independent QA (FAIL, `007eb0e`) and Research (CHANGES_REQUESTED, `6406a25`) reviewed exact candidate `931fb1c`. Blocking issues: one-sided global anchor acceptance despite contradictory context, wrong-release local-neighbor matches without trusted identity/full-document coherence, and loss of target-edge whitespace. Reviewers did not independently run the complete 145-test repository suite.
+
+Owner explicitly approved DEC-021 and [bounded Correction 01](task_packets/RL-MVP-003-CORRECTION-01.md), including trusted existing DocumentVersion role/project/version/SHA-256 byte verification, two-sided alignment, and exact source span or null. No contracts schema change, merge, Task 4, scientific D03 validation, paid calls or deployment. Codex correction has not yet been published.
+
 ## Entry format
 
 Date / epoch / task or decision ID; approved change vs proposal; affected files/contracts; source/approval evidence; test/benchmark impact; migration/rollback; required receivers; unresolved issues. Never backfill a success claim without evidence.
