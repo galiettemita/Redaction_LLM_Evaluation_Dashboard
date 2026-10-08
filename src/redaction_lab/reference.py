@@ -13,6 +13,8 @@ import pdfplumber
 from redaction_lab.canonical import canonicalize_redacted
 from redaction_lab.contracts import (
     CanonicalRedactedDocument,
+    DocumentRole,
+    DocumentVersion,
     RedactionTarget,
     ReferenceMapping,
     ReferenceScoreability,
@@ -27,8 +29,8 @@ from redaction_lab.pdf_detector import (
 )
 
 
-MAPPING_METHOD_VERSION = "text-first-reference-v1"
-GLOBAL_ALIGNMENT_VERSION = "monotonic-word-sequence-v1"
+MAPPING_METHOD_VERSION = "text-first-reference-v2"
+GLOBAL_ALIGNMENT_VERSION = "complete-monotonic-context-v2"
 _MARKER_RE = re.compile(r"\[\[TARGET:([^\]]+)\]\]")
 _WORD_RE = re.compile(r"[^\W_]+(?:['’][^\W_]+)*", re.UNICODE)
 
@@ -49,8 +51,6 @@ class _Candidate:
     right: tuple[str, ...]
     left_boundary: bool
     right_boundary: bool
-    geometry_bounded_left: bool = False
-    geometry_bounded_right: bool = False
     source_start: int | None = None
     source_end: int | None = None
 
@@ -76,6 +76,34 @@ def _tokens(text: str) -> tuple[_Token, ...]:
             )
         )
     return tuple(tokens)
+
+
+def _alignment_tokens(text: str) -> tuple[_Token, ...]:
+    """Normalize only explicit volatile metadata while preserving token positions."""
+
+    tokens = _tokens(text)
+    normalized: list[_Token] = []
+    for index, token in enumerate(tokens):
+        value = token.normalized
+        previous = tokens[index - 1] if index else None
+        same_line = previous is not None and previous.line == token.line
+        if same_line and previous.normalized == "page" and value.isdecimal():
+            value = "<page-number>"
+        elif (
+            same_line
+            and previous.normalized == "release"
+            and value in {"redacted", "reference"}
+        ):
+            value = "<document-role>"
+        normalized.append(
+            _Token(
+                normalized=value,
+                start=token.start,
+                end=token.end,
+                line=token.line,
+            )
+        )
+    return tuple(normalized)
 
 
 def _occurrences(haystack: tuple[str, ...], needle: tuple[str, ...]) -> list[int]:
@@ -124,6 +152,22 @@ def _validate_inputs(
     ):
         raise ValueError("canonical marker invariant failed")
     return markers
+
+
+def _trusted_reference_binding_is_valid(
+    redacted: CanonicalRedactedDocument,
+    reference_pdf: bytes,
+    trusted_reference_document: DocumentVersion | None,
+    expected_reference_version_id: str | None,
+) -> bool:
+    if trusted_reference_document is None or not expected_reference_version_id:
+        return False
+    return (
+        trusted_reference_document.role is DocumentRole.REFERENCE
+        and trusted_reference_document.project_id == redacted.project_id
+        and trusted_reference_document.version_id == expected_reference_version_id
+        and trusted_reference_document.sha256 == sha256(reference_pdf).hexdigest()
+    )
 
 
 def _mapping_id(
@@ -242,6 +286,17 @@ def _line_context(
     return left, right, left_boundary, right_boundary, other_marker_on_line
 
 
+def _document_context(
+    text: str,
+    marker_start: int,
+    marker_end: int,
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    return (
+        tuple(token.normalized for token in _tokens(text[:marker_start])),
+        tuple(token.normalized for token in _tokens(text[marker_end:])),
+    )
+
+
 def _anchor_candidates(
     reference_tokens: tuple[_Token, ...],
     left: tuple[str, ...],
@@ -333,28 +388,8 @@ def _candidate_contains_marker(
     return bool(_MARKER_RE.search(reference_text, start, end))
 
 
-def _has_unbound_boundary_punctuation(
-    reference_text: str,
-    reference_tokens: tuple[_Token, ...],
-    candidate: _Candidate,
-) -> bool:
-    if candidate.source_start is not None and candidate.source_end is not None:
-        return False
-    first = reference_tokens[candidate.start]
-    last = reference_tokens[candidate.end - 1]
-    left_edge = (
-        reference_tokens[candidate.start - 1].end
-        if candidate.start > 0
-        else reference_text.rfind("\n", 0, first.start) + 1
-    )
-    right_edge = (
-        reference_tokens[candidate.end].start
-        if candidate.end < len(reference_tokens)
-        else len(reference_text)
-    )
-    left_gap = reference_text[left_edge:first.start]
-    right_gap = reference_text[last.end:right_edge]
-    return bool(left_gap.strip() or right_gap.strip())
+def _lacks_exact_source_bounds(candidate: _Candidate) -> bool:
+    return candidate.source_start is None or candidate.source_end is None
 
 
 def _globally_supported(
@@ -392,7 +427,7 @@ def _globally_supported(
             (red_start + offset, ref_start + offset) in matching_pairs
             for offset in range(width)
         )
-    return left_ok or right_ok
+    return left_ok and right_ok
 
 
 def _intersects(
@@ -493,8 +528,8 @@ def _exact_page_text(page: object, targets: tuple[RedactionTarget, ...]) -> str:
                     pieces.append(" ")
             pieces.append(event[5])
             previous = event
-        rendered = "".join(pieces).strip()
-        if rendered:
+        rendered = "".join(pieces)
+        if rendered.strip():
             rendered_lines.append(rendered)
     return "\n".join(rendered_lines)
 
@@ -571,8 +606,8 @@ def _geometry_quote(
                             str(char.get("text", "")),
                         )
                     )
-        quote = "".join(item[3] for item in sorted(chars)).strip()
-        return quote or None
+        quote = "".join(item[3] for item in sorted(chars))
+        return quote if quote.strip() else None
     except Exception:
         return None
 
@@ -620,7 +655,7 @@ def _geometry_candidate(
                 right_evidence = anchor
         has_left = bool(left_evidence) or (left_boundary and start == 0)
         has_right = bool(right_evidence) or (right_boundary and end == len(words))
-        if not (has_left or has_right):
+        if not (has_left and has_right):
             continue
         first = reference_tokens[start]
         last = reference_tokens[end - 1]
@@ -647,8 +682,6 @@ def _geometry_candidate(
                 right=right_evidence,
                 left_boundary=left_boundary and start == 0,
                 right_boundary=right_boundary and end == len(words),
-                geometry_bounded_left=True,
-                geometry_bounded_right=True,
                 source_start=source_start,
                 source_end=source_start + len(quote),
             )
@@ -670,15 +703,15 @@ def _confirmed(
 ) -> ReferenceMapping:
     first = reference_tokens[candidate.start]
     last = reference_tokens[candidate.end - 1]
-    source_start = candidate.source_start if candidate.source_start is not None else first.start
+    source_start = (
+        candidate.source_start
+        if candidate.source_start is not None
+        else first.start
+    )
     source_end = candidate.source_end if candidate.source_end is not None else last.end
     exact = reference_text[source_start:source_end]
     left = candidate.left
-    if not left and not candidate.left_boundary and candidate.geometry_bounded_left:
-        left = ("geometry-bounded-left-endpoint",)
     right = candidate.right
-    if not right and not candidate.right_boundary and candidate.geometry_bounded_right:
-        right = ("geometry-bounded-right-endpoint",)
     return ReferenceMapping(
         mapping_id=_mapping_id(
             redacted,
@@ -752,18 +785,20 @@ def align_reference(
     reference_pdf: bytes | None,
     *,
     targets: tuple[RedactionTarget, ...],
+    trusted_reference_document: DocumentVersion | None,
     reference_document_version_id: str | None,
     reference_canonical_version_id: str | None,
     mapping_version: str,
 ) -> list[ReferenceMapping]:
-    """Return one safe mapping per target; uncertain candidates never expose truth."""
+    """Align against bytes bound to a caller-authenticated DocumentVersion."""
 
     markers = _validate_inputs(redacted, targets)
     if not mapping_version or not mapping_version.strip():
         raise ValueError("mapping version is required")
     if reference_pdf is None:
         if (
-            reference_document_version_id is not None
+            trusted_reference_document is not None
+            or reference_document_version_id is not None
             or reference_canonical_version_id is not None
         ):
             raise ValueError(
@@ -782,12 +817,28 @@ def align_reference(
             for target in targets
         ]
     if (
-        not reference_document_version_id
-        or not reference_document_version_id.strip()
+        not _trusted_reference_binding_is_valid(
+            redacted,
+            reference_pdf,
+            trusted_reference_document,
+            reference_document_version_id,
+        )
         or not reference_canonical_version_id
         or not reference_canonical_version_id.strip()
     ):
-        raise ValueError("reference version identifiers are required")
+        return [
+            _unconfirmed(
+                redacted,
+                target,
+                status=ReferenceStatus.CONFLICTING,
+                mapping_version=mapping_version,
+                reference_document_version_id=reference_document_version_id,
+                reference_canonical_version_id=reference_canonical_version_id,
+                reference_hash=None,
+                readable=None,
+            )
+            for target in targets
+        ]
 
     parsed = _reference_document(
         reference_pdf,
@@ -829,7 +880,10 @@ def align_reference(
     exact_reference_hash = sha256(exact_reference_text.encode("utf-8")).hexdigest()
     reference_tokens = _tokens(exact_reference_text)
     redacted_tokens = _tokens(redacted.canonical_text)
-    global_pairs = _monotonic_pairs(redacted_tokens, reference_tokens)
+    global_pairs = _monotonic_pairs(
+        _alignment_tokens(redacted.canonical_text),
+        _alignment_tokens(exact_reference_text),
+    )
     if not reference_tokens or not global_pairs:
         return [
             _unconfirmed(
@@ -845,9 +899,25 @@ def align_reference(
             for target in targets
         ]
     matching_pairs = _expanded_pairs(global_pairs)
+    globally_matched_redacted = {redacted_index for redacted_index, _ in matching_pairs}
+    if globally_matched_redacted != set(range(len(redacted_tokens))):
+        return [
+            _unconfirmed(
+                redacted,
+                target,
+                status=ReferenceStatus.CONFLICTING,
+                mapping_version=mapping_version,
+                reference_document_version_id=reference_document_version_id,
+                reference_canonical_version_id=reference_canonical_version_id,
+                reference_hash=exact_reference_hash,
+                readable=True,
+            )
+            for target in targets
+        ]
 
     results: list[ReferenceMapping] = []
     confirmed_ranges: list[tuple[int, int, int]] = []
+    plausible_reference_ranges: list[tuple[int, int]] = []
     document_alignment_conflict = False
     for index, (target, marker) in enumerate(zip(targets, markers, strict=True)):
         if _reference_boxes_overlap(target, detection):
@@ -868,6 +938,9 @@ def align_reference(
         left, right, left_boundary, right_boundary, adjacent = _line_context(
             redacted.canonical_text, marker[0], marker[1]
         )
+        document_left, document_right = _document_context(
+            redacted.canonical_text, marker[0], marker[1]
+        )
         if adjacent or not left or not right:
             candidates = _geometry_candidate(
                 reference_pdf,
@@ -875,8 +948,8 @@ def align_reference(
                 detection,
                 exact_reference_text,
                 reference_tokens,
-                left,
-                right,
+                document_left,
+                document_right,
                 left_boundary,
                 right_boundary,
             )
@@ -888,7 +961,12 @@ def align_reference(
                 left_boundary,
                 right_boundary,
             )
-        hidden_matches = _hidden_reference_match_count(exact_reference_text, left, right)
+        hidden_matches = _hidden_reference_match_count(
+            exact_reference_text, left, right
+        )
+        plausible_reference_ranges.extend(
+            (candidate.start, candidate.end) for candidate in candidates
+        )
         if hidden_matches or any(
             _candidate_contains_marker(
                 exact_reference_text, reference_tokens, candidate
@@ -939,8 +1017,8 @@ def align_reference(
             detection,
             exact_reference_text,
             reference_tokens,
-            left,
-            right,
+            document_left,
+            document_right,
             left_boundary,
             right_boundary,
         )
@@ -952,9 +1030,7 @@ def align_reference(
             ),
             candidate,
         )
-        if _has_unbound_boundary_punctuation(
-            exact_reference_text, reference_tokens, candidate
-        ):
+        if _lacks_exact_source_bounds(candidate):
             results.append(
                 _unconfirmed(
                     redacted,
@@ -1008,9 +1084,22 @@ def align_reference(
         )
         confirmed_ranges.append((index, candidate.start, candidate.end))
 
-    globally_coherent = not document_alignment_conflict and all(
-        confirmed_ranges[position - 1][2] <= confirmed_ranges[position][1]
-        for position in range(1, len(confirmed_ranges))
+    matched_reference = {reference_index for _, reference_index in matching_pairs}
+    target_reference = {
+        token_index
+        for start, end in plausible_reference_ranges
+        for token_index in range(start, end)
+    }
+    reference_context_coherent = (
+        matched_reference | target_reference
+    ) == set(range(len(reference_tokens)))
+    globally_coherent = (
+        not document_alignment_conflict
+        and reference_context_coherent
+        and all(
+            confirmed_ranges[position - 1][2] <= confirmed_ranges[position][1]
+            for position in range(1, len(confirmed_ranges))
+        )
     )
     if not globally_coherent:
         for index, mapping in enumerate(results):

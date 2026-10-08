@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from hashlib import sha256
 from io import BytesIO
 import logging
@@ -12,6 +13,8 @@ from reportlab.pdfgen.canvas import Canvas
 
 from redaction_lab.canonical import canonicalize_redacted
 from redaction_lab.contracts import (
+    DocumentRole,
+    DocumentVersion,
     PredictionManifest,
     PredictionSettings,
     ReferenceScoreability,
@@ -19,7 +22,12 @@ from redaction_lab.contracts import (
 )
 from redaction_lab.fixtures import make_synthetic_pair
 from redaction_lab.pdf_detector import DetectionStatus, detect_targets
-from redaction_lab.reference import align_reference
+from redaction_lab.reference import (
+    _Candidate,
+    _Token,
+    _globally_supported,
+    align_reference,
+)
 
 
 PROJECT_ID = "project-rl-mvp-003"
@@ -28,6 +36,7 @@ REDACTED_CANONICAL_ID = "redacted-canonical-v1"
 REFERENCE_VERSION_ID = "reference-document-v1"
 REFERENCE_CANONICAL_ID = "reference-canonical-v1"
 MAPPING_VERSION = "mapping-v1"
+_DEFAULT_TRUSTED_RECORD = object()
 
 
 def _pdf_bytes(draw) -> bytes:
@@ -72,18 +81,78 @@ def _fixture_context(case: str, tmp_path: Path):
     return canonical, targets, reference_path.read_bytes()
 
 
-def _align(canonical, targets, reference_pdf: bytes | None):
+def _trusted_reference(
+    reference_pdf: bytes,
+    **updates,
+) -> DocumentVersion:
+    record = DocumentVersion(
+        document_id="reference-document",
+        version_id=REFERENCE_VERSION_ID,
+        project_id=PROJECT_ID,
+        sha256=sha256(reference_pdf).hexdigest(),
+        role=DocumentRole.REFERENCE,
+        created_at=datetime(2026, 10, 8, tzinfo=timezone.utc),
+        provenance="trusted synthetic test registry",
+        access_policy="synthetic-test-only",
+    )
+    return record.model_copy(update=updates)
+
+
+def _align(
+    canonical,
+    targets,
+    reference_pdf: bytes | None,
+    *,
+    trusted_reference_document=_DEFAULT_TRUSTED_RECORD,
+    reference_document_version_id: str | None = None,
+):
+    if reference_document_version_id is None and reference_pdf is not None:
+        reference_document_version_id = REFERENCE_VERSION_ID
+    if trusted_reference_document is _DEFAULT_TRUSTED_RECORD:
+        trusted_reference_document = (
+            _trusted_reference(reference_pdf) if reference_pdf is not None else None
+        )
     return align_reference(
         canonical,
         reference_pdf,
         targets=targets,
-        reference_document_version_id=(
-            REFERENCE_VERSION_ID if reference_pdf is not None else None
-        ),
+        trusted_reference_document=trusted_reference_document,
+        reference_document_version_id=reference_document_version_id,
         reference_canonical_version_id=(
             REFERENCE_CANONICAL_ID if reference_pdf is not None else None
         ),
         mapping_version=MAPPING_VERSION,
+    )
+
+
+@pytest.mark.parametrize("supported_side", ["left", "right"])
+def test_global_support_requires_both_non_boundary_textual_sides(
+    supported_side: str,
+) -> None:
+    candidate = _Candidate(
+        start=2,
+        end=3,
+        left=("before",),
+        right=("after",),
+        left_boundary=False,
+        right_boundary=False,
+    )
+    redacted_tokens = (
+        _Token("before", 0, 6, 0),
+        _Token("after", 20, 25, 0),
+    )
+    matching_pairs = (
+        frozenset({(0, 1)})
+        if supported_side == "left"
+        else frozenset({(1, 3)})
+    )
+
+    assert not _globally_supported(
+        candidate,
+        marker_start=10,
+        marker_end=19,
+        redacted_tokens=redacted_tokens,
+        matching_pairs=matching_pairs,
     )
 
 
@@ -158,6 +227,77 @@ def test_wrong_document_is_conflicting_and_hides_reference_text(
     }
     assert all(mapping.exact_revealed_text is None for mapping in mappings)
     assert "Unrelated synthetic release" not in str(mappings)
+
+
+def test_wrong_reference_with_matching_local_neighbors_is_conflicting() -> None:
+    prefix = "preamble stable alpha "
+    suffix = " beta stable tail"
+
+    def draw_redacted(canvas: Canvas) -> None:
+        canvas.drawString(72, 720, "trusted document opening context")
+        canvas.drawString(72, 700, f"{prefix}SECRET{suffix}")
+        canvas.drawString(72, 680, "trusted document closing context")
+        _overlay(canvas, 72, 700, prefix, "SECRET")
+
+    def draw_wrong_reference(canvas: Canvas) -> None:
+        canvas.drawString(72, 720, "unrelated release opening material")
+        canvas.drawString(72, 700, f"junk alpha WRONG beta noise")
+        canvas.drawString(72, 680, "unrelated release closing material")
+
+    canonical, targets = _redacted_context(_pdf_bytes(draw_redacted))
+    reference_pdf = _pdf_bytes(draw_wrong_reference)
+
+    mapping = _align(canonical, targets, reference_pdf)[0]
+
+    assert mapping.status is ReferenceStatus.CONFLICTING
+    assert mapping.exact_revealed_text is None
+    assert "WRONG" not in str(mapping)
+
+
+def test_unmatched_reference_context_outside_target_invalidates_pairing() -> None:
+    prefix = "alpha "
+    suffix = " beta"
+
+    def draw_redacted(canvas: Canvas) -> None:
+        canvas.drawString(72, 720, "preamble")
+        canvas.drawString(72, 700, f"{prefix}SECRET{suffix}")
+        canvas.drawString(72, 680, "tail")
+        _overlay(canvas, 72, 700, prefix, "SECRET")
+
+    def draw_wrong_reference(canvas: Canvas) -> None:
+        canvas.drawString(72, 720, "preamble EXTRA")
+        canvas.drawString(72, 700, "alpha WRONG beta")
+        canvas.drawString(72, 680, "UNRELATED tail")
+
+    canonical, targets = _redacted_context(_pdf_bytes(draw_redacted))
+    reference_pdf = _pdf_bytes(draw_wrong_reference)
+
+    mapping = _align(canonical, targets, reference_pdf)[0]
+
+    assert mapping.status is ReferenceStatus.CONFLICTING
+    assert mapping.exact_revealed_text is None
+    assert "WRONG" not in str(mapping)
+
+
+def test_interior_geometry_fallback_cannot_replace_missing_textual_side() -> None:
+    prefix = "alpha before "
+
+    def draw_redacted(canvas: Canvas) -> None:
+        canvas.drawString(72, 700, f"{prefix}SECRET")
+        canvas.drawString(72, 680, "after omega")
+        _overlay(canvas, 72, 700, prefix, "SECRET")
+
+    def draw_reference(canvas: Canvas) -> None:
+        canvas.drawString(72, 700, f"{prefix}SECRET")
+        canvas.drawString(72, 680, "changed omega")
+
+    canonical, targets = _redacted_context(_pdf_bytes(draw_redacted))
+
+    mapping = _align(canonical, targets, _pdf_bytes(draw_reference))[0]
+
+    assert mapping.status is ReferenceStatus.CONFLICTING
+    assert mapping.scoreability is ReferenceScoreability.NOT_SCOREABLE
+    assert mapping.exact_revealed_text is None
 
 
 def test_globally_reordered_target_passages_invalidate_every_mapping() -> None:
@@ -296,7 +436,7 @@ def test_reflowed_partially_revealed_reference_cannot_confirm_visible_prefix() -
     assert secret not in str(mapping)
 
 
-def test_reflow_punctuation_and_page_number_changes_do_not_shift_target() -> None:
+def test_reflow_without_physical_source_bounds_is_not_scoreable() -> None:
     prefix = "The courier was "
     secret = "Agent Cedar"
 
@@ -314,9 +454,9 @@ def test_reflow_punctuation_and_page_number_changes_do_not_shift_target() -> Non
 
     mapping = _align(canonical, targets, _pdf_bytes(draw_reference))[0]
 
-    assert mapping.status is ReferenceStatus.CONFIRMED
-    assert mapping.exact_revealed_text == "Agent\nCedar"
-    assert mapping.reference_token_locator is not None
+    assert mapping.status is ReferenceStatus.AMBIGUOUS
+    assert mapping.scoreability is ReferenceScoreability.NOT_SCOREABLE
+    assert mapping.exact_revealed_text is None
 
 
 def test_reflowed_boundary_punctuation_fails_closed_without_exact_span() -> None:
@@ -342,7 +482,7 @@ def test_reflowed_boundary_punctuation_fails_closed_without_exact_span() -> None
 
 @pytest.mark.parametrize(
     "secret",
-    ["(Agent-Cedar),", "Agent  Cedar"],
+    ["(Agent-Cedar),", "Agent  Cedar", " SECRET", "SECRET ", " SECRET "],
 )
 def test_exact_reference_preserves_covered_punctuation_and_whitespace(
     secret: str,
@@ -385,22 +525,21 @@ def test_character_locator_tracks_the_matched_duplicate_occurrence() -> None:
     assert mapping.reference_token_locator.endswith("chars:11-16")
 
 
-def test_adjacent_targets_are_extracted_independently(tmp_path: Path) -> None:
+def test_adjacent_targets_without_two_textual_sides_are_not_scoreable(
+    tmp_path: Path,
+) -> None:
     canonical, targets, reference_pdf = _fixture_context(
         "adjacent_boxes", tmp_path
     )
 
     mappings = _align(canonical, targets, reference_pdf)
 
-    assert [mapping.status for mapping in mappings] == [
-        ReferenceStatus.CONFIRMED,
-        ReferenceStatus.CONFIRMED,
-    ]
-    assert [mapping.exact_revealed_text for mapping in mappings] == [
-        "ALPHA",
-        "BRAVO",
-    ]
-    assert mappings[0].reference_token_locator != mappings[1].reference_token_locator
+    assert all(mapping.status is ReferenceStatus.CONFLICTING for mapping in mappings)
+    assert all(
+        mapping.scoreability is ReferenceScoreability.NOT_SCOREABLE
+        for mapping in mappings
+    )
+    assert all(mapping.exact_revealed_text is None for mapping in mappings)
 
 
 def test_missing_reference_returns_absent_for_every_target(tmp_path: Path) -> None:
@@ -411,6 +550,75 @@ def test_missing_reference_returns_absent_for_every_target(tmp_path: Path) -> No
     assert len(mappings) == len(targets)
     assert {mapping.status for mapping in mappings} == {ReferenceStatus.ABSENT}
     assert all(mapping.reference_document_version_id is None for mapping in mappings)
+    assert all(mapping.exact_revealed_text is None for mapping in mappings)
+
+
+def test_reference_without_trusted_document_binding_is_not_confirmed(
+    tmp_path: Path,
+) -> None:
+    canonical, targets, reference_pdf = _fixture_context("two_boxes", tmp_path)
+
+    mappings = _align(
+        canonical,
+        targets,
+        reference_pdf,
+        trusted_reference_document=None,
+    )
+
+    assert {mapping.status for mapping in mappings} == {
+        ReferenceStatus.CONFLICTING
+    }
+    assert all(mapping.exact_revealed_text is None for mapping in mappings)
+
+
+@pytest.mark.parametrize(
+    ("record_updates", "expected_version"),
+    [
+        ({"role": DocumentRole.REDACTED}, REFERENCE_VERSION_ID),
+        ({"project_id": "other-project"}, REFERENCE_VERSION_ID),
+        ({"version_id": "other-reference-version"}, REFERENCE_VERSION_ID),
+        ({"sha256": "0" * 64}, REFERENCE_VERSION_ID),
+    ],
+)
+def test_mismatched_trusted_reference_metadata_is_not_confirmed(
+    record_updates: dict[str, object],
+    expected_version: str,
+    tmp_path: Path,
+) -> None:
+    canonical, targets, reference_pdf = _fixture_context("two_boxes", tmp_path)
+    trusted = _trusted_reference(reference_pdf, **record_updates)
+
+    mappings = _align(
+        canonical,
+        targets,
+        reference_pdf,
+        trusted_reference_document=trusted,
+        reference_document_version_id=expected_version,
+    )
+
+    assert {mapping.status for mapping in mappings} == {
+        ReferenceStatus.CONFLICTING
+    }
+    assert all(mapping.exact_revealed_text is None for mapping in mappings)
+
+
+def test_trusted_reference_version_must_match_expected_version(
+    tmp_path: Path,
+) -> None:
+    canonical, targets, reference_pdf = _fixture_context("two_boxes", tmp_path)
+    trusted = _trusted_reference(reference_pdf)
+
+    mappings = _align(
+        canonical,
+        targets,
+        reference_pdf,
+        trusted_reference_document=trusted,
+        reference_document_version_id="unexpected-reference-version",
+    )
+
+    assert {mapping.status for mapping in mappings} == {
+        ReferenceStatus.CONFLICTING
+    }
     assert all(mapping.exact_revealed_text is None for mapping in mappings)
 
 
@@ -507,7 +715,7 @@ def test_mapping_identity_and_evidence_are_deterministic(tmp_path: Path) -> None
     assert all(mapping.mapping_version == MAPPING_VERSION for mapping in first)
 
 
-def test_exact_reference_variants_have_distinct_hashes_and_mapping_ids() -> None:
+def test_changed_reference_spacing_is_unconfirmed_with_distinct_identity() -> None:
     prefix = "The exact identity was "
 
     def draw_redacted(canvas: Canvas) -> None:
@@ -527,7 +735,7 @@ def test_exact_reference_variants_have_distinct_hashes_and_mapping_ids() -> None
     doubled = _align(canonical, targets, reference("Agent  Cedar"))[0]
 
     assert single.status is ReferenceStatus.CONFIRMED
-    assert doubled.status is ReferenceStatus.CONFIRMED
+    assert doubled.status is ReferenceStatus.AMBIGUOUS
     assert single.exact_revealed_text != doubled.exact_revealed_text
     assert single.reference_canonical_hash != doubled.reference_canonical_hash
     assert single.mapping_id != doubled.mapping_id
