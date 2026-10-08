@@ -71,6 +71,12 @@ Prepared exact-candidate read-only QA and Research review packets. Preliminary s
 
 **Receivers:** QA and Research at their next active task checkpoint; no automatic notification/ACK claimed.
 
+## 2026-10-08 | E0009 | RL-MVP-001 corrected reviews reconciled
+
+Independent QA handoff on `qa/rl-mvp-001-corrected-a1d8311` at `046c8b3ada5d9a40aded9d2beb15c91d50007221` reports PASS on exact implementation `a1d831153c726db38fc0c403c4d6d80893f657a5`: 43 repository tests and 11 adversarial tests passed, 1 deselected. Research handoff on `review/rl-mvp-001-research-corrected-e0008` at `a597ee23d397e7d8be3c31cd55b1e06c34f9eac0` reports contract-semantics PASS and 13 independent checks.
+
+No scientific scoring approval. Remaining transactional checks are deferred to authorized downstream work. Integration and Task 2 remain unauthorized pending owner approval. Lead did not run application tests.
+
 ## Entry format
 
 Date / epoch / task or decision ID; approved change vs proposal; affected files/contracts; source/approval evidence; test/benchmark impact; migration/rollback; required receivers; unresolved issues. Never backfill a success claim without evidence.
