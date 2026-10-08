@@ -133,6 +133,12 @@ QA branch `b18f947639713b255d2c88adbc1dfbe03832417e` FAIL and Research branch `4
 
 Published [Correction 04](task_packets/RL-MVP-002-CORRECTION-04.md) to define a conservative accepted-layout envelope and focused positive/negative tests within Task 2. No Lead code changes or application tests, merge, Task 3, paid services, research score approval or deployment. October 12 deadline remains at risk.
 
+## 2026-10-08 | E0020 | RL-MVP-002 Correction 04 review routing
+
+Verified published implementation `df20fe074c0bebc7be15971199d3c361469bc6b1` and Backend branch head `6ba3e02af0d13b8ef673ac007f06d08912ff9e38`, with only two approved code/test files plus one handoff changed. Codex reports 70 focused and 113 full tests passing, compileall, dependency and diff checks; Lead did not independently execute tests.
+
+Published [fresh QA and Research review packet](task_packets/RL-MVP-002-CORRECTION-04-REVIEW.md) on the exact SHA. No independent PASS, merge, Task 3, scientific score validation, provider call or deployment. October 12 checkpoint remains at risk.
+
 ## Entry format
 
 Date / epoch / task or decision ID; approved change vs proposal; affected files/contracts; source/approval evidence; test/benchmark impact; migration/rollback; required receivers; unresolved issues. Never backfill a success claim without evidence.
