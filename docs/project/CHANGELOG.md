@@ -105,6 +105,12 @@ Verified on live GitHub: corrected Task 2 implementation `12698b92d883af658266d5
 
 Published [fresh QA/Research review packet](task_packets/RL-MVP-002-CORRECTED-REVIEW.md) addressing all four previous blockers, regressions and model-context isolation. No independent PASS yet, merge, Task 3, paid provider call, research-scoring approval or deployment.
 
+## 2026-10-08 | E0015 | October 12 deadline amendment
+
+DEC-020 records owner's change from October 14 to October 12, 2026, with no change to MVP scope or quality gates. Updated shared coordination records and scheduled corresponding design, roadmap, implementation-plan, Codex-guide and role-kickoff updates. Historical filenames retain oct14 for link stability; contents state October 12.
+
+QA and Research request additional RL-MVP-002 fixes; Correction 02 routed within existing Task 2 scope. No code, test execution, merge, Task 3, paid calls, scientific scoring approval or deployment claimed. Receivers: Backend/Codex, QA, Research, Frontend at next active checkpoint; no ACK presumed.
+
 ## Entry format
 
 Date / epoch / task or decision ID; approved change vs proposal; affected files/contracts; source/approval evidence; test/benchmark impact; migration/rollback; required receivers; unresolved issues. Never backfill a success claim without evidence.
