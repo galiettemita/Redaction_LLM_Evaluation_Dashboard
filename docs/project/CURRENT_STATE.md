@@ -1,12 +1,12 @@
 # Current state
 
-Updated: 2026-10-08 (America/New_York). Coordination epoch: **E0023**.
+Updated: 2026-10-08 (America/New_York). Coordination epoch: **E0024**.
 Integration branch: `main`. Canonical writer: **Lead/Architect**, within the owner's approved scope.
 Resolve the actual HEAD with GitHub; do not infer a current SHA from this file's timestamp.
 
 ## Read this first
 
-**Stage:** S1 / October 12 MVP implementation. **Execution boundary:** RL-MVP-001 and RL-MVP-002 are merged. RL-MVP-003 and later implementation tasks remain unapproved.
+**Stage:** S1 / October 12 MVP implementation. **Execution boundary:** RL-MVP-001 and RL-MVP-002 are merged. RL-MVP-003 reference alignment is owner-approved within its task packet; later tasks remain unapproved.
 **Product implementation:** RL-MVP-001 merged in PR #1 (`ba60aaa8`); RL-MVP-002 merged in PR #2 (`35281fb9`).
 **Scoring validity:** not established. **Deployment:** none established here.
 **Active background agents / scheduler:** none installed by this setup.
@@ -16,7 +16,7 @@ The eight shared files and root agent instructions define a coordination protoco
 
 ## Holds and urgent changes
 
-E0023: owner-authorized RL-MVP-002 integration completed. RL-MVP-003 and later tasks remain unapproved; no model calls, scientific scoring or deployment authorized. Standing hold: no application code, live model calls, migrations, cloud resources or deployment without the relevant approved task and decisions. Private data must not be put in this public repository.
+E0024: RL-MVP-003 is approved for synthetic-only reference alignment; no Task 4, model calls, merge, scientific scoring or deployment authorized. Standing hold: no application code, live model calls, migrations, cloud resources or deployment without the relevant approved task and decisions. Private data must not be put in this public repository.
 
 On a critical new change, the Lead records affected task IDs here as `ON_HOLD`, increments the epoch and links the decision. This stops work only when an active agent next checks; it is not a remote kill switch.
 
@@ -27,7 +27,8 @@ On a critical new change, the Lead records affected task IDs here as `ON_HOLD`, 
 | RL-OPS-001 | DOCUMENTATION_BASELINE | Lead/Architect | This coordination package. Verify committed files against the setup request; no app tests claimed. |
 | RL-MVP-PLAN-001 | PLAN_APPROVED | Lead/Architect | [Oct 12 design (legacy filename)](../../docs/superpowers/specs/2026-10-07-oct14-mvp-design.md) and [weekly roadmap](plans/2026-10-07-weekly-implementation-roadmap.md); [detailed plan](../../docs/superpowers/plans/2026-10-07-oct14-mvp-implementation.md) owner approved 2026-10-07; RL-MVP-001 merged; RL-MVP-002 coding approved within its packet. |
 | RL-MVP-001 | MERGED | Backend | [Contracts and synthetic fixtures](task_packets/RL-MVP-001-contracts-and-synthetic-fixtures.md); corrected implementation `a1d8311`, branch head `c698cd4`; QA and Research both PASS for Task 1; owner-approved merge complete. |
-| RL-MVP-002 | MERGED | Backend/Codex + Lead integration | Reviewed implementation `736fa18`, published branch head `395d232`, owner-approved PR #2 merged as `35281fb9`; QA PASS and Research Task-2 semantics PASS. No Task 3 authorization. |
+| RL-MVP-002 | MERGED | Backend/Codex + Lead integration | Reviewed implementation `736fa18`, owner-approved PR #2 merged as `35281fb9`; QA PASS and Research Task-2 semantics PASS. |
+| RL-MVP-003 | APPROVED (not started) | Backend/Codex | [Reference-alignment task packet](task_packets/RL-MVP-003-text-first-reference-alignment.md); new isolated branch, synthetic TDD, complete/unique/visible truth only, QA/Research review. No merge or Task 4. |
 | RL-S1-001 | PROPOSED | Lead + Backend | Define document/target/reference records and initial input limits; D01/D02/D03 and component plan required. |
 | RL-S2-001 | PROPOSED | Research | Propose rubric, human benchmark and release criteria; D03/D04/D05; no invented thresholds. |
 | RL-UX-001 | PROPOSED | Frontend | Synthetic-data workflow proposal only; D09 and scoped approval before implementation. |
@@ -36,11 +37,11 @@ These proposed items are not claimed, running or approved to execute. The Lead a
 
 ## Remaining gates and next action
 
-**October 12, 2026 MVP checkpoint remains AT RISK.** RL-MVP-001 and RL-MVP-002 are merged; reference alignment, real predictor, separate evaluator, upload UI and end-to-end integration remain unbuilt.
+**October 12, 2026 MVP remains AT RISK.** Tasks 1 and 2 merged; Task 3 is owner-approved but not implemented; Tasks 4+ remain unapproved.
 
-Owner explicitly authorized RL-MVP-002 merge after independent [QA PASS](https://github.com/galiettemita/Redaction_LLM_Evaluation_Dashboard/blob/986c525778db7229315940da638d724267a4407b/docs/project/handoffs/RL-MVP-002-qa-20261008T190000Z-736fa18.md) and [Research Task-2 PASS](https://github.com/galiettemita/Redaction_LLM_Evaluation_Dashboard/blob/38dacef1091a4849fda0acce9444873a87499401/docs/project/handoffs/RL-MVP-002-research-20261008T190900Z-correction05.md) on implementation `736fa18419340b9fcb8dd5e121e8eebcc24b22f7`. [PR #2](https://github.com/galiettemita/Redaction_LLM_Evaluation_Dashboard/pull/2) merged into main at `35281fb9f6755ff5e5b10918b3be47cf2c4981ae`. Lead verified the two-parent merge and detector, canonicalizer, test and Backend handoff blobs. Codex reported 120 full tests passed; independent reviewers ran targeted probes but not the full suite. This does **not** establish real-world detector recall, hostile-PDF safety or scientific scoring validity.
+The owner explicitly approved starting RL-MVP-003 after Task-2 integration. [Approved packet](task_packets/RL-MVP-003-text-first-reference-alignment.md) scopes deterministic text-first global/local anchor alignment with exact source quotation, fully revealed readable unique truth, and fail-closed unknown/null for partial, repeated, wrong-release or unsupported cases. Only new reference.py and test_reference.py plus one Backend handoff are authorized on a new Codex branch. QA and Research must independently review exact SHA before any merge. D03 research-human scientific confirmation criteria remain unvalidated.
 
-**Next:** prepare a bounded RL-MVP-003 reference-alignment task packet and obtain owner authorization before any Codex implementation. Fully revealed, readable, uniquely aligned text is required for verified target scores; partial/unknown truth remains null. No paid calls, private data, deployment or Task 3 work authorized by the merge.
+No model calls, paid services, private data, Task 4, cloud or deployment.
 
 ## What is present / absent
 
@@ -49,7 +50,7 @@ Present on main: typed contracts, synthetic PDF fixtures, vector-PDF redaction d
 
 ## Latest important change
 
-E0023: owner-authorized RL-MVP-002 merged via PR #2. Task 3 remains unapproved; October 12 deadline still at risk.
+E0024: owner approved RL-MVP-003 bounded Codex implementation. No Task-3 code, independent review or merge yet.
 
 ## Maintenance rule
 

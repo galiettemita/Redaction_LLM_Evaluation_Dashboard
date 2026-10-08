@@ -155,6 +155,12 @@ Owner explicitly authorized merge of the independently reviewed Task 2 branch. [
 
 Task 2 is MERGED, not production/scientifically validated. Task 3 not authorized, no model calls, paid services, private data or deployment. October 12 checkpoint remains at risk.
 
+## 2026-10-08 | E0024 | RL-MVP-003 approved for Codex
+
+Owner explicitly approved starting RL-MVP-003 after the owner-authorized Task-2 merge. Published [Task-3 packet](task_packets/RL-MVP-003-text-first-reference-alignment.md) for text-first global/local token alignment, exact source quotation and versioned evidence, strict null truth for partial/ambiguous/unsupported references, and redacted-only predictor isolation. Authorized new reference.py and test_reference.py plus one scoped Backend handoff on a new branch. No code or application tests performed by Lead.
+
+Independent QA/Research review required on exact candidate; D03 human validation and any verified-scoring claims remain unapproved. No merge, Task 4, paid calls, private data or deployment. October 12 target remains at risk.
+
 ## Entry format
 
 Date / epoch / task or decision ID; approved change vs proposal; affected files/contracts; source/approval evidence; test/benchmark impact; migration/rollback; required receivers; unresolved issues. Never backfill a success claim without evidence.
