@@ -139,6 +139,10 @@ Verified published implementation `df20fe074c0bebc7be15971199d3c361469bc6b1` and
 
 Published [fresh QA and Research review packet](task_packets/RL-MVP-002-CORRECTION-04-REVIEW.md) on the exact SHA. No independent PASS, merge, Task 3, scientific score validation, provider call or deployment. October 12 checkpoint remains at risk.
 
+## 2026-10-08 | E0021 | RL-MVP-002 Correction 05 review routing
+
+Independent QA FAIL and Research Task-2 PASS on Correction 04 were reconciled. Codex published Correction 05 implementation `736fa18419340b9fcb8dd5e121e8eebcc24b22f7` with handoff branch head `395d2321012092bd619a34711cb0b4ca4855abf2`. Delta is limited to detector, tests and one handoff; Codex reports 120 tests passed, not independently rerun by Lead. Published [review packet](task_packets/RL-MVP-002-CORRECTION-05-REVIEW.md). No merge, Task 3, paid calls, scientific approval or deployment.
+
 ## Entry format
 
 Date / epoch / task or decision ID; approved change vs proposal; affected files/contracts; source/approval evidence; test/benchmark impact; migration/rollback; required receivers; unresolved issues. Never backfill a success claim without evidence.
