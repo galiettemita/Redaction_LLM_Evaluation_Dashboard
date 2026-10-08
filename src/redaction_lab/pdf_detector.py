@@ -20,7 +20,7 @@ from pypdf.generic import ContentStream
 from redaction_lab.contracts import DetectionEvidence, RedactionTarget, ScopeStatus
 
 
-DETECTOR_VERSION = "vector-text-rect-v5"
+DETECTOR_VERSION = "vector-text-rect-v6"
 _TEXT_SHOW_OPERATORS = {b"Tj", b"TJ", b"'", b'"'}
 _UNSAFE_OPERATORS = {
     b"Do",
@@ -190,17 +190,12 @@ def _plausible_text_rectangle(
     rectangle: tuple[float, float, float, float],
     chars: list[dict[str, Any]],
 ) -> bool:
-    x0, y0, x1, y1 = rectangle
+    _, y0, _, y1 = rectangle
     visible_boxes = [
         _char_bbox(char)
         for char in chars
         if str(char.get("text", "")).strip()
     ]
-    for cx0, _, cx1, _ in visible_boxes:
-        horizontal_overlap = min(x1, cx1) - max(x0, cx0)
-        if horizontal_overlap > 0:
-            return True
-
     if not visible_boxes:
         return False
     rectangle_height = y1 - y0

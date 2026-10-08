@@ -403,6 +403,57 @@ def test_black_non_text_art_is_excluded() -> None:
     assert result.ignored_artwork_count == 1
 
 
+@pytest.mark.parametrize("width,height", [(40, 40), (120, 30)])
+def test_remote_non_text_art_aligned_with_text_is_excluded(
+    width: int, height: int
+) -> None:
+    def draw(canvas: Canvas) -> None:
+        canvas.setFont("Helvetica", 11)
+        canvas.drawString(72, 700, "Visible synthetic paragraph with no redaction.")
+        canvas.setFillColorRGB(0, 0, 0)
+        canvas.rect(72, 220, width, height, stroke=0, fill=1)
+
+    result = _detect(_pdf_bytes(draw))
+
+    assert result.status is DetectionStatus.NO_REDACTIONS
+    assert result.targets == ()
+    assert result.ignored_artwork_count == 1
+
+
+@pytest.mark.parametrize("width,height", [(40, 40), (120, 30)])
+def test_non_text_height_rectangle_in_same_line_flow_is_unsupported(
+    width: int, height: int
+) -> None:
+    def draw(canvas: Canvas) -> None:
+        canvas.setFont("Helvetica", 11)
+        canvas.drawString(72, 700, "Before")
+        canvas.drawString(270, 700, "After")
+        canvas.setFillColorRGB(0, 0, 0)
+        canvas.rect(125, 690, width, height, stroke=0, fill=1)
+
+    result = _detect(_pdf_bytes(draw))
+
+    assert result.status is DetectionStatus.UNSUPPORTED
+    assert result.targets == ()
+    assert result.reason_code == "AMBIGUOUS_TEXT_FLOW_RECTANGLE"
+
+
+@pytest.mark.parametrize("width,height", [(40, 40), (120, 30)])
+def test_non_text_height_rectangle_intersecting_glyphs_remains_detected(
+    width: int, height: int
+) -> None:
+    def draw(canvas: Canvas) -> None:
+        canvas.setFont("Helvetica", 11)
+        canvas.drawString(72, 700, "SYNTHETIC_SECRET")
+        canvas.setFillColorRGB(0, 0, 0)
+        canvas.rect(72, 690, width, height, stroke=0, fill=1)
+
+    result = _detect(_pdf_bytes(draw))
+
+    assert result.status is DetectionStatus.SUPPORTED
+    assert len(result.targets) == 1
+
+
 def test_overlapping_remote_black_art_is_excluded() -> None:
     def draw(canvas: Canvas) -> None:
         canvas.setFont("Helvetica", 11)
@@ -511,12 +562,15 @@ def test_offset_boundary_rectangle_in_general_text_region_is_unsupported(
     assert result.reason_code == "AMBIGUOUS_TEXT_FLOW_RECTANGLE"
 
 
-def test_remote_text_sized_rectangle_is_unsupported_without_art_evidence() -> None:
+@pytest.mark.parametrize("box_x", [72, 460])
+def test_remote_text_sized_rectangle_is_unsupported_without_art_evidence(
+    box_x: int,
+) -> None:
     def draw(canvas: Canvas) -> None:
         canvas.setFont("Helvetica", 11)
         canvas.drawString(72, 700, "Short")
         canvas.setFillColorRGB(0, 0, 0)
-        canvas.rect(460, 220, 60, 12, stroke=0, fill=1)
+        canvas.rect(box_x, 220, 60, 12, stroke=0, fill=1)
 
     result = _detect(_pdf_bytes(draw))
 
