@@ -20,7 +20,7 @@ from pypdf.generic import ContentStream
 from redaction_lab.contracts import DetectionEvidence, RedactionTarget, ScopeStatus
 
 
-DETECTOR_VERSION = "vector-text-rect-v4"
+DETECTOR_VERSION = "vector-text-rect-v5"
 _TEXT_SHOW_OPERATORS = {b"Tj", b"TJ", b"'", b'"'}
 _UNSAFE_OPERATORS = {
     b"Do",
@@ -186,7 +186,7 @@ def _same_text_flow(
     return False
 
 
-def _aligned_with_text_block(
+def _plausible_text_rectangle(
     rectangle: tuple[float, float, float, float],
     chars: list[dict[str, Any]],
 ) -> bool:
@@ -203,22 +203,14 @@ def _aligned_with_text_block(
 
     if not visible_boxes:
         return False
-    rectangle_width = x1 - x0
     rectangle_height = y1 - y0
     text_heights = sorted(cy1 - cy0 for _, cy0, _, cy1 in visible_boxes)
     typical_text_height = text_heights[len(text_heights) // 2]
-    if (
-        rectangle_width < typical_text_height * 2.0
-        or rectangle_height > typical_text_height * 2.0
-    ):
-        return False
-
-    minimum_horizontal_gap = min(
-        x0 - cx1 if cx1 <= x0 else cx0 - x1
-        for cx0, _, cx1, _ in visible_boxes
-        if cx1 <= x0 or cx0 >= x1
+    return (
+        typical_text_height * 0.5
+        <= rectangle_height
+        <= typical_text_height * 2.0
     )
-    return minimum_horizontal_gap <= max(36.0, rectangle_width * 1.5)
 
 
 def _has_ambiguous_multicolumn_layout(
@@ -236,9 +228,7 @@ def _has_ambiguous_multicolumn_layout(
         else:
             lines[-1].append(char)
 
-    spans: list[tuple[float, float]] = []
     positioned_spans: list[tuple[float, float, float, float, int]] = []
-    line_span_starts: list[list[float]] = []
     for line_index, line in enumerate(lines):
         ordered = sorted(line, key=lambda item: float(item["x0"]))
         if not ordered:
@@ -248,12 +238,10 @@ def _has_ambiguous_multicolumn_layout(
         )[len(ordered) // 2]
         segment_gap = max(8.0, typical_height * 0.75)
         span_start = float(ordered[0]["x0"])
-        current_line_starts = [span_start]
         previous = ordered[0]
         for current in ordered[1:]:
             if float(current["x0"]) - float(previous["x1"]) > segment_gap:
                 span_end = float(previous["x1"])
-                spans.append((span_start, span_end))
                 positioned_spans.append(
                     (
                         span_start,
@@ -264,10 +252,8 @@ def _has_ambiguous_multicolumn_layout(
                     )
                 )
                 span_start = float(current["x0"])
-                current_line_starts.append(span_start)
             previous = current
         span_end = float(previous["x1"])
-        spans.append((span_start, span_end))
         positioned_spans.append(
             (
                 span_start,
@@ -277,9 +263,45 @@ def _has_ambiguous_multicolumn_layout(
                 line_index,
             )
         )
-        line_span_starts.append(current_line_starts)
-
     start_tolerance = page_width * 0.05
+    spans_by_line: dict[
+        int, list[tuple[float, float, float, float, int]]
+    ] = {}
+    for span in positioned_spans:
+        spans_by_line.setdefault(span[4], []).append(span)
+
+    heading_lines: set[int] = set()
+    page_center = page_width / 2.0
+    for heading_line, heading_spans in spans_by_line.items():
+        if len(heading_spans) != 1:
+            continue
+        heading = heading_spans[0]
+        body_spans = [
+            span for span in positioned_spans if span[4] != heading_line
+        ]
+        body_lines = {span[4] for span in body_spans}
+        if (
+            len(body_lines) < 2
+            or heading_line >= min(body_lines)
+            or not heading[0] <= page_center <= heading[1]
+            or heading[3] <= max(span[3] for span in body_spans)
+            or any(len(spans_by_line[line]) != 1 for line in body_lines)
+        ):
+            continue
+        body_starts = [span[0] for span in body_spans]
+        if max(body_starts) - min(body_starts) <= start_tolerance:
+            heading_lines.add(heading_line)
+
+    layout_spans = [
+        span for span in positioned_spans if span[4] not in heading_lines
+    ]
+    spans = [(span[0], span[1]) for span in layout_spans]
+    line_span_starts = [
+        [span[0] for span in spans_by_line[line_index]]
+        for line_index in sorted(spans_by_line)
+        if line_index not in heading_lines
+    ]
+
     column_starts: list[tuple[float, int]] = []
     for start, _ in sorted(spans):
         for index, (known_start, count) in enumerate(column_starts):
@@ -309,14 +331,8 @@ def _has_ambiguous_multicolumn_layout(
     staggered_sparse_columns = any(
         abs(first_start - second_start) >= minimum_column_separation
         and max(first_start, second_start) > min(first_end, second_end)
-        and abs(first_top - second_top)
-        <= max(48.0, max(first_height, second_height) * 4.0)
-        for first_start, first_end, first_top, first_height, first_line in (
-            positioned_spans
-        )
-        for second_start, second_end, second_top, second_height, second_line in (
-            positioned_spans
-        )
+        for first_start, first_end, _, _, first_line in layout_spans
+        for second_start, second_end, _, _, second_line in layout_spans
         if first_line < second_line
     )
     return split_line or sparse_secondary_column or staggered_sparse_columns
@@ -697,7 +713,7 @@ def detect_targets(
                             for char in chars
                         )
                         or _same_text_flow(bbox, chars)
-                        or _aligned_with_text_block(bbox, chars)
+                        or _plausible_text_rectangle(bbox, chars)
                     ]
                     if any(
                         _intersects(first, second)
@@ -749,9 +765,9 @@ def detect_targets(
                             and _intersects(bbox, _char_bbox(char))
                         ]
                         if not occluded_chars:
-                            if _same_text_flow(bbox, chars) or _aligned_with_text_block(
+                            if _same_text_flow(
                                 bbox, chars
-                            ):
+                            ) or _plausible_text_rectangle(bbox, chars):
                                 return _unsupported(
                                     source_sha256,
                                     page_count=page_count,
