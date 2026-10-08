@@ -20,7 +20,7 @@ from pypdf.generic import ContentStream
 from redaction_lab.contracts import DetectionEvidence, RedactionTarget, ScopeStatus
 
 
-DETECTOR_VERSION = "vector-text-rect-v2"
+DETECTOR_VERSION = "vector-text-rect-v3"
 _TEXT_SHOW_OPERATORS = {b"Tj", b"TJ", b"'", b'"'}
 _UNSAFE_OPERATORS = {
     b"Do",
@@ -186,27 +186,19 @@ def _same_text_flow(
     return False
 
 
-def _near_text_block(
+def _aligned_with_text_block(
     rectangle: tuple[float, float, float, float],
     chars: list[dict[str, Any]],
 ) -> bool:
-    x0, y0, x1, y1 = rectangle
-    nearby_gap = max(36.0, (y1 - y0) * 3.0)
-    text_above = False
-    text_below = False
+    x0, _, x1, _ = rectangle
     for char in chars:
         if not str(char.get("text", "")).strip():
             continue
-        cx0, cy0, cx1, cy1 = _char_bbox(char)
+        cx0, _, cx1, _ = _char_bbox(char)
         horizontal_overlap = min(x1, cx1) - max(x0, cx0)
-        if horizontal_overlap <= 0:
-            continue
-        vertical_gap = max(cy0 - y1, y0 - cy1, 0.0)
-        if vertical_gap <= nearby_gap:
+        if horizontal_overlap > 0:
             return True
-        text_above = text_above or cy0 >= y1
-        text_below = text_below or cy1 <= y0
-    return text_above and text_below
+    return False
 
 
 def _has_ambiguous_multicolumn_layout(
@@ -225,6 +217,7 @@ def _has_ambiguous_multicolumn_layout(
             lines[-1].append(char)
 
     spans: list[tuple[float, float]] = []
+    line_span_starts: list[list[float]] = []
     for line in lines:
         ordered = sorted(line, key=lambda item: float(item["x0"]))
         if not ordered:
@@ -234,13 +227,16 @@ def _has_ambiguous_multicolumn_layout(
         )[len(ordered) // 2]
         segment_gap = max(8.0, typical_height * 0.75)
         span_start = float(ordered[0]["x0"])
+        current_line_starts = [span_start]
         previous = ordered[0]
         for current in ordered[1:]:
             if float(current["x0"]) - float(previous["x1"]) > segment_gap:
                 spans.append((span_start, float(previous["x1"])))
                 span_start = float(current["x0"])
+                current_line_starts.append(span_start)
             previous = current
         spans.append((span_start, float(previous["x1"])))
+        line_span_starts.append(current_line_starts)
 
     start_tolerance = page_width * 0.05
     column_starts: list[tuple[float, int]] = []
@@ -258,11 +254,18 @@ def _has_ambiguous_multicolumn_layout(
 
     repeated_starts = [start for start, count in column_starts if count >= 2]
     minimum_column_separation = page_width * 0.15
-    return any(
+    split_line = any(
         abs(first - second) >= minimum_column_separation
-        for index, first in enumerate(repeated_starts)
-        for second in repeated_starts[index + 1 :]
+        for starts in line_span_starts
+        for index, first in enumerate(starts)
+        for second in starts[index + 1 :]
     )
+    sparse_secondary_column = any(
+        abs(repeated - start) >= minimum_column_separation
+        for repeated in repeated_starts
+        for start, _ in spans
+    )
+    return split_line or sparse_secondary_column
 
 
 def _identity_matrix(operands: list[Any]) -> bool:
@@ -489,15 +492,6 @@ def detect_targets(
                             redacted_document_version_id=redacted_document_version_id,
                             reason_code="TEXT_VISIBILITY_UNCERTAIN",
                         )
-                    if _has_ambiguous_multicolumn_layout(chars, float(page.width)):
-                        return _unsupported(
-                            source_sha256,
-                            page_count=page_count,
-                            project_id=project_id,
-                            redacted_document_version_id=redacted_document_version_id,
-                            reason_code="AMBIGUOUS_TEXT_LAYOUT",
-                        )
-
                     paint_evidence = _painted_rectangles(reader, page_index)
                     if paint_evidence is None:
                         return _unsupported(
@@ -649,7 +643,7 @@ def detect_targets(
                             for char in chars
                         )
                         or _same_text_flow(bbox, chars)
-                        or _near_text_block(bbox, chars)
+                        or _aligned_with_text_block(bbox, chars)
                     ]
                     if any(
                         _intersects(first, second)
@@ -701,7 +695,7 @@ def detect_targets(
                             and _intersects(bbox, _char_bbox(char))
                         ]
                         if not occluded_chars:
-                            if _same_text_flow(bbox, chars) or _near_text_block(
+                            if _same_text_flow(bbox, chars) or _aligned_with_text_block(
                                 bbox, chars
                             ):
                                 return _unsupported(
@@ -732,6 +726,14 @@ def detect_targets(
                                 rectangle_index=rectangle_index,
                                 bbox=bbox,
                             )
+                        )
+                    if _has_ambiguous_multicolumn_layout(chars, float(page.width)):
+                        return _unsupported(
+                            source_sha256,
+                            page_count=page_count,
+                            project_id=project_id,
+                            redacted_document_version_id=redacted_document_version_id,
+                            reason_code="AMBIGUOUS_TEXT_LAYOUT",
                         )
 
                 if diagnostics.seen:
