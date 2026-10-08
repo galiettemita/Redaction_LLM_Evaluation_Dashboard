@@ -93,6 +93,12 @@ Verified Codex branch `codex/rl-mvp-002-detection-canonicalization` at `a6a603f6
 
 Published exact-candidate QA and Research review packets. Key review focus: hidden PDF-layer text leakage, unsupported graphics/paint operations, redacted-only canonical context, deterministic target identity and failure reporting. No independent verdict, merge, Task 3, provider call, scientific approval or deployment.
 
+## 2026-10-08 | E0013 | RL-MVP-002 independent-review reconciliation
+
+Fetched exact published QA handoff `48adf452178e1e7c38896b088f2e7481846bf275` and Research handoff `a0d56b599a5ba284ef036b813fa8167164189847` for implementation `430467314ca992f36cf3eaab9d49cde45a9805ac`. QA: FAIL; Research: CHANGES_REQUESTED. Four blockers: target IDs not project-scoped, ambiguous multi-column reading order, overlapping/duplicate rectangles creating multiple targets, and standalone redaction-like rectangles silently dismissed as artwork. Both used focused probes; neither independently reran full 78-test suite.
+
+**Disposition:** CHANGES_REQUESTED. Published [bounded correction packet](task_packets/RL-MVP-002-CORRECTION-01.md) within Task 2; no code corrections performed by Lead. New exact candidate requires fresh independent QA/Research review. No merge, Task 3, paid calls, scientific score approval or deployment.
+
 ## Entry format
 
 Date / epoch / task or decision ID; approved change vs proposal; affected files/contracts; source/approval evidence; test/benchmark impact; migration/rollback; required receivers; unresolved issues. Never backfill a success claim without evidence.
