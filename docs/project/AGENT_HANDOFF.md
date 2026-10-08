@@ -17,6 +17,7 @@ This file is the Lead-maintained routing/index record. Each specialist writes a 
 | E0009 / RL-MVP-001 corrected QA review | QA -> Lead | PASS for Task 1; not scientific validation | Review `a1d8311`; handoff branch `qa/rl-mvp-001-corrected-a1d8311` at `046c8b3a`; 43 original tests, 11 adversarial passes, 1 deselected. |
 | E0009 / RL-MVP-001 corrected Research review | Research -> Lead | PASS for contract semantics; not scientific validation | Review `a1d8311`; handoff branch `review/rl-mvp-001-research-corrected-e0008` at `a597ee23`; 13 independent checks. |
 | E0009 / RL-MVP-001 integration gate | Lead -> owner | AWAITING MERGE AUTHORIZATION | Candidate branch `codex/rl-mvp-001-contracts-fixtures` at `c698cd4`; no merge or Task 2 until explicitly authorized. |
+| E0010 / RL-MVP-001 integration | Lead -> Backend, Research, Frontend, QA | MERGED; no receiver ACK | Owner-authorized [PR #1](https://github.com/galiettemita/Redaction_LLM_Evaluation_Dashboard/pull/1) at `ba60aaa8` integrated reviewed contracts and fixtures. Task 2 not authorized; next roles read current main. |
 | Next S1 packet | Lead -> owner / relevant roles | NOT APPROVED | Resolve blocking decisions and propose one narrow packet. |
 
 No review, implementation completion or running agent is implied by these rows.

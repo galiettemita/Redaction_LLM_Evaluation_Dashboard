@@ -77,6 +77,10 @@ Independent QA handoff on `qa/rl-mvp-001-corrected-a1d8311` at `046c8b3ada5d9a40
 
 No scientific scoring approval. Remaining transactional checks are deferred to authorized downstream work. Integration and Task 2 remain unauthorized pending owner approval. Lead did not run application tests.
 
+## 2026-10-08 | E0010 | RL-MVP-001 merged
+
+Owner authorized and GitHub merged PR #1 at `ba60aaa811fad1ec7d2ad79ab2f4aebfa021b067`. Exact reviewed implementation `a1d8311` is included with its two Backend handoffs. QA PASS (43 repository tests, 11 adversarial passes, 1 deselected); Research contract-semantics PASS (13 independent checks). Lead verified the merge and blob hashes, not runtime tests. No Task 2, deployment or research-scoring authorization. Transactional integrity and summary provenance remain downstream requirements.
+
 ## Entry format
 
 Date / epoch / task or decision ID; approved change vs proposal; affected files/contracts; source/approval evidence; test/benchmark impact; migration/rollback; required receivers; unresolved issues. Never backfill a success claim without evidence.
