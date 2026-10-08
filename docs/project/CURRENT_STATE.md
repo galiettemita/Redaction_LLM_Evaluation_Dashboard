@@ -1,6 +1,6 @@
 # Current state
 
-Updated: 2026-10-08 (America/New_York). Coordination epoch: **E0026**.
+Updated: 2026-10-08 (America/New_York). Coordination epoch: **E0027**.
 Integration branch: `main`. Canonical writer: **Lead/Architect**, within the owner's approved scope.
 Resolve the actual HEAD with GitHub; do not infer a current SHA from this file's timestamp.
 
@@ -16,7 +16,7 @@ The eight shared files and root agent instructions define a coordination protoco
 
 ## Holds and urgent changes
 
-E0026: independent QA FAIL and Research CHANGES_REQUESTED on Task 3. Owner approved bounded Correction 01 and DEC-021; no merge, Task 4, paid model calls, scientific scoring or deployment. Standing hold: no application code, live model calls, migrations, cloud resources or deployment without the relevant approved task and decisions. Private data must not be put in this public repository.
+E0027 HOLD: Backend stopped Task-3 Correction 01 after local false-CONFIRMED probe using fabricated DocumentVersion; rejected candidate NOT PUBLISHED. Trusted reference provenance/pairing decision pending. No merge, Task 4, paid model calls, scoring or deployment. Standing hold: no application code, live model calls, migrations, cloud resources or deployment without the relevant approved task and decisions. Private data must not be put in this public repository.
 
 On a critical new change, the Lead records affected task IDs here as `ON_HOLD`, increments the epoch and links the decision. This stops work only when an active agent next checks; it is not a remote kill switch.
 
@@ -28,7 +28,7 @@ On a critical new change, the Lead records affected task IDs here as `ON_HOLD`, 
 | RL-MVP-PLAN-001 | PLAN_APPROVED | Lead/Architect | [Oct 12 design (legacy filename)](../../docs/superpowers/specs/2026-10-07-oct14-mvp-design.md) and [weekly roadmap](plans/2026-10-07-weekly-implementation-roadmap.md); [detailed plan](../../docs/superpowers/plans/2026-10-07-oct14-mvp-implementation.md) owner approved 2026-10-07; RL-MVP-001 merged; RL-MVP-002 coding approved within its packet. |
 | RL-MVP-001 | MERGED | Backend | [Contracts and synthetic fixtures](task_packets/RL-MVP-001-contracts-and-synthetic-fixtures.md); corrected implementation `a1d8311`, branch head `c698cd4`; QA and Research both PASS for Task 1; owner-approved merge complete. |
 | RL-MVP-002 | MERGED | Backend/Codex + Lead integration | Reviewed implementation `736fa18`, owner-approved PR #2 merged as `35281fb9`; QA PASS and Research Task-2 semantics PASS. |
-| RL-MVP-003 | CHANGES_REQUESTED; CORRECTION_01_APPROVED | Backend/Codex | QA FAIL and Research CHANGES_REQUESTED on `931fb1c`. [Correction 01 packet](task_packets/RL-MVP-003-CORRECTION-01.md) approved under DEC-021; trusted reference identity, two-sided support and exact span. No merge or Task 4. |
+| RL-MVP-003 | BLOCKED; TRUST_BOUNDARY_PROPOSED | Backend/Codex + Lead | Backend stopped on fabricated-record false CONFIRMED and partially hidden edge punctuation; local rejected candidate `80f9ee1` NOT PUBLISHED. [Owner decision proposal](task_packets/RL-MVP-003-TRUST-BOUNDARY-PROPOSAL.md). No merge/Task 4. |
 | RL-S1-001 | PROPOSED | Lead + Backend | Define document/target/reference records and initial input limits; D01/D02/D03 and component plan required. |
 | RL-S2-001 | PROPOSED | Research | Propose rubric, human benchmark and release criteria; D03/D04/D05; no invented thresholds. |
 | RL-UX-001 | PROPOSED | Frontend | Synthetic-data workflow proposal only; D09 and scoped approval before implementation. |
@@ -37,11 +37,11 @@ These proposed items are not claimed, running or approved to execute. The Lead a
 
 ## Remaining gates and next action
 
-**October 12, 2026 MVP remains AT RISK.** Tasks 1 and 2 merged; Task 3 unmerged and under correction; Tasks 4+ not authorized.
+**October 12, 2026 MVP remains AT RISK.** Tasks 1 and 2 merged; Task 3 BLOCKED; Tasks 4+ unauthorized.
 
-Independent [QA](https://github.com/galiettemita/Redaction_LLM_Evaluation_Dashboard/blob/007eb0e242a3f43cc01843d0713442a7f02e1e1f/docs/project/handoffs/RL-MVP-003-qa-20261008T202300Z-931fb1c.md) (FAIL) and [Research](https://github.com/galiettemita/Redaction_LLM_Evaluation_Dashboard/blob/6406a25012801c3850a10e65c4dc8a11036b7c5a/docs/project/handoffs/RL-MVP-003-research-20261008T205700Z-review.md) (CHANGES_REQUESTED) reviewed `931fb1c`. Both found false-CONFIRMED risk from one-sided global alignment and exact target-edge whitespace loss; Research also found wrong-release acceptance from matching local neighbors. Full 145-test suite was not independently rerun.
+Backend reports stopping Correction 01 after an independent local probe falsely CONFIRMED ground truth when a caller fabricated a matching DocumentVersion. SHA-256 checks only establish byte consistency, not the record's authority or true document pairing. A second local finding shows partially covered edge punctuation can be omitted while CONFIRMED. Backend reports 159 full tests passed on local candidate `80f9ee1`, but it is **rejected and NOT PUBLISHED**; Lead has not inspected it or run its tests. Remote Task-3 branch remains at `2d79ee6`.
 
-The owner approved [Correction 01](task_packets/RL-MVP-003-CORRECTION-01.md) and DEC-021: require both textual sides, preserve exact spans or null, and verify trusted existing DocumentVersion SHA-256/role/project/version against reference bytes. Trusted record provenance and correct release pairing are still external responsibilities; if not provable, do not CONFIRM. Codex may modify only `reference.py`, `test_reference.py` and a new Backend handoff on the existing Task-3 branch. New exact-SHA QA/Research reviews required. No merge, Task 4, model calls, paid services, deployment or D03 scientific approval.
+[Owner decision proposal](task_packets/RL-MVP-003-TRUST-BOUNDARY-PROPOSAL.md): for October 12, use an explicitly trusted synthetic-fixture pairing registry/manifest and keep arbitrary uploaded references unconfirmed/null; or authorize a broader authenticated intake/persistence boundary. Neither option is yet approved. Do not resume Task-3 implementation, merge, start Task 4, use paid services or claim D03 scientific validation without the required approval.
 
 ## What is present / absent
 
@@ -50,7 +50,7 @@ Present on main: typed contracts, synthetic PDF fixtures, vector-PDF redaction d
 
 ## Latest important change
 
-E0026: owner approved DEC-021 and bounded RL-MVP-003 Correction 01 after independent QA and Research requested changes. No corrected implementation yet.
+E0027: Task-3 Correction 01 blocked on missing trusted reference provenance; local rejected candidate not published. Owner decision requested; no new design approved.
 
 ## Maintenance rule
 
