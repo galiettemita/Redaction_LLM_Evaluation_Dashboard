@@ -16,7 +16,7 @@ UnitScore = Annotated[float, Field(ge=0.0, le=1.0)]
 class FrozenRecord(BaseModel):
     """Base settings for records that must not silently change shape."""
 
-    model_config = ConfigDict(extra="forbid", frozen=True, str_strip_whitespace=True)
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
 
 class DocumentRole(StrEnum):
@@ -115,7 +115,7 @@ class ReferenceMapping(FrozenRecord):
     @model_validator(mode="after")
     def enforce_truth_availability(self) -> ReferenceMapping:
         if self.status is ReferenceStatus.CONFIRMED:
-            if not self.exact_revealed_text:
+            if not self.exact_revealed_text or not self.exact_revealed_text.strip():
                 raise ValueError("confirmed mappings require exact revealed text")
         elif self.exact_revealed_text is not None:
             raise ValueError("unconfirmed mappings must not expose revealed text")
@@ -251,4 +251,3 @@ class JobState(FrozenRecord):
     error_code: str | None = None
     created_at: datetime
     updated_at: datetime
-

@@ -3,6 +3,8 @@ from pathlib import Path
 
 import pytest
 from pypdf import PdfReader
+from pypdf.generic import ContentStream
+from reportlab.pdfbase.pdfmetrics import stringWidth
 
 from redaction_lab.fixtures import SYNTHETIC_CASES, make_synthetic_pair
 
@@ -13,6 +15,17 @@ def _digest(path: Path) -> str:
 
 def _text(path: Path) -> str:
     return "\n".join(page.extract_text() or "" for page in PdfReader(path).pages)
+
+
+def _rectangles(path: Path) -> list[tuple[float, float, float, float]]:
+    reader = PdfReader(path)
+    page = reader.pages[0]
+    operations = ContentStream(page.get_contents(), reader).operations
+    return [
+        tuple(float(value) for value in operands)
+        for operands, operator in operations
+        if operator == b"re"
+    ]
 
 
 def test_synthetic_fixture_is_reproducible(tmp_path: Path) -> None:
@@ -51,6 +64,64 @@ def test_hidden_text_layer_trap_is_extractable_beneath_overlay(
 
     assert "SYNTHETIC_TRAP_TOKEN" in _text(redacted)
     assert "SYNTHETIC_TRAP_TOKEN" in _text(reference)
+
+
+@pytest.mark.parametrize(
+    ("case", "release", "covered_spans"),
+    [
+        (
+            "two_boxes",
+            "redacted",
+            [
+                (700, "The synthetic courier was ", "Agent Cedar"),
+                (664, "The synthetic package contained ", "12 paper stars"),
+            ],
+        ),
+        (
+            "adjacent_boxes",
+            "redacted",
+            [
+                (700, "Codes ", "ALPHA"),
+                (700, "Codes ALPHA ", "BRAVO"),
+            ],
+        ),
+        (
+            "repeated_anchors",
+            "redacted",
+            [
+                (700, "The unit transferred ", "BLUE"),
+                (664, "The unit transferred ", "GREEN"),
+            ],
+        ),
+        (
+            "still_hidden_reference",
+            "reference",
+            [(700, "The synthetic destination was ", "ORCHARD SEVEN")],
+        ),
+        (
+            "hidden_text_layer",
+            "redacted",
+            [(700, "The hidden token is ", "SYNTHETIC_TRAP_TOKEN")],
+        ),
+    ],
+)
+def test_redaction_rectangles_fully_cover_intended_text(
+    case: str,
+    release: str,
+    covered_spans: list[tuple[float, str, str]],
+    tmp_path: Path,
+) -> None:
+    redacted, reference = make_synthetic_pair(case, tmp_path / case)
+    path = redacted if release == "redacted" else reference
+    rectangles = _rectangles(path)
+
+    for baseline, prefix, secret in covered_spans:
+        start = 72 + stringWidth(prefix, "Helvetica", 11)
+        end = start + stringWidth(secret, "Helvetica", 11)
+        assert any(
+            x <= start and x + width >= end and y <= baseline <= y + height
+            for x, y, width, height in rectangles
+        )
 
 
 def test_case_registry_is_explicit_and_unknown_cases_fail(tmp_path: Path) -> None:

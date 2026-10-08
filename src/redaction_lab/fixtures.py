@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Callable
 
 from reportlab.lib.pagesizes import letter
+from reportlab.pdfbase.pdfmetrics import stringWidth
 from reportlab.pdfgen.canvas import Canvas
 
 
@@ -17,7 +18,7 @@ SYNTHETIC_CASES = (
     "hidden_text_layer",
 )
 
-_PAGE_WIDTH, _PAGE_HEIGHT = letter
+_, _PAGE_HEIGHT = letter
 
 
 def _canvas(path: Path, case: str, release: str) -> Canvas:
@@ -44,21 +45,41 @@ def _draw_overlay(canvas: Canvas, x: float, y: float, width: float, height: floa
     canvas.restoreState()
 
 
+def _cover_text(
+    canvas: Canvas,
+    line_x: float,
+    y: float,
+    prefix: str,
+    secret: str,
+    *,
+    margin: float = 1.0,
+) -> None:
+    x = line_x + stringWidth(prefix, "Helvetica", 11) - margin
+    width = stringWidth(secret, "Helvetica", 11) + 2 * margin
+    _draw_overlay(canvas, x, y, width)
+
+
 def _write_two_boxes(canvas: Canvas, redacted: bool, _: bool) -> None:
     canvas.setFont("Helvetica", 11)
     canvas.drawString(72, 700, "The synthetic courier was Agent Cedar at 09:00.")
     canvas.drawString(72, 664, "The synthetic package contained 12 paper stars.")
     if redacted:
-        _draw_overlay(canvas, 195, 700, 68)
-        _draw_overlay(canvas, 224, 664, 76)
+        _cover_text(canvas, 72, 700, "The synthetic courier was ", "Agent Cedar")
+        _cover_text(
+            canvas,
+            72,
+            664,
+            "The synthetic package contained ",
+            "12 paper stars",
+        )
 
 
 def _write_adjacent_boxes(canvas: Canvas, redacted: bool, _: bool) -> None:
     canvas.setFont("Helvetica", 11)
     canvas.drawString(72, 700, "Codes ALPHA BRAVO were entered separately.")
     if redacted:
-        _draw_overlay(canvas, 106, 700, 38)
-        _draw_overlay(canvas, 146, 700, 40)
+        _cover_text(canvas, 72, 700, "Codes ", "ALPHA")
+        _cover_text(canvas, 72, 700, "Codes ALPHA ", "BRAVO")
 
 
 def _write_repeated_anchors(canvas: Canvas, redacted: bool, _: bool) -> None:
@@ -66,8 +87,8 @@ def _write_repeated_anchors(canvas: Canvas, redacted: bool, _: bool) -> None:
     canvas.drawString(72, 700, "The unit transferred BLUE before dawn.")
     canvas.drawString(72, 664, "The unit transferred GREEN before dawn.")
     if redacted:
-        _draw_overlay(canvas, 174, 700, 34)
-        _draw_overlay(canvas, 174, 664, 42)
+        _cover_text(canvas, 72, 700, "The unit transferred ", "BLUE")
+        _cover_text(canvas, 72, 664, "The unit transferred ", "GREEN")
 
 
 def _write_still_hidden_reference(
@@ -76,14 +97,26 @@ def _write_still_hidden_reference(
     canvas.setFont("Helvetica", 11)
     canvas.drawString(72, 700, "The synthetic destination was ORCHARD SEVEN.")
     if redacted or is_reference:
-        _draw_overlay(canvas, 222, 700, 96)
+        _cover_text(
+            canvas,
+            72,
+            700,
+            "The synthetic destination was ",
+            "ORCHARD SEVEN",
+        )
 
 
 def _write_hidden_text_layer(canvas: Canvas, redacted: bool, _: bool) -> None:
     canvas.setFont("Helvetica", 11)
     canvas.drawString(72, 700, "The hidden token is SYNTHETIC_TRAP_TOKEN.")
     if redacted:
-        _draw_overlay(canvas, 163, 700, 142)
+        _cover_text(
+            canvas,
+            72,
+            700,
+            "The hidden token is ",
+            "SYNTHETIC_TRAP_TOKEN",
+        )
 
 
 _WRITERS: dict[str, Callable[[Canvas, bool, bool], None]] = {

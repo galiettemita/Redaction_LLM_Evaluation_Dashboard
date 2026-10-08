@@ -61,6 +61,28 @@ def test_unknown_truth_is_null() -> None:
         )
 
 
+def test_confirmed_truth_preserves_exact_text() -> None:
+    exact_text = "  Agent Cedar\n"
+    mapping = ReferenceMapping(
+        mapping_id="map-002",
+        mapping_version="mapping-v1",
+        target_id="target-001",
+        target_version="target-v1",
+        reference_document_version_id="reference-v1",
+        status=ReferenceStatus.CONFIRMED,
+        exact_revealed_text=exact_text,
+        mapping_method_version="anchor-align-v1",
+        provenance="synthetic-test",
+    )
+
+    assert mapping.exact_revealed_text == exact_text
+
+    with pytest.raises(ValidationError):
+        ReferenceMapping.model_validate(
+            {**mapping.model_dump(), "exact_revealed_text": "   "}
+        )
+
+
 def test_prediction_manifest_has_no_reference_fields() -> None:
     manifest = PredictionManifest(
         manifest_id="manifest-001",
