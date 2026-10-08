@@ -1,6 +1,6 @@
 # Decision register
 
-Baseline: [MASTER_SPEC.md](MASTER_SPEC.md), imported 2026-10-06. Epoch E0026.
+Baseline: [MASTER_SPEC.md](MASTER_SPEC.md), imported 2026-10-06. Epoch E0027.
 Product decision IDs `DEC-...` are distinct from the source PDF's open-decision IDs `D01`-`D10`.
 
 ## Authority
@@ -41,6 +41,12 @@ A new user instruction can authorize work within its scope, but a chat statement
 | DEC-021 | Owner approves RL-MVP-003 Correction 01: require both available non-boundary anchor sides to agree with global alignment; do not let geometry override conflicting textual evidence; preserve exact target-edge whitespace or leave truth unknown; refine only the reference-alignment callable interface to accept a **trusted existing DocumentVersion** and verify project, reference role, version ID and SHA-256 against reference PDF bytes. Require conservative document-wide context coherence and trustworthy pairing; if the stateless layer cannot establish them, return unconfirmed, not guessed truth. No contract schema change, numeric threshold, scientific D03 approval, or new task authorization. | Explicit owner approval on 2026-10-08 following independent QA FAIL and Research CHANGES_REQUESTED on Task-3 candidate `931fb1c`. Affects only `reference.py`, `test_reference.py`, Task-3 Backend handoff, and future callers. Existing DocumentVersion remains unchanged; future persistence must authenticate record provenance/pairing. New exact-SHA QA/Research review required; no merge/Task 4. |
 
 Source B1 is identified in MASTER_SPEC. These IDs normalize previously stated requirements; they do not approve new numeric methods.
+
+## Proposed, not approved
+
+| ID | Proposal | Status / effects |
+| --- | --- | --- |
+| DEC-022 | For the October 12 synthetic-only demonstration, permit a trusted test-fixture manifest/registry of immutable redacted/reference pairs and hashes, accessible only through a trusted bootstrap/resolver; require full two-sided text evidence and exact spans or null. Unregistered/user-uploaded references remain NOT_SCOREABLE pending a separately authorized authenticated provenance/pairing system. | **PROPOSED 2026-10-08; OWNER APPROVAL NOT OBTAINED.** See [trust-boundary proposal](task_packets/RL-MVP-003-TRUST-BOUNDARY-PROPOSAL.md). This would narrow the first checkpoint's scoreable inputs, add a scoped trust-boundary implementation, and require QA/Research review. Does not approve D03 scientific validity, new costs, deployment or Task 4. |
 
 ## Installed coordination rules (not research approvals)
 
