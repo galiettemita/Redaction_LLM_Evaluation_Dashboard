@@ -51,6 +51,12 @@ Recorded DEC-018 owner-defined October 14 MVP milestone. Published proposed [MVP
 
 Affected roles: Research, Backend, Frontend, QA. Receivers read at next active checkpoint; no automatic cross-chat messages or acknowledgments.
 
+## 2026-10-07 | E0006 | Oct 14 design approved, plan and role kickoffs prepared
+
+DEC-019 records the owner's approval of the written MVP design. Published the detailed [implementation plan](../../docs/superpowers/plans/2026-10-07-oct14-mvp-implementation.md), four role kickoffs under kickoffs/, and CODEX_START_HERE.md. RL-MVP-001 packet remains proposed pending plan review and task approval. This is documentation only; no app code, model calls, new resources, benchmark tests or deployment. Research, institutional data and engineering gates remain outstanding.
+
+Receivers: Backend, Research, Frontend and QA at next active checkpoint; no ACK presumed.
+
 ## Entry format
 
 Date / epoch / task or decision ID; approved change vs proposal; affected files/contracts; source/approval evidence; test/benchmark impact; migration/rollback; required receivers; unresolved issues. Never backfill a success claim without evidence.

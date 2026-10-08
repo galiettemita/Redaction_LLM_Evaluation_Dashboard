@@ -1,6 +1,6 @@
 # Decision register
 
-Baseline: [MASTER_SPEC.md](MASTER_SPEC.md), imported 2026-10-06. Epoch E0005.
+Baseline: [MASTER_SPEC.md](MASTER_SPEC.md), imported 2026-10-06. Epoch E0006.
 Product decision IDs `DEC-...` are distinct from the source PDF's open-decision IDs `D01`-`D10`.
 
 ## Authority
@@ -33,6 +33,8 @@ A new user instruction can authorize work within its scope, but a chat statement
 | DEC-017 | Owner approves a seven-day evaluation-focused working MVP with zero additional spending beyond existing subscriptions. Codex plan does not imply third-party model API credits or cloud services. No paid calls or resource provisioning authorized. | Product-owner direction approved 2026-10-07; D08 specialized approval/validation pending. |
 
 | DEC-018 | Owner sets October 14, 2026 first checkpoint: a locally runnable smallest end-to-end version accepting a redacted and matching reference PDF, automatically handling every supported text redaction, using one real prediction model via an extensible adapter and a separate evaluation model, and displaying per-target plus document/model results. The long-term reference-optional prediction rule remains. A seven-day demo is a target, not a validated-score or zero-bug guarantee; no extra spend. | Product-owner milestone request on 2026-10-07. Proposed written MVP design and weekly roadmap are linked in CURRENT_STATE. This milestone does not approve exact model IDs, numerical rubric, code task packets, external calls or deployment. |
+
+| DEC-019 | Owner explicitly approved the written October 14 MVP design on 2026-10-07 and requested a detailed Codex implementation plan and role-specific implementation preparation. This approves the scoped design direction only: the detailed plan still requires owner review, each coding task requires a packet, and research/data/engineering approvals remain separate. | Owner approval in Lead conversation, 2026-10-07. MVP design: docs/superpowers/specs/2026-10-07-oct14-mvp-design.md. Implementation plan: docs/superpowers/plans/2026-10-07-oct14-mvp-implementation.md (READY FOR OWNER REVIEW). |
 
 Source B1 is identified in MASTER_SPEC. These IDs normalize previously stated requirements; they do not approve new numeric methods.
 

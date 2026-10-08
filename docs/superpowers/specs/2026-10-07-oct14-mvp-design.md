@@ -1,6 +1,6 @@
 # Redaction Lab — October 14 MVP design
 
-Status: PROPOSED FOR OWNER REVIEW. Not an implementation authorization.
+Status: OWNER-APPROVED DESIGN (2026-10-07). Not an implementation authorization; detailed implementation plan still awaits owner review.
 Date: 2026-10-07. Deadline: 2026-10-14. Baseline: 7a3150ceea2d5fb23aa8acfaeef2b0ed2c4c2bc1, E0004.
 Authority: MASTER_SPEC.md and DEC-001 through DEC-018.
 
