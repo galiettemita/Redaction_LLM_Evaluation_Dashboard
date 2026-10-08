@@ -1,0 +1,229 @@
+from __future__ import annotations
+
+from io import BytesIO
+from pathlib import Path
+
+from pypdf import PdfReader, PdfWriter
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen.canvas import Canvas
+
+from redaction_lab.fixtures import make_synthetic_pair
+from redaction_lab.pdf_detector import DetectionStatus, detect_targets
+
+
+PROJECT_ID = "project-rl-mvp-002"
+DOCUMENT_VERSION_ID = "redacted-document-v1"
+
+
+def _detect(pdf_bytes: bytes):
+    return detect_targets(
+        pdf_bytes,
+        project_id=PROJECT_ID,
+        redacted_document_version_id=DOCUMENT_VERSION_ID,
+    )
+
+
+def _fixture_bytes(case: str, tmp_path: Path) -> bytes:
+    redacted, _ = make_synthetic_pair(case, tmp_path / case)
+    return redacted.read_bytes()
+
+
+def _pdf_bytes(draw) -> bytes:
+    output = BytesIO()
+    canvas = Canvas(output, pagesize=letter, invariant=1, pageCompression=0)
+    draw(canvas)
+    canvas.showPage()
+    canvas.save()
+    return output.getvalue()
+
+
+def test_detects_two_distinct_black_text_boxes(tmp_path: Path) -> None:
+    result = _detect(_fixture_bytes("two_boxes", tmp_path))
+
+    assert result.status is DetectionStatus.SUPPORTED
+    assert len(result.targets) == 2
+    assert [target.page_index for target in result.targets] == [0, 0]
+    assert len({target.target_id for target in result.targets}) == 2
+    assert all(target.project_id == PROJECT_ID for target in result.targets)
+    assert all(
+        target.redacted_document_version_id == DOCUMENT_VERSION_ID
+        for target in result.targets
+    )
+    assert all(
+        0.0 <= coordinate <= 1.0
+        for target in result.targets
+        for coordinate in target.normalized_bbox
+    )
+
+
+def test_adjacent_boxes_not_merged(tmp_path: Path) -> None:
+    result = _detect(_fixture_bytes("adjacent_boxes", tmp_path))
+
+    assert result.status is DetectionStatus.SUPPORTED
+    assert len(result.targets) == 2
+    first, second = result.targets
+    assert first.normalized_bbox[2] < second.normalized_bbox[0]
+
+
+def test_near_black_text_overlay_is_detected() -> None:
+    def draw(canvas: Canvas) -> None:
+        canvas.setFont("Helvetica", 11)
+        canvas.drawString(72, 700, "Visible SYNTHETIC_SECRET after prefix.")
+        canvas.setFillColorRGB(0.05, 0.05, 0.05)
+        canvas.rect(108, 697, 115, 14, stroke=0, fill=1)
+
+    result = _detect(_pdf_bytes(draw))
+
+    assert result.status is DetectionStatus.SUPPORTED
+    assert len(result.targets) == 1
+
+
+def test_target_ids_and_geometry_are_stable(tmp_path: Path) -> None:
+    pdf_bytes = _fixture_bytes("two_boxes", tmp_path)
+
+    first = _detect(pdf_bytes)
+    second = _detect(pdf_bytes)
+
+    assert first == second
+    assert first.source_sha256 == second.source_sha256
+    assert [target.target_id for target in first.targets] == [
+        target.target_id for target in second.targets
+    ]
+    assert [target.normalized_bbox for target in first.targets] == [
+        target.normalized_bbox for target in second.targets
+    ]
+
+
+def test_black_non_text_art_is_excluded() -> None:
+    def draw(canvas: Canvas) -> None:
+        canvas.setFont("Helvetica", 11)
+        canvas.drawString(72, 700, "Visible synthetic paragraph with no redaction.")
+        canvas.setFillColorRGB(0, 0, 0)
+        canvas.rect(420, 220, 40, 40, stroke=0, fill=1)
+
+    result = _detect(_pdf_bytes(draw))
+
+    assert result.status is DetectionStatus.NO_REDACTIONS
+    assert result.targets == ()
+    assert result.ignored_artwork_count == 1
+
+
+def test_non_rectangular_black_occlusion_in_text_flow_is_unsupported() -> None:
+    def draw(canvas: Canvas) -> None:
+        canvas.setFont("Helvetica", 11)
+        canvas.drawString(72, 700, "Visible SYNTHETIC_SECRET after prefix.")
+        canvas.setFillColorRGB(0, 0, 0)
+        canvas.roundRect(108, 697, 115, 14, 3, stroke=0, fill=1)
+
+    result = _detect(_pdf_bytes(draw))
+
+    assert result.status is DetectionStatus.UNSUPPORTED
+    assert result.targets == ()
+    assert result.reason_code == "NON_RECTANGULAR_BLACK_SHAPE"
+
+
+def test_table_like_line_art_in_text_flow_is_unsupported() -> None:
+    def draw(canvas: Canvas) -> None:
+        canvas.setFont("Helvetica", 11)
+        canvas.drawString(72, 700, "Synthetic table cell")
+        canvas.setStrokeColorRGB(0, 0, 0)
+        canvas.rect(60, 690, 200, 30, stroke=1, fill=0)
+
+    result = _detect(_pdf_bytes(draw))
+
+    assert result.status is DetectionStatus.UNSUPPORTED
+    assert result.targets == ()
+    assert result.reason_code == "TABLE_OR_LINE_ART_CONTENT"
+
+
+def test_table_grid_lines_in_text_flow_are_unsupported() -> None:
+    def draw(canvas: Canvas) -> None:
+        canvas.setFont("Helvetica", 11)
+        canvas.drawString(72, 700, "Synthetic table cell")
+        canvas.setStrokeColorRGB(0, 0, 0)
+        canvas.line(60, 690, 260, 690)
+        canvas.line(60, 720, 260, 720)
+        canvas.line(60, 690, 60, 720)
+        canvas.line(260, 690, 260, 720)
+
+    result = _detect(_pdf_bytes(draw))
+
+    assert result.status is DetectionStatus.UNSUPPORTED
+    assert result.reason_code == "TABLE_OR_LINE_ART_CONTENT"
+
+
+def test_text_flow_black_candidate_without_occluded_glyphs_is_unsupported() -> None:
+    def draw(canvas: Canvas) -> None:
+        canvas.setFont("Helvetica", 11)
+        canvas.drawString(72, 700, "Before")
+        canvas.drawString(220, 700, "After")
+        canvas.setFillColorRGB(0, 0, 0)
+        canvas.rect(125, 697, 80, 14, stroke=0, fill=1)
+
+    result = _detect(_pdf_bytes(draw))
+
+    assert result.status is DetectionStatus.UNSUPPORTED
+    assert result.targets == ()
+    assert result.reason_code == "AMBIGUOUS_TEXT_FLOW_RECTANGLE"
+
+
+def test_page_without_visible_text_is_explicitly_unsupported() -> None:
+    def draw(canvas: Canvas) -> None:
+        canvas.setFillColorRGB(0, 0, 0)
+        canvas.rect(72, 650, 180, 30, stroke=0, fill=1)
+
+    result = _detect(_pdf_bytes(draw))
+
+    assert result.status is DetectionStatus.UNSUPPORTED
+    assert result.reason_code == "NO_VISIBLE_TEXT"
+
+
+def test_malformed_pdf_is_explicitly_unsupported() -> None:
+    result = _detect(b"not a pdf and contains no safe source text")
+
+    assert result.status is DetectionStatus.UNSUPPORTED
+    assert result.targets == ()
+    assert result.reason_code == "MALFORMED_PDF"
+    assert "not a pdf" not in repr(result)
+
+
+def test_rotated_page_is_explicitly_unsupported() -> None:
+    original = _pdf_bytes(
+        lambda canvas: canvas.drawString(72, 700, "Visible synthetic text.")
+    )
+    reader = PdfReader(BytesIO(original))
+    reader.pages[0].rotate(90)
+    output = BytesIO()
+    writer = PdfWriter()
+    writer.add_page(reader.pages[0])
+    writer.write(output)
+
+    result = _detect(output.getvalue())
+
+    assert result.status is DetectionStatus.UNSUPPORTED
+    assert result.reason_code == "ROTATED_PAGE"
+
+
+def test_overlay_painted_before_text_is_rejected() -> None:
+    def draw(canvas: Canvas) -> None:
+        canvas.setFillColorRGB(0, 0, 0)
+        canvas.rect(115, 697, 90, 14, stroke=0, fill=1)
+        canvas.setFillColorRGB(0, 0, 0)
+        canvas.setFont("Helvetica", 11)
+        canvas.drawString(72, 700, "Visible SYNTHETIC_SECRET after box.")
+
+    result = _detect(_pdf_bytes(draw))
+
+    assert result.status is DetectionStatus.UNSUPPORTED
+    assert result.reason_code == "PAINT_ORDER_UNCERTAIN"
+
+
+def test_zero_redactions_is_distinct_from_unsupported() -> None:
+    pdf_bytes = _pdf_bytes(
+        lambda canvas: canvas.drawString(72, 700, "Visible synthetic text only.")
+    )
+
+    result = _detect(pdf_bytes)
+
+    assert result.status is DetectionStatus.NO_REDACTIONS
+    assert result.reason_code is None
