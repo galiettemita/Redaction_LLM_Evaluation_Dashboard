@@ -99,6 +99,12 @@ Fetched exact published QA handoff `48adf452178e1e7c38896b088f2e7481846bf275` an
 
 **Disposition:** CHANGES_REQUESTED. Published [bounded correction packet](task_packets/RL-MVP-002-CORRECTION-01.md) within Task 2; no code corrections performed by Lead. New exact candidate requires fresh independent QA/Research review. No merge, Task 3, paid calls, scientific score approval or deployment.
 
+## 2026-10-08 | E0014 | RL-MVP-002 corrected candidate review routing
+
+Verified on live GitHub: corrected Task 2 implementation `12698b92d883af658266d54a9223b5619dedc7ee`, Backend branch head `c37837669ce9e538a3afa8db0e25ef92cbbdd327`, and published unique Backend handoff. Relative to previous Backend branch head, two authorized source/test files changed plus one handoff. Codex reports 45 focused and 88 full tests passed, compileall and diff check passed; Lead did not execute application tests.
+
+Published [fresh QA/Research review packet](task_packets/RL-MVP-002-CORRECTED-REVIEW.md) addressing all four previous blockers, regressions and model-context isolation. No independent PASS yet, merge, Task 3, paid provider call, research-scoring approval or deployment.
+
 ## Entry format
 
 Date / epoch / task or decision ID; approved change vs proposal; affected files/contracts; source/approval evidence; test/benchmark impact; migration/rollback; required receivers; unresolved issues. Never backfill a success claim without evidence.
