@@ -161,6 +161,12 @@ Owner explicitly approved starting RL-MVP-003 after the owner-authorized Task-2 
 
 Independent QA/Research review required on exact candidate; D03 human validation and any verified-scoring claims remain unapproved. No merge, Task 4, paid calls, private data or deployment. October 12 target remains at risk.
 
+## 2026-10-08 | E0025 | RL-MVP-003 candidate intake and review routing
+
+Verified exact Codex implementation `931fb1c0012d3b530b837f204d922f0aaa95a602`, published Backend head `2d79ee6a7d5ba2a06148ff257529faa50dfa06e1` and handoff. Compared with main `4e08b7f1579523dbd44294f02c0ff18d51a754a4`: two new approved source/test files and one Backend handoff; no other changed paths. Codex reports 25 focused and 145 full tests passing, compileall and dependency/diff checks; Lead has not executed application tests. Published [independent QA/Research review packet](task_packets/RL-MVP-003-INDEPENDENT-REVIEW.md), including false-confirmation, one-sided global alignment, exact quotation, reference leakage and identity/version checks.
+
+No independent verdict, merge, Task 4, paid calls, research-human scoring approval or deployment. October 12 deadline remains at risk.
+
 ## Entry format
 
 Date / epoch / task or decision ID; approved change vs proposal; affected files/contracts; source/approval evidence; test/benchmark impact; migration/rollback; required receivers; unresolved issues. Never backfill a success claim without evidence.
