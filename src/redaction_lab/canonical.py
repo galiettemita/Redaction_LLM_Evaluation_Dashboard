@@ -43,7 +43,7 @@ def _page_text(page: Any, targets: tuple[Any, ...]) -> str:
     target_boxes = [
         (target, _target_bbox(target, page_width, page_height)) for target in targets
     ]
-    events: list[tuple[float, float, int, str]] = []
+    events: list[tuple[float, float, float, float, int, str]] = []
     for char_index, char in enumerate(page.chars):
         bbox = (
             float(char["x0"]),
@@ -57,23 +57,49 @@ def _page_text(page: Any, targets: tuple[Any, ...]) -> str:
             (
                 float(char["top"]),
                 float(char["x0"]),
+                float(char["x1"]),
+                float(char["bottom"]) - float(char["top"]),
                 char_index,
                 str(char.get("text", "")),
             )
         )
     marker_offset = len(events) + 1
     for target_index, (target, bbox) in enumerate(target_boxes):
-        top = page_height - bbox[3]
+        occluded_chars = [
+            char
+            for char in page.chars
+            if str(char.get("text", "")).strip()
+            and _intersects(
+                (
+                    float(char["x0"]),
+                    float(char["y0"]),
+                    float(char["x1"]),
+                    float(char["y1"]),
+                ),
+                bbox,
+            )
+        ]
+        if not occluded_chars:
+            raise ValueError("target has no occluded text")
+        top = sum(float(char["top"]) for char in occluded_chars) / len(
+            occluded_chars
+        )
+        height = sum(
+            float(char["bottom"]) - float(char["top"])
+            for char in occluded_chars
+        ) / len(occluded_chars)
         events.append(
             (
                 top,
                 bbox[0],
+                bbox[2],
+                height,
                 marker_offset + target_index,
                 f" [[TARGET:{target.target_id}]] ",
             )
         )
 
-    lines: list[list[tuple[float, float, int, str]]] = []
+    lines: list[list[tuple[float, float, float, float, int, str]]] = []
     for event in sorted(events, key=lambda item: (item[0], item[1], item[2])):
         if not lines or abs(lines[-1][0][0] - event[0]) > 3.0:
             lines.append([event])
@@ -82,9 +108,20 @@ def _page_text(page: Any, targets: tuple[Any, ...]) -> str:
 
     rendered_lines: list[str] = []
     for line in lines:
-        pieces = [
-            event[3] for event in sorted(line, key=lambda item: (item[1], item[2]))
-        ]
+        pieces: list[str] = []
+        previous = None
+        for event in sorted(line, key=lambda item: (item[1], item[4])):
+            if previous is not None:
+                gap = event[1] - previous[2]
+                space_threshold = max(1.5, min(previous[3], event[3]) * 0.2)
+                if (
+                    gap > space_threshold
+                    and not previous[5].endswith((" ", "\t"))
+                    and not event[5].startswith((" ", "\t"))
+                ):
+                    pieces.append(" ")
+            pieces.append(event[5])
+            previous = event
         rendered = re.sub(r"[ \t]+", " ", "".join(pieces)).strip()
         if rendered:
             rendered_lines.append(rendered)

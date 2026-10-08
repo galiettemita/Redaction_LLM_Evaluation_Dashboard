@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import inspect
+from io import BytesIO
 import logging
 from dataclasses import replace
 from pathlib import Path
 
 import pytest
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen.canvas import Canvas
 
 import redaction_lab.canonical as canonical_module
 from redaction_lab.canonical import canonicalize_redacted
@@ -35,6 +38,15 @@ def _canonicalize(pdf_bytes: bytes, detection):
         redacted_document_version_id=DOCUMENT_VERSION_ID,
         canonical_document_version_id=CANONICAL_VERSION_ID,
     )
+
+
+def _pdf_bytes(draw) -> bytes:
+    output = BytesIO()
+    canvas = Canvas(output, pagesize=letter, invariant=1, pageCompression=0)
+    draw(canvas)
+    canvas.showPage()
+    canvas.save()
+    return output.getvalue()
 
 
 def test_hidden_overlay_text_never_in_canonical_or_manifest(
@@ -104,6 +116,36 @@ def test_one_marker_per_target_and_visible_reading_order_preserved(
     assert f"contained {markers[1]}" in canonical.canonical_text
     assert "Agent Cedar" not in canonical.canonical_text
     assert "12 paper stars" not in canonical.canonical_text
+
+
+def test_tall_supported_rectangle_keeps_marker_in_sentence_order() -> None:
+    def draw(canvas: Canvas) -> None:
+        canvas.setFont("Helvetica", 11)
+        canvas.drawString(72, 700, "Visible SYNTHETIC_SECRET after")
+        canvas.setFillColorRGB(0, 0, 0)
+        canvas.rect(108, 680, 112, 45, stroke=0, fill=1)
+
+    pdf_bytes = _pdf_bytes(draw)
+    detection = _detect(pdf_bytes)
+    canonical = _canonicalize(pdf_bytes, detection)
+    marker = f"[[TARGET:{detection.targets[0].target_id}]]"
+
+    assert detection.status is DetectionStatus.SUPPORTED
+    assert f"Visible {marker} after" in canonical.canonical_text
+
+
+def test_positioned_words_preserve_a_visible_word_boundary() -> None:
+    def draw(canvas: Canvas) -> None:
+        canvas.setFont("Helvetica", 11)
+        canvas.drawString(72, 700, "Visible")
+        canvas.drawString(115, 700, "context")
+
+    pdf_bytes = _pdf_bytes(draw)
+    detection = _detect(pdf_bytes)
+    canonical = _canonicalize(pdf_bytes, detection)
+
+    assert detection.status is DetectionStatus.NO_REDACTIONS
+    assert canonical.canonical_text == "Visible context"
 
 
 def test_adjacent_targets_receive_distinct_markers(tmp_path: Path) -> None:

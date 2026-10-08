@@ -1,9 +1,19 @@
 from __future__ import annotations
 
 from io import BytesIO
+import logging
 from pathlib import Path
 
+import pytest
 from pypdf import PdfReader, PdfWriter
+from pypdf.generic import (
+    ArrayObject,
+    DecodedStreamObject,
+    DictionaryObject,
+    NameObject,
+    RectangleObject,
+    TextStringObject,
+)
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen.canvas import Canvas
 
@@ -34,6 +44,51 @@ def _pdf_bytes(draw) -> bytes:
     draw(canvas)
     canvas.showPage()
     canvas.save()
+    return output.getvalue()
+
+
+def _rewrite_page(
+    pdf_bytes: bytes,
+    *,
+    prefix: bytes = b"",
+    cropbox: tuple[int, int, int, int] | None = None,
+    optional_content_off: bool = False,
+) -> bytes:
+    reader = PdfReader(BytesIO(pdf_bytes))
+    page = reader.pages[0]
+    original = page.get_contents().get_data()
+    stream = DecodedStreamObject()
+    if optional_content_off:
+        stream.set_data(b"/OC /HiddenLayer BDC\n" + original + b"\nEMC")
+        ocg = DictionaryObject(
+            {
+                NameObject("/Type"): NameObject("/OCG"),
+                NameObject("/Name"): TextStringObject("Hidden synthetic layer"),
+            }
+        )
+        properties = DictionaryObject({NameObject("/HiddenLayer"): ocg})
+        page[NameObject("/Resources")][NameObject("/Properties")] = properties
+        reader.trailer["/Root"][NameObject("/OCProperties")] = DictionaryObject(
+            {
+                NameObject("/OCGs"): ArrayObject([ocg]),
+                NameObject("/D"): DictionaryObject(
+                    {NameObject("/OFF"): ArrayObject([ocg])}
+                ),
+            }
+        )
+    else:
+        stream.set_data(prefix + original)
+    page[NameObject("/Contents")] = stream
+    if cropbox is not None:
+        page.cropbox = RectangleObject(cropbox)
+    writer = PdfWriter()
+    writer.add_page(page)
+    if optional_content_off:
+        writer._root_object[NameObject("/OCProperties")] = reader.trailer["/Root"][
+            "/OCProperties"
+        ]
+    output = BytesIO()
+    writer.write(output)
     return output.getvalue()
 
 
@@ -71,6 +126,19 @@ def test_near_black_text_overlay_is_detected() -> None:
         canvas.drawString(72, 700, "Visible SYNTHETIC_SECRET after prefix.")
         canvas.setFillColorRGB(0.05, 0.05, 0.05)
         canvas.rect(108, 697, 115, 14, stroke=0, fill=1)
+
+    result = _detect(_pdf_bytes(draw))
+
+    assert result.status is DetectionStatus.SUPPORTED
+    assert len(result.targets) == 1
+
+
+def test_rich_cmyk_black_text_overlay_is_detected() -> None:
+    def draw(canvas: Canvas) -> None:
+        canvas.setFont("Helvetica", 11)
+        canvas.drawString(72, 700, "Visible SYNTHETIC_TRAP_TOKEN after prefix.")
+        canvas.setFillColorCMYK(1, 1, 1, 1)
+        canvas.rect(108, 697, 155, 14, stroke=0, fill=1)
 
     result = _detect(_pdf_bytes(draw))
 
@@ -152,6 +220,118 @@ def test_table_grid_lines_in_text_flow_are_unsupported() -> None:
     assert result.reason_code == "TABLE_OR_LINE_ART_CONTENT"
 
 
+def test_single_thick_stroke_over_text_is_unsupported() -> None:
+    def draw(canvas: Canvas) -> None:
+        canvas.setFont("Helvetica", 11)
+        canvas.drawString(72, 700, "SYNTHETIC_TRAP_TOKEN")
+        canvas.setStrokeColorRGB(0, 0, 0)
+        canvas.setLineWidth(25)
+        canvas.line(70, 704, 230, 704)
+
+    result = _detect(_pdf_bytes(draw))
+
+    assert result.status is DetectionStatus.UNSUPPORTED
+    assert result.reason_code == "TABLE_OR_LINE_ART_CONTENT"
+
+
+def test_thick_stroked_curve_over_text_is_unsupported() -> None:
+    def draw(canvas: Canvas) -> None:
+        canvas.setFont("Helvetica", 11)
+        canvas.drawString(72, 700, "SYNTHETIC_TRAP_TOKEN")
+        canvas.setStrokeColorRGB(0, 0, 0)
+        canvas.setLineWidth(25)
+        path = canvas.beginPath()
+        path.moveTo(70, 704)
+        path.curveTo(110, 710, 180, 698, 230, 704)
+        canvas.drawPath(path, stroke=1, fill=0)
+
+    result = _detect(_pdf_bytes(draw))
+
+    assert result.status is DetectionStatus.UNSUPPORTED
+    assert result.reason_code == "TABLE_OR_LINE_ART_CONTENT"
+
+
+def test_grey_ruled_table_with_black_box_is_unsupported() -> None:
+    def draw(canvas: Canvas) -> None:
+        canvas.setFont("Helvetica", 11)
+        canvas.drawString(72, 700, "Role")
+        canvas.drawString(170, 700, "SYNTHETIC_TRAP_TOKEN")
+        canvas.setStrokeColorRGB(0.5, 0.5, 0.5)
+        canvas.rect(60, 688, 250, 30, stroke=1, fill=0)
+        canvas.line(150, 688, 150, 718)
+        canvas.setFillColorRGB(0, 0, 0)
+        canvas.rect(168, 697, 140, 14, stroke=0, fill=1)
+
+    result = _detect(_pdf_bytes(draw))
+
+    assert result.status is DetectionStatus.UNSUPPORTED
+    assert result.reason_code == "TABLE_OR_LINE_ART_CONTENT"
+
+
+def test_invisible_text_rendering_mode_is_unsupported() -> None:
+    def draw(canvas: Canvas) -> None:
+        text = canvas.beginText(72, 700)
+        text.setFont("Helvetica", 11)
+        text.setTextRenderMode(3)
+        text.textLine("SYNTHETIC_TRAP_TOKEN")
+        canvas.drawText(text)
+
+    result = _detect(_pdf_bytes(draw))
+
+    assert result.status is DetectionStatus.UNSUPPORTED
+    assert result.reason_code == "COMPLEX_PAGE_GRAPHICS"
+
+
+def test_white_text_is_unsupported() -> None:
+    def draw(canvas: Canvas) -> None:
+        canvas.setFillColorRGB(1, 1, 1)
+        canvas.setFont("Helvetica", 11)
+        canvas.drawString(72, 700, "SYNTHETIC_TRAP_TOKEN")
+
+    result = _detect(_pdf_bytes(draw))
+
+    assert result.status is DetectionStatus.UNSUPPORTED
+    assert result.reason_code == "TEXT_VISIBILITY_UNCERTAIN"
+
+
+def test_white_rectangle_covering_text_is_unsupported() -> None:
+    def draw(canvas: Canvas) -> None:
+        canvas.setFillColorRGB(0, 0, 0)
+        canvas.setFont("Helvetica", 11)
+        canvas.drawString(72, 700, "SYNTHETIC_TRAP_TOKEN")
+        canvas.setFillColorRGB(1, 1, 1)
+        canvas.rect(70, 697, 160, 14, stroke=0, fill=1)
+
+    result = _detect(_pdf_bytes(draw))
+
+    assert result.status is DetectionStatus.UNSUPPORTED
+    assert result.reason_code == "TEXT_VISIBILITY_UNCERTAIN"
+
+
+def test_nondefault_cropbox_is_unsupported() -> None:
+    original = _pdf_bytes(
+        lambda canvas: canvas.drawString(500, 700, "SYNTHETIC_TRAP_TOKEN")
+    )
+    cropped = _rewrite_page(original, cropbox=(0, 0, 300, 792))
+
+    result = _detect(cropped)
+
+    assert result.status is DetectionStatus.UNSUPPORTED
+    assert result.reason_code == "NONDEFAULT_PAGE_BOUNDARY"
+
+
+def test_optional_content_is_unsupported() -> None:
+    original = _pdf_bytes(
+        lambda canvas: canvas.drawString(72, 700, "SYNTHETIC_TRAP_TOKEN")
+    )
+    layered = _rewrite_page(original, optional_content_off=True)
+
+    result = _detect(layered)
+
+    assert result.status is DetectionStatus.UNSUPPORTED
+    assert result.reason_code == "COMPLEX_PAGE_GRAPHICS"
+
+
 def test_text_flow_black_candidate_without_occluded_glyphs_is_unsupported() -> None:
     def draw(canvas: Canvas) -> None:
         canvas.setFont("Helvetica", 11)
@@ -185,6 +365,23 @@ def test_malformed_pdf_is_explicitly_unsupported() -> None:
     assert result.targets == ()
     assert result.reason_code == "MALFORMED_PDF"
     assert "not a pdf" not in repr(result)
+
+
+def test_malformed_operands_do_not_leak_through_logs_or_stderr(
+    caplog: pytest.LogCaptureFixture, capsys: pytest.CaptureFixture[str]
+) -> None:
+    original = _pdf_bytes(
+        lambda canvas: canvas.drawString(72, 700, "Visible synthetic text")
+    )
+    malformed = _rewrite_page(original, prefix=b"(SYNTHETIC_TRAP_TOKEN) g\n")
+
+    with caplog.at_level(logging.DEBUG):
+        result = _detect(malformed)
+    captured = capsys.readouterr()
+
+    assert result.status is DetectionStatus.UNSUPPORTED
+    assert "SYNTHETIC_TRAP_TOKEN" not in caplog.text
+    assert "SYNTHETIC_TRAP_TOKEN" not in captured.err
 
 
 def test_rotated_page_is_explicitly_unsupported() -> None:

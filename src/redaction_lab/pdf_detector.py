@@ -5,10 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import StrEnum
 from hashlib import sha256
-from io import BytesIO
+from io import BytesIO, StringIO
 import logging
 from math import isclose
-from contextlib import contextmanager
+from contextlib import contextmanager, redirect_stderr
 from threading import RLock
 from typing import Any
 
@@ -21,14 +21,41 @@ from redaction_lab.contracts import DetectionEvidence, RedactionTarget, ScopeSta
 
 DETECTOR_VERSION = "vector-text-rect-v1"
 _TEXT_SHOW_OPERATORS = {b"Tj", b"TJ", b"'", b'"'}
-_UNSAFE_OPERATORS = {b"Do", b"W", b"W*", b"gs", b"sh"}
+_UNSAFE_OPERATORS = {
+    b"Do",
+    b"W",
+    b"W*",
+    b"gs",
+    b"sh",
+    b"BMC",
+    b"BDC",
+    b"EMC",
+    b"MP",
+    b"DP",
+    b"CS",
+    b"cs",
+    b"SC",
+    b"SCN",
+    b"sc",
+    b"scn",
+}
 _FILL_OPERATORS = {b"f", b"f*", b"B", b"B*"}
 _PARSER_LOG_LOCK = RLock()
 
 
+class _ParserDiagnosticSink(logging.Handler):
+    def __init__(self) -> None:
+        super().__init__(level=logging.NOTSET)
+        self.seen = False
+
+    def emit(self, record: logging.LogRecord) -> None:
+        if record.levelno >= logging.WARNING:
+            self.seen = True
+
+
 @contextmanager
 def _suppress_parser_debug_logs():
-    """Prevent third-party parsers from logging document text at DEBUG."""
+    """Capture parser diagnostics without emitting document-bearing messages."""
 
     with _PARSER_LOG_LOCK:
         parser_loggers = [logging.getLogger("pdfminer"), logging.getLogger("pypdf")]
@@ -38,14 +65,23 @@ def _suppress_parser_debug_logs():
             if isinstance(logger, logging.Logger)
             and (name.startswith("pdfminer.") or name.startswith("pypdf."))
         )
-        original_levels = [(logger, logger.level) for logger in parser_loggers]
+        original_state = [
+            (logger, logger.level, logger.handlers[:], logger.propagate)
+            for logger in parser_loggers
+        ]
+        sink = _ParserDiagnosticSink()
         try:
             for logger in parser_loggers:
-                logger.setLevel(logging.WARNING)
-            yield
+                logger.setLevel(logging.NOTSET)
+                logger.handlers = [sink]
+                logger.propagate = False
+            with redirect_stderr(StringIO()):
+                yield sink
         finally:
-            for logger, level in original_levels:
+            for logger, level, handlers, propagate in original_state:
                 logger.setLevel(level)
+                logger.handlers = handlers
+                logger.propagate = propagate
 
 
 class DetectionStatus(StrEnum):
@@ -71,6 +107,7 @@ class DetectionResult:
 class _PaintedRectangle:
     bbox: tuple[float, float, float, float]
     operation_index: int
+    color: tuple[float, ...]
 
 
 def _unsupported(
@@ -108,7 +145,10 @@ def _near_black(color: Any) -> bool:
         return max(components) <= 0.1
     if len(components) == 4:
         cyan, magenta, yellow, black = components
-        return max(cyan, magenta, yellow) <= 0.1 and black >= 0.9
+        red = (1.0 - cyan) * (1.0 - black)
+        green = (1.0 - magenta) * (1.0 - black)
+        blue = (1.0 - yellow) * (1.0 - black)
+        return max(red, green, blue) <= 0.1
     return False
 
 
@@ -171,6 +211,8 @@ def _painted_rectangles(
             return None
         if operator == b"cm" and not _identity_matrix(operands):
             return None
+        if operator == b"Tr" and _as_floats(operands) != (0.0,):
+            return None
         if operator in _TEXT_SHOW_OPERATORS:
             last_text_index = index
         elif operator == b"q":
@@ -192,11 +234,14 @@ def _painted_rectangles(
             y0, y1 = sorted((y, y + height))
             pending_rectangles.append(((x0, y0, x1, y1), index))
         elif operator in _FILL_OPERATORS:
-            if _near_black(fill_color):
-                painted.extend(
-                    _PaintedRectangle(bbox=bbox, operation_index=operation_index)
-                    for bbox, operation_index in pending_rectangles
+            painted.extend(
+                _PaintedRectangle(
+                    bbox=bbox,
+                    operation_index=operation_index,
+                    color=fill_color,
                 )
+                for bbox, operation_index in pending_rectangles
+            )
             pending_rectangles.clear()
         elif operator in {b"n", b"S", b"s"}:
             pending_rectangles.clear()
@@ -211,6 +256,8 @@ def _matching_paint_index(
     painted: list[_PaintedRectangle],
 ) -> int | None:
     for rectangle in painted:
+        if not _near_black(rectangle.color):
+            continue
         if all(
             isclose(actual, expected, abs_tol=0.02)
             for actual, expected in zip(bbox, rectangle.bbox)
@@ -273,10 +320,18 @@ def detect_targets(
 ) -> DetectionResult:
     source_sha256 = sha256(pdf_bytes).hexdigest()
     try:
-        with _suppress_parser_debug_logs():
+        with _suppress_parser_debug_logs() as diagnostics:
             reader = PdfReader(BytesIO(pdf_bytes), strict=True)
             page_count = len(reader.pages)
             with pdfplumber.open(BytesIO(pdf_bytes)) as pdf:
+                if diagnostics.seen:
+                    return _unsupported(
+                        source_sha256,
+                        page_count=page_count,
+                        project_id=project_id,
+                        redacted_document_version_id=redacted_document_version_id,
+                        reason_code="MALFORMED_PDF",
+                    )
                 if len(pdf.pages) != page_count or page_count == 0:
                     return _unsupported(
                         source_sha256,
@@ -289,8 +344,9 @@ def detect_targets(
                 targets: list[RedactionTarget] = []
                 ignored_artwork_count = 0
                 for page_index, page in enumerate(pdf.pages):
+                    pdf_page = reader.pages[page_index]
                     rotation = (
-                        int(reader.pages[page_index].get("/Rotate", 0) or 0) % 360
+                        int(pdf_page.get("/Rotate", 0) or 0) % 360
                     )
                     if rotation:
                         return _unsupported(
@@ -299,6 +355,19 @@ def detect_targets(
                             project_id=project_id,
                             redacted_document_version_id=redacted_document_version_id,
                             reason_code="ROTATED_PAGE",
+                        )
+                    cropbox = tuple(float(value) for value in pdf_page.cropbox)
+                    mediabox = tuple(float(value) for value in pdf_page.mediabox)
+                    if any(
+                        not isclose(actual, expected, abs_tol=0.02)
+                        for actual, expected in zip(cropbox, mediabox)
+                    ):
+                        return _unsupported(
+                            source_sha256,
+                            page_count=page_count,
+                            project_id=project_id,
+                            redacted_document_version_id=redacted_document_version_id,
+                            reason_code="NONDEFAULT_PAGE_BOUNDARY",
                         )
                     if page.images or page.annots:
                         return _unsupported(
@@ -325,6 +394,18 @@ def detect_targets(
                             redacted_document_version_id=redacted_document_version_id,
                             reason_code="ROTATED_TEXT",
                         )
+                    if any(
+                        str(char.get("text", "")).strip()
+                        and not _near_black(char.get("non_stroking_color"))
+                        for char in chars
+                    ):
+                        return _unsupported(
+                            source_sha256,
+                            page_count=page_count,
+                            project_id=project_id,
+                            redacted_document_version_id=redacted_document_version_id,
+                            reason_code="TEXT_VISIBILITY_UNCERTAIN",
+                        )
 
                     paint_evidence = _painted_rectangles(reader, page_index)
                     if paint_evidence is None:
@@ -336,17 +417,34 @@ def detect_targets(
                             reason_code="COMPLEX_PAGE_GRAPHICS",
                         )
                     painted, last_text_index = paint_evidence
-                    black_lines = [
-                        line
-                        for line in page.lines
-                        if _near_black(line.get("stroking_color"))
+                    uncertain_rectangles = [
+                        rectangle
+                        for rectangle in painted
+                        if not _near_black(rectangle.color)
                     ]
-                    if len(black_lines) >= 2:
+                    if any(
+                        any(
+                            str(char.get("text", "")).strip()
+                            and _intersects(rectangle.bbox, _char_bbox(char))
+                            for char in chars
+                        )
+                        or _same_text_flow(rectangle.bbox, chars)
+                        for rectangle in uncertain_rectangles
+                    ):
+                        return _unsupported(
+                            source_sha256,
+                            page_count=page_count,
+                            project_id=project_id,
+                            redacted_document_version_id=redacted_document_version_id,
+                            reason_code="TEXT_VISIBILITY_UNCERTAIN",
+                        )
+                    lines = list(page.lines)
+                    if len(lines) >= 2:
                         line_art_bbox = (
-                            min(float(line["x0"]) for line in black_lines),
-                            min(float(line["y0"]) for line in black_lines),
-                            max(float(line["x1"]) for line in black_lines),
-                            max(float(line["y1"]) for line in black_lines),
+                            min(float(line["x0"]) for line in lines),
+                            min(float(line["y0"]) for line in lines),
+                            max(float(line["x1"]) for line in lines),
+                            max(float(line["y1"]) for line in lines),
                         )
                         if any(
                             str(char.get("text", "")).strip()
@@ -360,13 +458,32 @@ def detect_targets(
                                 redacted_document_version_id=redacted_document_version_id,
                                 reason_code="TABLE_OR_LINE_ART_CONTENT",
                             )
-                        ignored_artwork_count += len(black_lines)
+                        ignored_artwork_count += len(lines)
+                    for line in lines:
+                        half_width = max(float(line.get("linewidth", 1.0)), 1.0) / 2
+                        line_bbox = (
+                            float(line["x0"]) - half_width,
+                            float(line["y0"]) - half_width,
+                            float(line["x1"]) + half_width,
+                            float(line["y1"]) + half_width,
+                        )
+                        if any(
+                            str(char.get("text", "")).strip()
+                            and _intersects(line_bbox, _char_bbox(char))
+                            for char in chars
+                        ):
+                            return _unsupported(
+                                source_sha256,
+                                page_count=page_count,
+                                project_id=project_id,
+                                redacted_document_version_id=redacted_document_version_id,
+                                reason_code="TABLE_OR_LINE_ART_CONTENT",
+                            )
                     stroked_rectangles = [
                         rect
                         for rect in page.rects
                         if bool(rect.get("stroke"))
                         and not bool(rect.get("fill"))
-                        and _near_black(rect.get("stroking_color"))
                     ]
                     for stroked_rectangle in stroked_rectangles:
                         stroked_bbox = (
@@ -388,18 +505,17 @@ def detect_targets(
                                 reason_code="TABLE_OR_LINE_ART_CONTENT",
                             )
                         ignored_artwork_count += 1
-                    black_curves = [
-                        curve
-                        for curve in page.curves
-                        if bool(curve.get("fill"))
-                        and _near_black(curve.get("non_stroking_color"))
-                    ]
-                    for curve in black_curves:
+                    for curve in page.curves:
+                        half_width = (
+                            max(float(curve.get("linewidth", 1.0)), 1.0) / 2
+                            if bool(curve.get("stroke"))
+                            else 0.0
+                        )
                         curve_bbox = (
-                            float(curve["x0"]),
-                            float(curve["y0"]),
-                            float(curve["x1"]),
-                            float(curve["y1"]),
+                            float(curve["x0"]) - half_width,
+                            float(curve["y0"]) - half_width,
+                            float(curve["x1"]) + half_width,
+                            float(curve["y1"]) + half_width,
                         )
                         if any(
                             str(char.get("text", "")).strip()
@@ -411,7 +527,11 @@ def detect_targets(
                                 page_count=page_count,
                                 project_id=project_id,
                                 redacted_document_version_id=redacted_document_version_id,
-                                reason_code="NON_RECTANGULAR_BLACK_SHAPE",
+                                reason_code=(
+                                    "TABLE_OR_LINE_ART_CONTENT"
+                                    if bool(curve.get("stroke"))
+                                    else "NON_RECTANGULAR_BLACK_SHAPE"
+                                ),
                             )
                         ignored_artwork_count += 1
                     rectangles = [
@@ -468,6 +588,15 @@ def detect_targets(
                                 )
                             ignored_artwork_count += 1
                             continue
+                        line_tops = [float(char["top"]) for char in occluded_chars]
+                        if max(line_tops) - min(line_tops) > 3.0:
+                            return _unsupported(
+                                source_sha256,
+                                page_count=page_count,
+                                project_id=project_id,
+                                redacted_document_version_id=redacted_document_version_id,
+                                reason_code="AMBIGUOUS_MULTILINE_RECTANGLE",
+                            )
                         targets.append(
                             _target_for_rectangle(
                                 project_id=project_id,
@@ -480,6 +609,14 @@ def detect_targets(
                             )
                         )
 
+                if diagnostics.seen:
+                    return _unsupported(
+                        source_sha256,
+                        page_count=page_count,
+                        project_id=project_id,
+                        redacted_document_version_id=redacted_document_version_id,
+                        reason_code="MALFORMED_PDF",
+                    )
                 targets.sort(
                     key=lambda target: (
                         target.page_index,
