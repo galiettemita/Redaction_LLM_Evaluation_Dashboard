@@ -162,6 +162,74 @@ def test_target_ids_and_geometry_are_stable(tmp_path: Path) -> None:
     ]
 
 
+def test_target_ids_are_scoped_to_project(tmp_path: Path) -> None:
+    pdf_bytes = _fixture_bytes("two_boxes", tmp_path)
+
+    first_project = detect_targets(
+        pdf_bytes,
+        project_id="project-one",
+        redacted_document_version_id=DOCUMENT_VERSION_ID,
+    )
+    second_project = detect_targets(
+        pdf_bytes,
+        project_id="project-two",
+        redacted_document_version_id=DOCUMENT_VERSION_ID,
+    )
+
+    assert first_project.status is DetectionStatus.SUPPORTED
+    assert second_project.status is DetectionStatus.SUPPORTED
+    assert {target.target_id for target in first_project.targets}.isdisjoint(
+        target.target_id for target in second_project.targets
+    )
+
+
+def test_ambiguous_two_column_layout_is_unsupported() -> None:
+    def draw(canvas: Canvas) -> None:
+        canvas.setFont("Helvetica", 11)
+        canvas.drawString(72, 720, "Left column first line")
+        canvas.drawString(72, 700, "Left SYNTHETIC_SECRET")
+        canvas.drawString(330, 720, "Right column first line")
+        canvas.drawString(330, 700, "Right column second line")
+        canvas.setFillColorRGB(0, 0, 0)
+        canvas.rect(94, 697, 120, 14, stroke=0, fill=1)
+
+    result = _detect(_pdf_bytes(draw))
+
+    assert result.status is DetectionStatus.UNSUPPORTED
+    assert result.targets == ()
+    assert result.reason_code == "AMBIGUOUS_TEXT_LAYOUT"
+
+
+def test_overlapping_black_text_rectangles_are_unsupported() -> None:
+    def draw(canvas: Canvas) -> None:
+        canvas.setFont("Helvetica", 11)
+        canvas.drawString(72, 700, "Visible SYNTHETIC_SECRET after")
+        canvas.setFillColorRGB(0, 0, 0)
+        canvas.rect(108, 697, 80, 14, stroke=0, fill=1)
+        canvas.rect(160, 697, 70, 14, stroke=0, fill=1)
+
+    result = _detect(_pdf_bytes(draw))
+
+    assert result.status is DetectionStatus.UNSUPPORTED
+    assert result.targets == ()
+    assert result.reason_code == "OVERLAPPING_REDACTION_RECTANGLES"
+
+
+def test_duplicate_black_text_rectangles_are_unsupported() -> None:
+    def draw(canvas: Canvas) -> None:
+        canvas.setFont("Helvetica", 11)
+        canvas.drawString(72, 700, "Visible SYNTHETIC_SECRET after")
+        canvas.setFillColorRGB(0, 0, 0)
+        canvas.rect(108, 697, 112, 14, stroke=0, fill=1)
+        canvas.rect(108, 697, 112, 14, stroke=0, fill=1)
+
+    result = _detect(_pdf_bytes(draw))
+
+    assert result.status is DetectionStatus.UNSUPPORTED
+    assert result.targets == ()
+    assert result.reason_code == "OVERLAPPING_REDACTION_RECTANGLES"
+
+
 def test_black_non_text_art_is_excluded() -> None:
     def draw(canvas: Canvas) -> None:
         canvas.setFont("Helvetica", 11)
@@ -174,6 +242,21 @@ def test_black_non_text_art_is_excluded() -> None:
     assert result.status is DetectionStatus.NO_REDACTIONS
     assert result.targets == ()
     assert result.ignored_artwork_count == 1
+
+
+def test_standalone_redaction_like_rectangle_is_unsupported() -> None:
+    def draw(canvas: Canvas) -> None:
+        canvas.setFont("Helvetica", 11)
+        canvas.drawString(72, 730, "Visible context before the hidden line.")
+        canvas.drawString(72, 670, "Visible context after the hidden line.")
+        canvas.setFillColorRGB(0, 0, 0)
+        canvas.rect(72, 697, 150, 14, stroke=0, fill=1)
+
+    result = _detect(_pdf_bytes(draw))
+
+    assert result.status is DetectionStatus.UNSUPPORTED
+    assert result.targets == ()
+    assert result.reason_code == "AMBIGUOUS_TEXT_FLOW_RECTANGLE"
 
 
 def test_non_rectangular_black_occlusion_in_text_flow_is_unsupported() -> None:

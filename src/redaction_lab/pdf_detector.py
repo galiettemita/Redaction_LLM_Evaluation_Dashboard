@@ -185,6 +185,64 @@ def _same_text_flow(
     return False
 
 
+def _near_text_block(
+    rectangle: tuple[float, float, float, float],
+    chars: list[dict[str, Any]],
+) -> bool:
+    x0, y0, x1, y1 = rectangle
+    nearby_gap = max(36.0, (y1 - y0) * 3.0)
+    for char in chars:
+        if not str(char.get("text", "")).strip():
+            continue
+        cx0, cy0, cx1, cy1 = _char_bbox(char)
+        horizontal_overlap = min(x1, cx1) - max(x0, cx0)
+        if horizontal_overlap <= 0:
+            continue
+        vertical_gap = max(cy0 - y1, y0 - cy1, 0.0)
+        if vertical_gap <= nearby_gap:
+            return True
+    return False
+
+
+def _has_ambiguous_multicolumn_layout(
+    chars: list[dict[str, Any]], page_width: float
+) -> bool:
+    lines: list[list[dict[str, Any]]] = []
+    visible_chars = [
+        char for char in chars if str(char.get("text", "")).strip()
+    ]
+    for char in sorted(
+        visible_chars, key=lambda item: (float(item["top"]), float(item["x0"]))
+    ):
+        if not lines or abs(float(lines[-1][0]["top"]) - float(char["top"])) > 3.0:
+            lines.append([char])
+        else:
+            lines[-1].append(char)
+
+    minimum_gap = page_width * 0.12
+    candidate_splits: list[float] = []
+    for line in lines:
+        ordered = sorted(line, key=lambda item: float(item["x0"]))
+        gaps = [
+            (
+                float(current["x0"]) - float(previous["x1"]),
+                (float(previous["x1"]) + float(current["x0"])) / 2,
+            )
+            for previous, current in zip(ordered, ordered[1:])
+        ]
+        if gaps:
+            largest_gap, split = max(gaps)
+            if largest_gap >= minimum_gap:
+                candidate_splits.append(split)
+
+    split_tolerance = page_width * 0.05
+    return any(
+        abs(first - second) <= split_tolerance
+        for index, first in enumerate(candidate_splits)
+        for second in candidate_splits[index + 1 :]
+    )
+
+
 def _identity_matrix(operands: list[Any]) -> bool:
     if len(operands) != 6:
         return False
@@ -284,13 +342,14 @@ def _target_for_rectangle(
     )
     identity_material = "|".join(
         (
+            project_id,
             redacted_document_version_id,
             str(page_index),
             *(f"{coordinate:.8f}" for coordinate in normalized),
             DETECTOR_VERSION,
         )
     )
-    digest = sha256(identity_material.encode("ascii")).hexdigest()[:24]
+    digest = sha256(identity_material.encode("utf-8")).hexdigest()[:24]
     return RedactionTarget(
         target_id=f"target-{digest}",
         target_version=f"target-{digest}-{DETECTOR_VERSION}",
@@ -405,6 +464,14 @@ def detect_targets(
                             project_id=project_id,
                             redacted_document_version_id=redacted_document_version_id,
                             reason_code="TEXT_VISIBILITY_UNCERTAIN",
+                        )
+                    if _has_ambiguous_multicolumn_layout(chars, float(page.width)):
+                        return _unsupported(
+                            source_sha256,
+                            page_count=page_count,
+                            project_id=project_id,
+                            redacted_document_version_id=redacted_document_version_id,
+                            reason_code="AMBIGUOUS_TEXT_LAYOUT",
                         )
 
                     paint_evidence = _painted_rectangles(reader, page_index)
@@ -540,6 +607,27 @@ def detect_targets(
                         if bool(rect.get("fill"))
                         and _near_black(rect.get("non_stroking_color"))
                     ]
+                    rectangle_boxes = [
+                        (
+                            float(rectangle["x0"]),
+                            float(rectangle["y0"]),
+                            float(rectangle["x1"]),
+                            float(rectangle["y1"]),
+                        )
+                        for rectangle in rectangles
+                    ]
+                    if any(
+                        _intersects(first, second)
+                        for index, first in enumerate(rectangle_boxes)
+                        for second in rectangle_boxes[index + 1 :]
+                    ):
+                        return _unsupported(
+                            source_sha256,
+                            page_count=page_count,
+                            project_id=project_id,
+                            redacted_document_version_id=redacted_document_version_id,
+                            reason_code="OVERLAPPING_REDACTION_RECTANGLES",
+                        )
                     for rectangle_index, rectangle in enumerate(rectangles):
                         bbox = (
                             float(rectangle["x0"]),
@@ -578,7 +666,9 @@ def detect_targets(
                             and _intersects(bbox, _char_bbox(char))
                         ]
                         if not occluded_chars:
-                            if _same_text_flow(bbox, chars):
+                            if _same_text_flow(bbox, chars) or _near_text_block(
+                                bbox, chars
+                            ):
                                 return _unsupported(
                                     source_sha256,
                                     page_count=page_count,
