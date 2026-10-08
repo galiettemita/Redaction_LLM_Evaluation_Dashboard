@@ -1,16 +1,21 @@
-# Codex — how to start the October 14 MVP
+# Codex — October 12 MVP: current startup and task protocol
 
-## Read-only startup you may do immediately
+**Effective deadline:** October 12, 2026 (DEC-020), replacing October 14. The original oct14 plan/spec filenames are retained as stable links; read their updated contents.
+**Authority:** AGENTS.md, live main HEAD, CURRENT_STATE.md, DECISIONS.md, AGENT_HANDOFF.md, the approved design/plan, and the exact current task packet.
 
-Open the existing GitHub repository in Codex: galiettemita/Redaction_LLM_Evaluation_Dashboard.
-Read root AGENTS.md and live main HEAD; at that SHA read CURRENT_STATE.md, DECISIONS.md, AGENT_HANDOFF.md, the Oct 14 MVP design and the detailed implementation plan. Report role, baseline SHA, epoch, blockers and local hardware/model feasibility. Do not modify code, install models, call paid APIs, provision services, or deploy. Do not claim the other ChatGPT chats were notified.
+## On every task
 
-## First coding task — only after owner approves detailed plan and packet
+1. Refresh GitHub main and report current SHA, decision epoch, task and blockers. Read the current task packet and only role-relevant documents; inspect local branch/worktree before making changes.
+2. Work on the specifically authorized isolated branch and exact file scope, using TDD and synthetic or explicitly authorized public fixtures. No extra spend, paid APIs, cloud, private research data, force push, unapproved merge or deployment.
+3. Record exact tests run/not run, results, file paths, commit SHA, known limitations and next receiver in a unique published Backend handoff.
+4. Return the handoff to Lead for independent QA and Research review. Do not automatically start the next task; a shorter deadline does not waive approval or research validity gates.
 
-Create a separate task branch/worktree. Read docs/project/task_packets/RL-MVP-001-contracts-and-synthetic-fixtures.md and Task 1 of docs/superpowers/plans/2026-10-07-oct14-mvp-implementation.md. Implement ONLY typed records, synthetic PDF fixtures and their tests using TDD. No providers, evaluation weights, UI, cloud, restricted data or extra spend.
+## Current task (October 8)
 
-At end, provide exact branch and commit, paths, tests run/not run, risks, and publish a task-scoped handoff. Stop for missing approval, changed epoch/HEAD, hidden reference leakage, model license/cost issue or scope conflict. Do not merge to main without authorization.
+RL-MVP-001 is merged. RL-MVP-002 Correction 02 is the active bounded task. Read docs/project/task_packets/RL-MVP-002-CORRECTION-02.md and the published QA/Research reviews of candidate 12698b92d883af658266d54a9223b5619dedc7ee. The owner reports having already sent the correction prompt to Codex; **do not launch a duplicate task**. Finish on the existing Task 2 branch, publish a new exact SHA/handoff, then await fresh QA and Research review. Task 3 is not authorized yet.
 
-## Copyable first prompt
+## Subsequent tasks
 
-Run a read-only Redaction Lab startup/preflight. Follow AGENTS.md at live main HEAD. Read the October 14 design, detailed implementation plan and RL-MVP-001 packet. Inspect the available Codex machine (OS, RAM, GPU, local model runtime, disk) and identify whether one real local predictor and a distinct local evaluator can run without additional spending; check licenses and availability. Report exact HEAD, epoch, feasibility, blockers and recommended first scoped coding action. Do not edit files, install/download models, call external paid services or start implementation yet.
+The approved detailed implementation plan at docs/superpowers/plans/2026-10-07-oct14-mvp-implementation.md now targets October 12. Task 3 reference alignment is the next planned dependency after Task 2 review/merge, not an instruction to begin. Other tasks require separate packets and authorization.
+
+No verified accuracy or real-model feasibility is established merely by a Codex subscription. If a prerequisite cannot be met by October 12, report the exact PARTIAL/BLOCKED status rather than fabricate a demo.
