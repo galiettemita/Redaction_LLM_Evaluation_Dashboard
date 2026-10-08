@@ -1,8 +1,10 @@
-# Research / Evaluation — October 14 kickoff
+# Research / Evaluation — October 12 kickoff
+
+**Deadline update (DEC-020, 2026-10-08):** first MVP checkpoint is October 12, not October 14. Keep original scope, no-spend rule and review gates. Task 1 is merged; Task 2 Correction 02 is routed, not yet independently verified or merged. Later tasks are not authorized merely by this date change.
 
 Status: PREPARED, NOT YET APPROVED TO IMPLEMENT OR DECLARE VALIDITY.
 Owner role: Research / Evaluation. Proposed task: RL-MVP-005.
-Read current HEAD, AGENTS.md, DECISIONS.md, RESEARCH_METHOD.md, INTERFACES.md, Oct 14 MVP design and detailed implementation plan.
+Read current HEAD, AGENTS.md, DECISIONS.md, RESEARCH_METHOD.md, INTERFACES.md, Oct 12 MVP design and detailed implementation plan.
 
 Prepare a versioned, evidence-based experimental evaluation rubric and synthetic benchmark proposal. Cover short names, paraphrases, actor/action/object reversal, negation, time/quantity/unit mismatches, uncertainty, unsupported additions, incomplete truth, judge disagreement and unknown/null states. Define exact evidence the evaluator should return. Separate scoreability gate, semantic evidence, provisional demo labels and research-verified scores.
 
