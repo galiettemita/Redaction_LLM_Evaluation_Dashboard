@@ -1,14 +1,14 @@
-# Redaction Lab — October 14 MVP design
+# Redaction Lab — October 12 MVP design
 
-Status: OWNER-APPROVED DESIGN (2026-10-07). Not an implementation authorization; detailed implementation plan still awaits owner review.
-Date: 2026-10-07. Deadline: 2026-10-14. Baseline: 7a3150ceea2d5fb23aa8acfaeef2b0ed2c4c2bc1, E0004.
-Authority: MASTER_SPEC.md and DEC-001 through DEC-018.
+Status: OWNER-APPROVED DESIGN (2026-10-07), deadline revised to October 12 on 2026-10-08 (DEC-020). Detailed plan also owner-approved; only individually approved tasks may be implemented.
+Date: 2026-10-07. Deadline: 2026-10-12 (DEC-020). Baseline: 7a3150ceea2d5fb23aa8acfaeef2b0ed2c4c2bc1, E0004.
+Authority: MASTER_SPEC.md and DEC-001 through DEC-020. Historical filename includes oct14 for stable links; October 12 is the effective deadline.
 
 ## Purpose and success
 
 Build the smallest real end-to-end Redaction Lab: upload one redacted PDF and a matching reference PDF; automatically detect every supported black-box text redaction; construct redacted-only canonical text; align exact revealed spans; make one independent prediction per target with ONE real model; use a DIFFERENT local evaluation model plus deterministic checks; display predictions, reference text and clearly qualified scores per target, document and model.
 
-The reference is required for scoring this October 14 demonstration but remains optional for prediction in the long-term product. A working demo is not a research-validated accuracy system.
+The reference is required for scoring this October 12 demonstration but remains optional for prediction in the long-term product. A working demo is not a research-validated accuracy system.
 
 ## Alternatives
 
@@ -52,6 +52,6 @@ Single-user local-only demo; no cloud deployment, provider billing, restricted d
 - Exact commands, environment, model/version, input hashes, tests run/not run, known limitations and demonstration recording documented.
 - Research/QA review of the exact candidate; any provisional score explicitly marked unvalidated.
 
-Out of scope for October 14: full scan/OCR support, DOCX, multiple prediction models, production deployment/auth, calibrated scientific accuracy claims, large-document scaling, and external retrieval. These remain in the long-term plan.
+Out of scope for October 12: full scan/OCR support, DOCX, multiple prediction models, production deployment/auth, calibrated scientific accuracy claims, large-document scaling, and external retrieval. These remain in the long-term plan.
 
-Review gate: owner must approve this written MVP design and the subsequent detailed Codex implementation plan before product code/scaffolding begins. Approval of scope is not permission for paid calls or release.
+Review gate: design and detailed implementation plan have owner approval; each coding task, merge, paid call or release still needs separate authorization. The earlier deadline does not waive QA, research, safety or data gates.
