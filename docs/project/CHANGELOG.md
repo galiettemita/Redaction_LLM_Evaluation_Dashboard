@@ -57,6 +57,12 @@ DEC-019 records the owner's approval of the written MVP design. Published the de
 
 Receivers: Backend, Research, Frontend and QA at next active checkpoint; no ACK presumed.
 
+## 2026-10-07 | E0007 | detailed plan and first coding task authorized
+
+The owner approved the detailed Oct 14 implementation plan and asked whether to proceed with the precise RL-MVP-001 Codex implementation prompt. This records bounded authorization for RL-MVP-001 only: typed contracts, synthetic PDF fixtures, local TDD tests, task branch/worktree and task-scoped handoff. No other implementation task, paid API, external data transfer, main merge or deployment is approved. Codex startup/preflight results are not yet available to this Lead chat. No code/tests were run by the Lead in this documentation update.
+
+Receivers: Backend (Codex), Research for semantic contract review, QA for independent candidate review. No ACK presumed.
+
 ## Entry format
 
 Date / epoch / task or decision ID; approved change vs proposal; affected files/contracts; source/approval evidence; test/benchmark impact; migration/rollback; required receivers; unresolved issues. Never backfill a success claim without evidence.

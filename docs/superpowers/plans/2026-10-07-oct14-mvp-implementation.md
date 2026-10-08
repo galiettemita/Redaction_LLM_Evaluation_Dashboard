@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (- [ ]) syntax for tracking.
 
-**Status:** READY FOR OWNER REVIEW. No application code authorized until plan and first task are approved.
+**Status:** OWNER APPROVED 2026-10-07. Execution authorization is LIMITED to RL-MVP-001 (Task 1); other tasks remain proposed and require separate scoped approval. No paid calls, external data transfer, merge or deployment.
 **Goal:** By October 14, demonstrate two PDF uploads, automatic supported text-redaction detection, exact reference alignment, one REAL prediction model, a DIFFERENT evaluation model, and per-target/document/model results.
 **Architecture:** Local modular Python backend; redacted-only manifests feed a provider-neutral prediction adapter, while reference truth is isolated in a separate evaluator. Frozen attempts, versioned mappings, durable SQLite job state and a thin web UI allow later additional models without changing core contracts.
 **Tech Stack:** Proposed Python 3.11+, Pydantic v2, pytest, pdfplumber/pdfminer.six, ReportLab synthetic fixtures, FastAPI, SQLite, HTTPX, local Ollama-compatible predictor, local NLI judge via Transformers, React/Vite/TypeScript. Verify licenses, hardware and exact versions in Task 0. No production stack approved.
