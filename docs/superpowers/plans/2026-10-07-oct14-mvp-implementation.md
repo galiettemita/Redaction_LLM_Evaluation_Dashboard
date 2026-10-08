@@ -1,9 +1,9 @@
-# October 14 MVP Implementation Plan
+# October 12 MVP Implementation Plan (DEC-020; historical filename)
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (- [ ]) syntax for tracking.
 
-**Status:** OWNER APPROVED 2026-10-07. Execution authorization is LIMITED to RL-MVP-001 (Task 1); other tasks remain proposed and require separate scoped approval. No paid calls, external data transfer, merge or deployment.
-**Goal:** By October 14, demonstrate two PDF uploads, automatic supported text-redaction detection, exact reference alignment, one REAL prediction model, a DIFFERENT evaluation model, and per-target/document/model results.
+**Status:** OWNER APPROVED 2026-10-07; first-checkpoint date amended to October 12, 2026 (DEC-020, 2026-10-08). RL-MVP-001 merged; RL-MVP-002 Correction 02 routed under its existing authorization; Tasks 3+ NOT APPROVED. No paid calls, external data transfer, automatic merge or deployment.
+**Goal:** By October 12, demonstrate two PDF uploads, automatic supported text-redaction detection, exact reference alignment, one REAL prediction model, a DIFFERENT evaluation model, and per-target/document/model results.
 **Architecture:** Local modular Python backend; redacted-only manifests feed a provider-neutral prediction adapter, while reference truth is isolated in a separate evaluator. Frozen attempts, versioned mappings, durable SQLite job state and a thin web UI allow later additional models without changing core contracts.
 **Tech Stack:** Proposed Python 3.11+, Pydantic v2, pytest, pdfplumber/pdfminer.six, ReportLab synthetic fixtures, FastAPI, SQLite, HTTPX, local Ollama-compatible predictor, local NLI judge via Transformers, React/Vite/TypeScript. Verify licenses, hardware and exact versions in Task 0. No production stack approved.
 **Spec:** docs/superpowers/specs/2026-10-07-oct14-mvp-design.md
@@ -116,7 +116,7 @@ pyproject.toml (deps/tests); src/redaction_lab/contracts.py (typed records and r
 
 ### Task 8 — Independent QA and checkpoint evidence (RL-MVP-008/009)
 
-**Files:** tests/test_end_to_end.py; docs/project/handoffs/<task>-qa-<UTC>-<ID>.md; docs/project/demo/2026-10-14-checkpoint.md.
+**Files:** tests/test_end_to_end.py; docs/project/handoffs/<task>-qa-<UTC>-<ID>.md; docs/project/demo/2026-10-12-checkpoint.md.
 **Consumes:** exact candidate commit, approved design, plan, fixtures and rubric.
 
 - [ ] QA independently tests overlay leakage, duplicate jobs, repeated anchors, missing truth, wrong actor/negation, refusals, malformed PDFs, restart and no extra spend.
@@ -124,10 +124,18 @@ pyproject.toml (deps/tests); src/redaction_lab/contracts.py (typed records and r
 - [ ] Execute one REAL local predictor and distinct evaluator end-to-end on synthetic multi-redaction pair; save reproducible environment/model/version evidence, without publishing private artifacts.
 - [ ] If any gate fails, label checkpoint PARTIAL/BLOCKED with reason. Lead integrates only after authorized review; no automatic deploy.
 
-## Execution order and schedule
+## Execution order and schedule — revised October 8
 
-Oct 7: owner plan review + Task 0; Oct 8: Tasks 1–2; Oct 9: Task 3; Oct 10: Task 4; Oct 11: Tasks 5–6; Oct 12: Task 7; Oct 13: Task 8 regression/recovery; Oct 14: controlled local demo. Research rubric and Frontend API mock design may be prepared in parallel after scope approval. This is a target, not a guaranteed completion date.
+**First MVP checkpoint: October 12, 2026 (DEC-020). Status: AT RISK.** The same acceptance criteria apply. This accelerated sequence is a conditional critical path, not authorization for later tasks or a guarantee of completion.
+
+- **Oct 8:** RL-MVP-002 Correction 02 is in progress on its existing branch; wait for exact-SHA QA/Research review and owner-authorized merge. Read-only no-cost machine/model/license feasibility may be checked separately. No Task 3 while Task 2 is held.
+- **Oct 9:** *If* Task 2 is approved and merged, propose/authorize Task 3 text-first reference alignment, with null/unknown tests and independent review. Research may prepare the Task 5 experimental-rubric proposal, and Frontend may prepare a synthetic API/UI contract, only within approved scopes.
+- **Oct 10:** *If prerequisites and packets are approved*, implement Task 4 provider-neutral one-shot adapter and a real no-cost local predictor; evaluate separate local judge feasibility. Start Task 5 research rubric review without claiming human scientific approval.
+- **Oct 11:** *If Task 3/4 contracts and local hardware are verified*, implement Task 6 independent evaluator and summaries; implement Task 7 minimal local two-upload API/viewer only against stable interfaces and approved packets. Independent QA reviews exact candidate commits; no unreviewed merges.
+- **Oct 12:** Task 8/9 integrated local synthetic-PDF demo, regression/QA and reproducibility evidence **only if all required gates pass**. If the real models, safe alignment, independent evaluator, UI or reviews are not ready, report PARTIAL/BLOCKED with exact missing components instead of a fabricated successful demo.
+
+**Sequencing rule:** Codex remains the implementation engine, but a completed branch is not automatically merged or allowed to start the next task. Backend and Frontend may work on separate approved branches only when interfaces are stable. QA and Research cannot be replaced by Codex self-review. No paid inference, cloud, private data, lowered truth requirements or scientifically unvalidated accuracy claims.
 
 ## Self-review and hard gates
 
-All spec flows have tasks. Exact dependency names are declared once above; downstream implementers must keep signatures compatible. No extra providers, OCR, DOCX, multi-model ranking or deployment this week. Hardware/licensing, exact local model IDs, validated numeric scoring and lab data permissions remain explicit gates. The owner approved the written MVP design; **this detailed implementation plan still requires owner review**. No product code has been written by publishing this plan.
+All spec flows have tasks. Exact dependency names are declared once above; downstream implementers must keep signatures compatible. No extra providers, OCR, DOCX, multi-model ranking or deployment this week. Hardware/licensing, exact local model IDs, validated numeric scoring and lab data permissions remain explicit gates. The owner approved the MVP design and detailed plan; DEC-020 changes the checkpoint date only. Task 1 is merged and Task 2 remains under correction. Tasks 3+ require separate authorization; plan publication does not implement code.
