@@ -282,6 +282,20 @@ def test_one_line_secondary_column_is_unsupported() -> None:
     assert result.reason_code == "AMBIGUOUS_TEXT_LAYOUT"
 
 
+def test_staggered_two_one_line_columns_are_unsupported() -> None:
+    def draw(canvas: Canvas) -> None:
+        canvas.setFont("Helvetica", 11)
+        canvas.drawString(72, 720, "Left SYNTHETIC_SECRET")
+        canvas.drawString(330, 680, "Right column only line")
+        canvas.setFillColorRGB(0, 0, 0)
+        canvas.rect(94, 717, 120, 14, stroke=0, fill=1)
+
+    result = _detect(_pdf_bytes(draw))
+
+    assert result.status is DetectionStatus.UNSUPPORTED
+    assert result.reason_code == "AMBIGUOUS_TEXT_LAYOUT"
+
+
 def test_single_column_single_line_layout_remains_supported() -> None:
     def draw(canvas: Canvas) -> None:
         canvas.setFont("Helvetica", 11)
@@ -302,6 +316,21 @@ def test_single_column_indented_layout_remains_supported() -> None:
         canvas.drawString(96, 700, "Indented SYNTHETIC_SECRET after")
         canvas.setFillColorRGB(0, 0, 0)
         canvas.rect(140, 697, 112, 14, stroke=0, fill=1)
+
+    result = _detect(_pdf_bytes(draw))
+
+    assert result.status is DetectionStatus.SUPPORTED
+    assert len(result.targets) == 1
+
+
+def test_single_column_heading_and_body_remain_supported() -> None:
+    def draw(canvas: Canvas) -> None:
+        canvas.setFont("Helvetica-Bold", 16)
+        canvas.drawString(240, 740, "Synthetic heading")
+        canvas.setFont("Helvetica", 11)
+        canvas.drawString(72, 700, "Visible SYNTHETIC_SECRET after the heading")
+        canvas.setFillColorRGB(0, 0, 0)
+        canvas.rect(108, 697, 112, 14, stroke=0, fill=1)
 
     result = _detect(_pdf_bytes(draw))
 
@@ -424,6 +453,49 @@ def test_standalone_rectangle_at_end_of_text_section_is_unsupported() -> None:
     assert result.status is DetectionStatus.UNSUPPORTED
     assert result.targets == ()
     assert result.reason_code == "AMBIGUOUS_TEXT_FLOW_RECTANGLE"
+
+
+@pytest.mark.parametrize("box_y", [720, 620])
+def test_near_indented_boundary_rectangle_is_unsupported(box_y: int) -> None:
+    def draw(canvas: Canvas) -> None:
+        canvas.setFont("Helvetica", 11)
+        canvas.drawString(72, 670, "Short")
+        canvas.setFillColorRGB(0, 0, 0)
+        canvas.rect(105, box_y, 120, 14, stroke=0, fill=1)
+
+    result = _detect(_pdf_bytes(draw))
+
+    assert result.status is DetectionStatus.UNSUPPORTED
+    assert result.targets == ()
+    assert result.reason_code == "AMBIGUOUS_TEXT_FLOW_RECTANGLE"
+
+
+def test_offset_boundary_rectangle_in_general_text_region_is_unsupported() -> None:
+    def draw(canvas: Canvas) -> None:
+        canvas.setFont("Helvetica", 11)
+        canvas.drawString(72, 670, "Short")
+        canvas.setFillColorRGB(0, 0, 0)
+        canvas.rect(260, 720, 120, 14, stroke=0, fill=1)
+
+    result = _detect(_pdf_bytes(draw))
+
+    assert result.status is DetectionStatus.UNSUPPORTED
+    assert result.targets == ()
+    assert result.reason_code == "AMBIGUOUS_TEXT_FLOW_RECTANGLE"
+
+
+def test_remote_wide_artwork_remains_excluded() -> None:
+    def draw(canvas: Canvas) -> None:
+        canvas.setFont("Helvetica", 11)
+        canvas.drawString(72, 700, "Short")
+        canvas.setFillColorRGB(0, 0, 0)
+        canvas.rect(460, 220, 60, 12, stroke=0, fill=1)
+
+    result = _detect(_pdf_bytes(draw))
+
+    assert result.status is DetectionStatus.NO_REDACTIONS
+    assert result.targets == ()
+    assert result.ignored_artwork_count == 1
 
 
 def test_non_rectangular_black_occlusion_in_text_flow_is_unsupported() -> None:

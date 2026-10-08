@@ -20,7 +20,7 @@ from pypdf.generic import ContentStream
 from redaction_lab.contracts import DetectionEvidence, RedactionTarget, ScopeStatus
 
 
-DETECTOR_VERSION = "vector-text-rect-v3"
+DETECTOR_VERSION = "vector-text-rect-v4"
 _TEXT_SHOW_OPERATORS = {b"Tj", b"TJ", b"'", b'"'}
 _UNSAFE_OPERATORS = {
     b"Do",
@@ -190,15 +190,35 @@ def _aligned_with_text_block(
     rectangle: tuple[float, float, float, float],
     chars: list[dict[str, Any]],
 ) -> bool:
-    x0, _, x1, _ = rectangle
-    for char in chars:
-        if not str(char.get("text", "")).strip():
-            continue
-        cx0, _, cx1, _ = _char_bbox(char)
+    x0, y0, x1, y1 = rectangle
+    visible_boxes = [
+        _char_bbox(char)
+        for char in chars
+        if str(char.get("text", "")).strip()
+    ]
+    for cx0, _, cx1, _ in visible_boxes:
         horizontal_overlap = min(x1, cx1) - max(x0, cx0)
         if horizontal_overlap > 0:
             return True
-    return False
+
+    if not visible_boxes:
+        return False
+    rectangle_width = x1 - x0
+    rectangle_height = y1 - y0
+    text_heights = sorted(cy1 - cy0 for _, cy0, _, cy1 in visible_boxes)
+    typical_text_height = text_heights[len(text_heights) // 2]
+    if (
+        rectangle_width < typical_text_height * 2.0
+        or rectangle_height > typical_text_height * 2.0
+    ):
+        return False
+
+    minimum_horizontal_gap = min(
+        x0 - cx1 if cx1 <= x0 else cx0 - x1
+        for cx0, _, cx1, _ in visible_boxes
+        if cx1 <= x0 or cx0 >= x1
+    )
+    return minimum_horizontal_gap <= max(36.0, rectangle_width * 1.5)
 
 
 def _has_ambiguous_multicolumn_layout(
@@ -217,8 +237,9 @@ def _has_ambiguous_multicolumn_layout(
             lines[-1].append(char)
 
     spans: list[tuple[float, float]] = []
+    positioned_spans: list[tuple[float, float, float, float, int]] = []
     line_span_starts: list[list[float]] = []
-    for line in lines:
+    for line_index, line in enumerate(lines):
         ordered = sorted(line, key=lambda item: float(item["x0"]))
         if not ordered:
             continue
@@ -231,11 +252,31 @@ def _has_ambiguous_multicolumn_layout(
         previous = ordered[0]
         for current in ordered[1:]:
             if float(current["x0"]) - float(previous["x1"]) > segment_gap:
-                spans.append((span_start, float(previous["x1"])))
+                span_end = float(previous["x1"])
+                spans.append((span_start, span_end))
+                positioned_spans.append(
+                    (
+                        span_start,
+                        span_end,
+                        float(ordered[0]["top"]),
+                        typical_height,
+                        line_index,
+                    )
+                )
                 span_start = float(current["x0"])
                 current_line_starts.append(span_start)
             previous = current
-        spans.append((span_start, float(previous["x1"])))
+        span_end = float(previous["x1"])
+        spans.append((span_start, span_end))
+        positioned_spans.append(
+            (
+                span_start,
+                span_end,
+                float(ordered[0]["top"]),
+                typical_height,
+                line_index,
+            )
+        )
         line_span_starts.append(current_line_starts)
 
     start_tolerance = page_width * 0.05
@@ -265,7 +306,20 @@ def _has_ambiguous_multicolumn_layout(
         for repeated in repeated_starts
         for start, _ in spans
     )
-    return split_line or sparse_secondary_column
+    staggered_sparse_columns = any(
+        abs(first_start - second_start) >= minimum_column_separation
+        and max(first_start, second_start) > min(first_end, second_end)
+        and abs(first_top - second_top)
+        <= max(48.0, max(first_height, second_height) * 4.0)
+        for first_start, first_end, first_top, first_height, first_line in (
+            positioned_spans
+        )
+        for second_start, second_end, second_top, second_height, second_line in (
+            positioned_spans
+        )
+        if first_line < second_line
+    )
+    return split_line or sparse_secondary_column or staggered_sparse_columns
 
 
 def _identity_matrix(operands: list[Any]) -> bool:
