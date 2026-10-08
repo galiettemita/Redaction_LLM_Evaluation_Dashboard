@@ -173,6 +173,12 @@ Independent QA (FAIL, `007eb0e`) and Research (CHANGES_REQUESTED, `6406a25`) rev
 
 Owner explicitly approved DEC-021 and [bounded Correction 01](task_packets/RL-MVP-003-CORRECTION-01.md), including trusted existing DocumentVersion role/project/version/SHA-256 byte verification, two-sided alignment, and exact source span or null. No contracts schema change, merge, Task 4, scientific D03 validation, paid calls or deployment. Codex correction has not yet been published.
 
+## 2026-10-08 | E0027 | Task 3 trust boundary stop and proposed DEC-022
+
+Backend reports stopping RL-MVP-003 Correction 01: a fabricated DocumentVersion can pass byte/role/project/version checks and falsely CONFIRM, and partially hidden edge punctuation may be omitted with CONFIRMED. Local rejected `80f9ee1` and its 159 reported tests are NOT PUBLISHED or independently verified; Backend remote remains `2d79ee6`. No merge or Task 4.
+
+Published [trust-boundary proposal](task_packets/RL-MVP-003-TRUST-BOUNDARY-PROPOSAL.md) and **proposed, not approved** DEC-022: synthetic-fixture trusted pairing manifest for October 12, with arbitrary user-uploaded reference truth null until authenticated pairing exists. This changes the demonstration's scoreable subset and requires owner approval, separate scoped work and fresh QA/Research. No application code or tests run by Lead; no scientific D03 approval, paid calls or deployment.
+
 ## Entry format
 
 Date / epoch / task or decision ID; approved change vs proposal; affected files/contracts; source/approval evidence; test/benchmark impact; migration/rollback; required receivers; unresolved issues. Never backfill a success claim without evidence.
