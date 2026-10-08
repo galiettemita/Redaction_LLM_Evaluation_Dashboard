@@ -81,6 +81,12 @@ No scientific scoring approval. Remaining transactional checks are deferred to a
 
 Owner authorized and GitHub merged PR #1 at `ba60aaa811fad1ec7d2ad79ab2f4aebfa021b067`. Exact reviewed implementation `a1d8311` is included with its two Backend handoffs. QA PASS (43 repository tests, 11 adversarial passes, 1 deselected); Research contract-semantics PASS (13 independent checks). Lead verified the merge and blob hashes, not runtime tests. No Task 2, deployment or research-scoring authorization. Transactional integrity and summary provenance remain downstream requirements.
 
+## 2026-10-07 | E0011 | RL-MVP-002 authorized for Codex
+
+Following the reviewed RL-MVP-001 merge, the owner directed continued Codex implementation. Published [RL-MVP-002](task_packets/RL-MVP-002-detection-canonicalization.md) as a bounded Backend task: automatic vector black-text-box detection, fail-closed removal of hidden selectable PDF text, deterministic canonical text and synthetic TDD tests. No merge, Task 3, paid calls, restricted data or deployment. No code/test execution claimed.
+
+Affected roles: Backend/Codex (implement), QA and Research (review exact candidate). No ACK presumed.
+
 ## Entry format
 
 Date / epoch / task or decision ID; approved change vs proposal; affected files/contracts; source/approval evidence; test/benchmark impact; migration/rollback; required receivers; unresolved issues. Never backfill a success claim without evidence.

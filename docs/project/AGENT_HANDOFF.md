@@ -18,6 +18,7 @@ This file is the Lead-maintained routing/index record. Each specialist writes a 
 | E0009 / RL-MVP-001 corrected Research review | Research -> Lead | PASS for contract semantics; not scientific validation | Review `a1d8311`; handoff branch `review/rl-mvp-001-research-corrected-e0008` at `a597ee23`; 13 independent checks. |
 | E0009 / RL-MVP-001 integration gate | Lead -> owner | AWAITING MERGE AUTHORIZATION | Candidate branch `codex/rl-mvp-001-contracts-fixtures` at `c698cd4`; no merge or Task 2 until explicitly authorized. |
 | E0010 / RL-MVP-001 integration | Lead -> Backend, Research, Frontend, QA | MERGED; no receiver ACK | Owner-authorized [PR #1](https://github.com/galiettemita/Redaction_LLM_Evaluation_Dashboard/pull/1) at `ba60aaa8` integrated reviewed contracts and fixtures. Task 2 not authorized; next roles read current main. |
+| E0011 / RL-MVP-002 Codex kickoff | Lead -> Backend, QA, Research | APPROVED TASK; no receiver ACK | [Task packet](task_packets/RL-MVP-002-detection-canonicalization.md): safe vector-PDF text redaction detection and canonicalization, synthetic TDD, new branch and handoff. No merge or Task 3. |
 | Next S1 packet | Lead -> owner / relevant roles | NOT APPROVED | Resolve blocking decisions and propose one narrow packet. |
 
 No review, implementation completion or running agent is implied by these rows.
