@@ -127,6 +127,12 @@ Verified `codex/rl-mvp-002-detection-canonicalization` at `821f57348c49845e4d922
 
 Published [exact-candidate QA/Research packet](task_packets/RL-MVP-002-CORRECTION-03-REVIEW.md). No independent PASS, merge, Task 3, paid service, scientific score validation or deployment. October 12 deadline unchanged and at risk.
 
+## 2026-10-08 | E0019 | Correction 03 independent reviews reconciled
+
+QA branch `b18f947639713b255d2c88adbc1dfbe03832417e` FAIL and Research branch `48377ce048b538a7f80bf962177f1d9b61e37483` CHANGES_REQUESTED on exact implementation `dbae9f79`. Three blocking cases: staggered columns >48pt, 18–20pt plausible no-glyph boundary boxes, and short centered-heading false positive. QA used independent PDF/source probes; Research reported 16/22 adversarial expectations passed; neither reran the full 100-test suite.
+
+Published [Correction 04](task_packets/RL-MVP-002-CORRECTION-04.md) to define a conservative accepted-layout envelope and focused positive/negative tests within Task 2. No Lead code changes or application tests, merge, Task 3, paid services, research score approval or deployment. October 12 deadline remains at risk.
+
 ## Entry format
 
 Date / epoch / task or decision ID; approved change vs proposal; affected files/contracts; source/approval evidence; test/benchmark impact; migration/rollback; required receivers; unresolved issues. Never backfill a success claim without evidence.
