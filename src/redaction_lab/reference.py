@@ -603,9 +603,18 @@ def _geometry_candidate(
         line_start = reference_text.rfind("\n", 0, first.start) + 1
         next_newline = reference_text.find("\n", last.end)
         line_end = len(reference_text) if next_newline < 0 else next_newline
-        source_start = reference_text.find(quote, line_start, line_end)
-        if source_start < 0:
+        source_matches: list[int] = []
+        search_at = line_start
+        while search_at <= line_end - len(quote):
+            found = reference_text.find(quote, search_at, line_end)
+            if found < 0:
+                break
+            if found <= first.start and found + len(quote) >= last.end:
+                source_matches.append(found)
+            search_at = found + 1
+        if len(source_matches) != 1:
             continue
+        source_start = source_matches[0]
         candidates.append(
             _Candidate(
                 start=start,

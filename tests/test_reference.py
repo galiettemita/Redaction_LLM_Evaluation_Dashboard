@@ -343,6 +343,27 @@ def test_exact_reference_preserves_covered_punctuation_and_whitespace(
     assert mapping.exact_revealed_text == secret
 
 
+def test_character_locator_tracks_the_matched_duplicate_occurrence() -> None:
+    prefix = "ALPHA then "
+    secret = "ALPHA"
+
+    def draw_redacted(canvas: Canvas) -> None:
+        canvas.drawString(72, 700, f"{prefix}{secret} at end.")
+        _overlay(canvas, 72, 700, prefix, secret)
+
+    def draw_reference(canvas: Canvas) -> None:
+        canvas.drawString(72, 700, f"{prefix}{secret} at end.")
+
+    canonical, targets = _redacted_context(_pdf_bytes(draw_redacted))
+
+    mapping = _align(canonical, targets, _pdf_bytes(draw_reference))[0]
+
+    assert mapping.status is ReferenceStatus.CONFIRMED
+    assert mapping.exact_revealed_text == secret
+    assert mapping.reference_token_locator is not None
+    assert mapping.reference_token_locator.endswith("chars:11-16")
+
+
 def test_adjacent_targets_are_extracted_independently(tmp_path: Path) -> None:
     canonical, targets, reference_pdf = _fixture_context(
         "adjacent_boxes", tmp_path
