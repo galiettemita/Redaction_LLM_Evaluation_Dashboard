@@ -1,6 +1,6 @@
 # Current state
 
-Updated: 2026-10-08 (America/New_York). Coordination epoch: **E0016**.
+Updated: 2026-10-08 (America/New_York). Coordination epoch: **E0017**.
 Integration branch: `main`. Canonical writer: **Lead/Architect**, within the owner's approved scope.
 Resolve the actual HEAD with GitHub; do not infer a current SHA from this file's timestamp.
 
@@ -16,7 +16,7 @@ The eight shared files and root agent instructions define a coordination protoco
 
 ## Holds and urgent changes
 
-E0016 hold: RL-MVP-002 Correction 02 candidate is published but not independently reviewed. No merge or Task 3 until exact-SHA QA/Research review and authorization. Standing hold: no application code, live model calls, migrations, cloud resources or deployment without the relevant approved task and decisions. Private data must not be put in this public repository.
+E0017 hold: RL-MVP-002 Correction 02 FAILED independent review; Correction 03 is routed. No merge or Task 3 before a corrected exact SHA passes review and owner authorization. Standing hold: no application code, live model calls, migrations, cloud resources or deployment without the relevant approved task and decisions. Private data must not be put in this public repository.
 
 On a critical new change, the Lead records affected task IDs here as `ON_HOLD`, increments the epoch and links the decision. This stops work only when an active agent next checks; it is not a remote kill switch.
 
@@ -27,7 +27,7 @@ On a critical new change, the Lead records affected task IDs here as `ON_HOLD`, 
 | RL-OPS-001 | DOCUMENTATION_BASELINE | Lead/Architect | This coordination package. Verify committed files against the setup request; no app tests claimed. |
 | RL-MVP-PLAN-001 | PLAN_APPROVED | Lead/Architect | [Oct 12 design (legacy filename)](../../docs/superpowers/specs/2026-10-07-oct14-mvp-design.md) and [weekly roadmap](plans/2026-10-07-weekly-implementation-roadmap.md); [detailed plan](../../docs/superpowers/plans/2026-10-07-oct14-mvp-implementation.md) owner approved 2026-10-07; RL-MVP-001 merged; RL-MVP-002 coding approved within its packet. |
 | RL-MVP-001 | MERGED | Backend | [Contracts and synthetic fixtures](task_packets/RL-MVP-001-contracts-and-synthetic-fixtures.md); corrected implementation `a1d8311`, branch head `c698cd4`; QA and Research both PASS for Task 1; owner-approved merge complete. |
-| RL-MVP-002 | CORRECTION_02_READY_FOR_REVIEW | Backend/Codex | Implementation `ea930ab`, branch head `e5333602`; Codex reports 94 tests passed; [fresh review packet](task_packets/RL-MVP-002-CORRECTION-02-REVIEW.md). No merge/Task 3. |
+| RL-MVP-002 | CHANGES_REQUESTED; CORRECTION_03_ROUTED | Backend/Codex | QA FAIL and Research CHANGES_REQUESTED on `ea930ab`; [Correction 03](task_packets/RL-MVP-002-CORRECTION-03.md) addresses staggered one-line columns and near/indented no-glyph boundary boxes. No merge/Task 3. |
 | RL-S1-001 | PROPOSED | Lead + Backend | Define document/target/reference records and initial input limits; D01/D02/D03 and component plan required. |
 | RL-S2-001 | PROPOSED | Research | Propose rubric, human benchmark and release criteria; D03/D04/D05; no invented thresholds. |
 | RL-UX-001 | PROPOSED | Frontend | Synthetic-data workflow proposal only; D09 and scoped approval before implementation. |
@@ -36,11 +36,11 @@ These proposed items are not claimed, running or approved to execute. The Lead a
 
 ## Remaining gates and next action
 
-**DEC-020 first MVP checkpoint: October 12, 2026. Schedule remains AT RISK.** No scope, QA or research gates waived.
+**October 12, 2026 checkpoint (DEC-020) remains AT RISK.** Task 1 merged; Task 2 not merged; later components unbuilt.
 
-Codex published RL-MVP-002 Correction 02 implementation `ea930abef319832cf494df5851be1b19d3e2cf1c` and Backend handoff branch head `e5333602c43d304a21980fc96103d19599e2dd27` (detector v3, sparse-column and one-sided boundary black-box handling). Codex reports 51 focused and 94 full tests passed, but Lead has not independently rerun them. [Fresh QA/Research review packet](task_packets/RL-MVP-002-CORRECTION-02-REVIEW.md) is routed; no independent verdict yet. No merge or Task 3 authorization.
+Independent [QA review](https://github.com/galiettemita/Redaction_LLM_Evaluation_Dashboard/blob/941a9b9b2ff4f1b39aa105122670aad42ad07ef2/docs/project/handoffs/RL-MVP-002-qa-20261008T150000Z-ea930ab.md) and [Research review](https://github.com/galiettemita/Redaction_LLM_Evaluation_Dashboard/blob/e1ea57d2cbbedd603637ac79dfffbeda48fe0c5c/docs/project/handoffs/RL-MVP-002-research-20261008T152306Z-correction02.md) of RL-MVP-002 Correction 02 `ea930abef319832cf494df5851be1b19d3e2cf1c` request changes. QA identified staggered two one-line columns that can escape fail-closed reading-order detection and near/indented one-sided no-glyph black boxes that can be dismissed as artwork. Research confirmed the boundary-redaction defect, while its narrower sparse-column probes passed. Neither reviewer independently ran Codex's full 94-test suite.
 
-Only Task 1 is merged. Reference alignment, real predictor, independent evaluator, UI and end-to-end demo remain unbuilt. Hardware/model licensing, scientific scoring and Columbia data approval remain open. No extra spend or deployment.
+[Correction 03](task_packets/RL-MVP-002-CORRECTION-03.md) is routed within Task 2 scope. Codex must publish a new SHA/handoff; QA and Research must re-review it independently. No merge, Task 3, paid calls, scientific score claims or deployment.
 
 ## What is present / absent
 
@@ -49,7 +49,7 @@ Present on main: typed contracts, synthetic PDF fixtures, package metadata and 4
 
 ## Latest important change
 
-E0016: Codex published Task 2 Correction 02 at `ea930ab`; exact-SHA QA and Research review requested. October 12 deadline unchanged. No merge or Task 3.
+E0017: QA and Research independently reviewed Correction 02 and requested changes; Correction 03 routed within Task 2. No new implementation, merge or Task 3 authorization.
 
 ## Maintenance rule
 

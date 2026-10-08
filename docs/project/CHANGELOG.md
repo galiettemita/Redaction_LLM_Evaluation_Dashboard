@@ -115,6 +115,12 @@ QA and Research request additional RL-MVP-002 fixes; Correction 02 routed within
 
 Verified Codex published implementation `ea930abef319832cf494df5851be1b19d3e2cf1c` and Backend handoff at `e5333602c43d304a21980fc96103d19599e2dd27`. Correction modifies detector and its tests only; Backend reports 51 focused and 94 full tests passing, compileall and diff checks. Lead did not independently execute tests. Routed [exact-candidate QA/Research packet](task_packets/RL-MVP-002-CORRECTION-02-REVIEW.md). No independent PASS, merge, Task 3, paid calls or deployment. October 12 deadline remains at risk under DEC-020.
 
+## 2026-10-08 | E0017 | RL-MVP-002 Correction 02 independent review reconciliation
+
+Retrieved QA review `941a9b9b2ff4f1b39aa105122670aad42ad07ef2` (FAIL) and Research review `e1ea57d2cbbedd603637ac79dfffbeda48fe0c5c` (CHANGES_REQUESTED) of exact implementation `ea930abef319832cf494df5851be1b19d3e2cf1c`. QA's isolated probes find staggered two one-line columns and a near/indented boundary no-glyph black box can still pass as safe/no-redactions. Research confirms the boundary case but passed its narrower sparse-column cases. Neither reviewer independently reran the full 94-test suite.
+
+Published [Correction 03](task_packets/RL-MVP-002-CORRECTION-03.md), a minimal Task-2-only fix packet. No Lead code edits or application tests, no merge, Task 3, paid call or scientific score validation. October 12 deadline unchanged and at risk.
+
 ## Entry format
 
 Date / epoch / task or decision ID; approved change vs proposal; affected files/contracts; source/approval evidence; test/benchmark impact; migration/rollback; required receivers; unresolved issues. Never backfill a success claim without evidence.
