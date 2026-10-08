@@ -1,6 +1,6 @@
 # Decision register
 
-Baseline: [MASTER_SPEC.md](MASTER_SPEC.md), imported 2026-10-06. Epoch E0025.
+Baseline: [MASTER_SPEC.md](MASTER_SPEC.md), imported 2026-10-06. Epoch E0026.
 Product decision IDs `DEC-...` are distinct from the source PDF's open-decision IDs `D01`-`D10`.
 
 ## Authority
@@ -37,6 +37,8 @@ A new user instruction can authorize work within its scope, but a chat statement
 | DEC-019 | Owner explicitly approved the written October 14 MVP design on 2026-10-07 and requested a detailed Codex implementation plan and role-specific implementation preparation. This approves the scoped design direction only: the detailed plan still requires owner review, each coding task requires a packet, and research/data/engineering approvals remain separate. | Owner approval in Lead conversation, 2026-10-07. MVP design: docs/superpowers/specs/2026-10-07-oct14-mvp-design.md. Implementation plan: docs/superpowers/plans/2026-10-07-oct14-mvp-implementation.md (READY FOR OWNER REVIEW). |
 
 | DEC-020 | The owner advances the **first MVP checkpoint from October 14 to October 12, 2026**. The same previously approved MVP scope, zero-additional-spend rule, independent QA/Research reviews, reference-null protections and human approval gates remain. This is a target date, not guaranteed delivery or blanket permission to code, merge or deploy. | Explicit owner direction on 2026-10-08. Supersedes the **date only** in DEC-018/019 and the prior roadmap. Affects plans, design, state, agent guidance and the next task schedule; no scoring-method decision changed. |
+
+| DEC-021 | Owner approves RL-MVP-003 Correction 01: require both available non-boundary anchor sides to agree with global alignment; do not let geometry override conflicting textual evidence; preserve exact target-edge whitespace or leave truth unknown; refine only the reference-alignment callable interface to accept a **trusted existing DocumentVersion** and verify project, reference role, version ID and SHA-256 against reference PDF bytes. Require conservative document-wide context coherence and trustworthy pairing; if the stateless layer cannot establish them, return unconfirmed, not guessed truth. No contract schema change, numeric threshold, scientific D03 approval, or new task authorization. | Explicit owner approval on 2026-10-08 following independent QA FAIL and Research CHANGES_REQUESTED on Task-3 candidate `931fb1c`. Affects only `reference.py`, `test_reference.py`, Task-3 Backend handoff, and future callers. Existing DocumentVersion remains unchanged; future persistence must authenticate record provenance/pairing. New exact-SHA QA/Research review required; no merge/Task 4. |
 
 Source B1 is identified in MASTER_SPEC. These IDs normalize previously stated requirements; they do not approve new numeric methods.
 
