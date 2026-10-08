@@ -1,8 +1,10 @@
-# Frontend / Product — October 14 kickoff
+# Frontend / Product — October 12 kickoff
+
+**Deadline update (DEC-020, 2026-10-08):** first MVP checkpoint is October 12, not October 14. Keep original scope, no-spend rule and review gates. Task 1 is merged; Task 2 Correction 02 is routed, not yet independently verified or merged. Later tasks are not authorized merely by this date change.
 
 Status: PREPARED, NOT YET APPROVED TO CODE.
 Owner role: Frontend / Product. Proposed task: RL-MVP-007.
-Read current HEAD, AGENTS.md, DECISIONS.md, INTERFACES.md, Oct 14 MVP design and detailed plan.
+Read current HEAD, AGENTS.md, DECISIONS.md, INTERFACES.md, Oct 12 MVP design and detailed plan.
 
 Design a professional, simple local interface for redacted PDF upload and optional reference PDF upload, a Run button, progress, clickable detected text redactions, prediction/revealed text comparison, per-target results and one-model document summary. No technical jargon in primary copy. Accessible labels, keyboard navigation and mobile readability.
 
