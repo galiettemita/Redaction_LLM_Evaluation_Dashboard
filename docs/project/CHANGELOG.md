@@ -121,6 +121,12 @@ Retrieved QA review `941a9b9b2ff4f1b39aa105122670aad42ad07ef2` (FAIL) and Resear
 
 Published [Correction 03](task_packets/RL-MVP-002-CORRECTION-03.md), a minimal Task-2-only fix packet. No Lead code edits or application tests, no merge, Task 3, paid call or scientific score validation. October 12 deadline unchanged and at risk.
 
+## 2026-10-08 | E0018 | RL-MVP-002 Correction 03 published; review routed
+
+Verified `codex/rl-mvp-002-detection-canonicalization` at `821f57348c49845e4d922122cb575e569f22d82c`, implementation `dbae9f79d1d4dcee1aba09978713e27d6939f77e`, and unique Backend handoff. Delta since prior Backend handoff is limited to detector source, detector tests and new handoff. Codex reports 57 focused / 100 full tests passed, compileall, dependency check and diff check; Lead did not independently execute tests.
+
+Published [exact-candidate QA/Research packet](task_packets/RL-MVP-002-CORRECTION-03-REVIEW.md). No independent PASS, merge, Task 3, paid service, scientific score validation or deployment. October 12 deadline unchanged and at risk.
+
 ## Entry format
 
 Date / epoch / task or decision ID; approved change vs proposal; affected files/contracts; source/approval evidence; test/benchmark impact; migration/rollback; required receivers; unresolved issues. Never backfill a success claim without evidence.
