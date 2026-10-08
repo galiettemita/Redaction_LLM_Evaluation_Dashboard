@@ -184,6 +184,29 @@ def test_globally_reordered_target_passages_invalidate_every_mapping() -> None:
     assert all(mapping.exact_revealed_text is None for mapping in mappings)
 
 
+def test_reordered_fixture_lines_cannot_leave_earlier_target_confirmed(
+    tmp_path: Path,
+) -> None:
+    canonical, targets, _ = _fixture_context("two_boxes", tmp_path)
+
+    def draw_reference(canvas: Canvas) -> None:
+        canvas.drawString(72, 738, "SYNTHETIC TEST DATA - NOT REAL")
+        canvas.drawString(
+            72, 700, "The synthetic package contained 12 paper stars."
+        )
+        canvas.drawString(
+            72, 664, "The synthetic courier was Agent Cedar at 09:00."
+        )
+        canvas.drawString(72, 36, "case=two_boxes; release=reference")
+
+    mappings = _align(canonical, targets, _pdf_bytes(draw_reference))
+
+    assert {mapping.status for mapping in mappings} == {
+        ReferenceStatus.CONFLICTING
+    }
+    assert all(mapping.exact_revealed_text is None for mapping in mappings)
+
+
 def test_one_sided_anchor_cannot_invent_target_endpoint() -> None:
     prefix = "Visible context "
 
@@ -440,6 +463,32 @@ def test_mapping_identity_and_evidence_are_deterministic(tmp_path: Path) -> None
         mapping.mapping_id for mapping in second
     ]
     assert all(mapping.mapping_version == MAPPING_VERSION for mapping in first)
+
+
+def test_exact_reference_variants_have_distinct_hashes_and_mapping_ids() -> None:
+    prefix = "The exact identity was "
+
+    def draw_redacted(canvas: Canvas) -> None:
+        canvas.drawString(72, 700, f"{prefix}Agent Cedar at noon.")
+        _overlay(canvas, 72, 700, prefix, "Agent Cedar")
+
+    def reference(secret: str) -> bytes:
+        return _pdf_bytes(
+            lambda canvas: canvas.drawString(
+                72, 700, f"{prefix}{secret} at noon."
+            )
+        )
+
+    canonical, targets = _redacted_context(_pdf_bytes(draw_redacted))
+
+    single = _align(canonical, targets, reference("Agent Cedar"))[0]
+    doubled = _align(canonical, targets, reference("Agent  Cedar"))[0]
+
+    assert single.status is ReferenceStatus.CONFIRMED
+    assert doubled.status is ReferenceStatus.CONFIRMED
+    assert single.exact_revealed_text != doubled.exact_revealed_text
+    assert single.reference_canonical_hash != doubled.reference_canonical_hash
+    assert single.mapping_id != doubled.mapping_id
 
 
 def test_confirmed_reference_never_enters_prediction_manifest(tmp_path: Path) -> None:

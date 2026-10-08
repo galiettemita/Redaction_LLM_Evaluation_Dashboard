@@ -793,6 +793,7 @@ def align_reference(
             )
             for target in targets
         ]
+    exact_reference_hash = sha256(exact_reference_text.encode("utf-8")).hexdigest()
     reference_tokens = _tokens(exact_reference_text)
     redacted_tokens = _tokens(redacted.canonical_text)
     global_pairs = _monotonic_pairs(redacted_tokens, reference_tokens)
@@ -805,7 +806,7 @@ def align_reference(
                 mapping_version=mapping_version,
                 reference_document_version_id=reference_document_version_id,
                 reference_canonical_version_id=reference_canonical_version_id,
-                reference_hash=reference.canonical_hash,
+                reference_hash=exact_reference_hash,
                 readable=bool(reference_tokens),
             )
             for target in targets
@@ -814,6 +815,7 @@ def align_reference(
 
     results: list[ReferenceMapping] = []
     confirmed_ranges: list[tuple[int, int, int]] = []
+    document_alignment_conflict = False
     for index, (target, marker) in enumerate(zip(targets, markers, strict=True)):
         if _reference_boxes_overlap(target, detection):
             results.append(
@@ -824,7 +826,7 @@ def align_reference(
                     mapping_version=mapping_version,
                     reference_document_version_id=reference_document_version_id,
                     reference_canonical_version_id=reference_canonical_version_id,
-                    reference_hash=reference.canonical_hash,
+                    reference_hash=exact_reference_hash,
                     complete_revelation=False,
                     readable=True,
                 )
@@ -868,7 +870,7 @@ def align_reference(
                     mapping_version=mapping_version,
                     reference_document_version_id=reference_document_version_id,
                     reference_canonical_version_id=reference_canonical_version_id,
-                    reference_hash=reference.canonical_hash,
+                    reference_hash=exact_reference_hash,
                     candidate_unique=hidden_matches == 1,
                     complete_revelation=False,
                     readable=True,
@@ -881,6 +883,8 @@ def align_reference(
                 if len(candidates) > 1
                 else ReferenceStatus.CONFLICTING
             )
+            if status is ReferenceStatus.CONFLICTING:
+                document_alignment_conflict = True
             results.append(
                 _unconfirmed(
                     redacted,
@@ -889,7 +893,7 @@ def align_reference(
                     mapping_version=mapping_version,
                     reference_document_version_id=reference_document_version_id,
                     reference_canonical_version_id=reference_canonical_version_id,
-                    reference_hash=reference.canonical_hash,
+                    reference_hash=exact_reference_hash,
                     candidate_unique=False,
                     readable=True,
                 )
@@ -922,6 +926,7 @@ def align_reference(
             redacted_tokens,
             matching_pairs,
         ):
+            document_alignment_conflict = True
             results.append(
                 _unconfirmed(
                     redacted,
@@ -930,7 +935,7 @@ def align_reference(
                     mapping_version=mapping_version,
                     reference_document_version_id=reference_document_version_id,
                     reference_canonical_version_id=reference_canonical_version_id,
-                    reference_hash=reference.canonical_hash,
+                    reference_hash=exact_reference_hash,
                     candidate_unique=True,
                     complete_revelation=True,
                     readable=True,
@@ -947,12 +952,12 @@ def align_reference(
                 mapping_version=mapping_version,
                 reference_document_version_id=reference_document_version_id,
                 reference_canonical_version_id=reference_canonical_version_id,
-                reference_hash=reference.canonical_hash,
+                reference_hash=exact_reference_hash,
             )
         )
         confirmed_ranges.append((index, candidate.start, candidate.end))
 
-    globally_coherent = all(
+    globally_coherent = not document_alignment_conflict and all(
         confirmed_ranges[position - 1][2] <= confirmed_ranges[position][1]
         for position in range(1, len(confirmed_ranges))
     )
@@ -967,7 +972,7 @@ def align_reference(
                 mapping_version=mapping_version,
                 reference_document_version_id=reference_document_version_id,
                 reference_canonical_version_id=reference_canonical_version_id,
-                reference_hash=reference.canonical_hash,
+                reference_hash=exact_reference_hash,
                 candidate_unique=True,
                 complete_revelation=True,
                 readable=True,
