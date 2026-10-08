@@ -149,6 +149,12 @@ QA handoff `986c525778db7229315940da638d724267a4407b` reports PASS and Research 
 
 **Disposition:** REVIEW_PASSED_AWAITING_MERGE_APPROVAL. No merge, Task 3, provider calls, paid services or deployment. October 12 deadline remains at risk.
 
+## 2026-10-08 | E0023 | RL-MVP-002 owner-authorized merge
+
+Owner explicitly authorized merge of the independently reviewed Task 2 branch. [PR #2](https://github.com/galiettemita/Redaction_LLM_Evaluation_Dashboard/pull/2) merged as `35281fb9f6755ff5e5b10918b3be47cf2c4981ae` with parents `216cb69f0a9e36d55c2e82b1b9c61987d9fa01d3` (main) and `395d2321012092bd619a34711cb0b4ca4855abf2` (published Backend head). Reviewed implementation `736fa18419340b9fcb8dd5e121e8eebcc24b22f7` received QA PASS and Research Task-2 semantics PASS. Lead verified merge/ref and file blobs; did not run application tests. Codex reported 120 full tests passing; independent reviews used focused probes.
+
+Task 2 is MERGED, not production/scientifically validated. Task 3 not authorized, no model calls, paid services, private data or deployment. October 12 checkpoint remains at risk.
+
 ## Entry format
 
 Date / epoch / task or decision ID; approved change vs proposal; affected files/contracts; source/approval evidence; test/benchmark impact; migration/rollback; required receivers; unresolved issues. Never backfill a success claim without evidence.
