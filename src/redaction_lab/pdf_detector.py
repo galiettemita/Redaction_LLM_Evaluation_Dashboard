@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager, redirect_stderr
 from dataclasses import dataclass
 from enum import StrEnum
 from hashlib import sha256
 from io import BytesIO, StringIO
+import json
 import logging
 from math import isclose
-from contextlib import contextmanager, redirect_stderr
 from threading import RLock
 from typing import Any
 
@@ -19,7 +20,7 @@ from pypdf.generic import ContentStream
 from redaction_lab.contracts import DetectionEvidence, RedactionTarget, ScopeStatus
 
 
-DETECTOR_VERSION = "vector-text-rect-v1"
+DETECTOR_VERSION = "vector-text-rect-v2"
 _TEXT_SHOW_OPERATORS = {b"Tj", b"TJ", b"'", b'"'}
 _UNSAFE_OPERATORS = {
     b"Do",
@@ -191,6 +192,8 @@ def _near_text_block(
 ) -> bool:
     x0, y0, x1, y1 = rectangle
     nearby_gap = max(36.0, (y1 - y0) * 3.0)
+    text_above = False
+    text_below = False
     for char in chars:
         if not str(char.get("text", "")).strip():
             continue
@@ -201,7 +204,9 @@ def _near_text_block(
         vertical_gap = max(cy0 - y1, y0 - cy1, 0.0)
         if vertical_gap <= nearby_gap:
             return True
-    return False
+        text_above = text_above or cy0 >= y1
+        text_below = text_below or cy1 <= y0
+    return text_above and text_below
 
 
 def _has_ambiguous_multicolumn_layout(
@@ -219,27 +224,44 @@ def _has_ambiguous_multicolumn_layout(
         else:
             lines[-1].append(char)
 
-    minimum_gap = page_width * 0.12
-    candidate_splits: list[float] = []
+    spans: list[tuple[float, float]] = []
     for line in lines:
         ordered = sorted(line, key=lambda item: float(item["x0"]))
-        gaps = [
-            (
-                float(current["x0"]) - float(previous["x1"]),
-                (float(previous["x1"]) + float(current["x0"])) / 2,
-            )
-            for previous, current in zip(ordered, ordered[1:])
-        ]
-        if gaps:
-            largest_gap, split = max(gaps)
-            if largest_gap >= minimum_gap:
-                candidate_splits.append(split)
+        if not ordered:
+            continue
+        typical_height = sorted(
+            float(char["bottom"]) - float(char["top"]) for char in ordered
+        )[len(ordered) // 2]
+        segment_gap = max(8.0, typical_height * 0.75)
+        span_start = float(ordered[0]["x0"])
+        previous = ordered[0]
+        for current in ordered[1:]:
+            if float(current["x0"]) - float(previous["x1"]) > segment_gap:
+                spans.append((span_start, float(previous["x1"])))
+                span_start = float(current["x0"])
+            previous = current
+        spans.append((span_start, float(previous["x1"])))
 
-    split_tolerance = page_width * 0.05
+    start_tolerance = page_width * 0.05
+    column_starts: list[tuple[float, int]] = []
+    for start, _ in sorted(spans):
+        for index, (known_start, count) in enumerate(column_starts):
+            if abs(start - known_start) <= start_tolerance:
+                new_count = count + 1
+                column_starts[index] = (
+                    (known_start * count + start) / new_count,
+                    new_count,
+                )
+                break
+        else:
+            column_starts.append((start, 1))
+
+    repeated_starts = [start for start, count in column_starts if count >= 2]
+    minimum_column_separation = page_width * 0.15
     return any(
-        abs(first - second) <= split_tolerance
-        for index, first in enumerate(candidate_splits)
-        for second in candidate_splits[index + 1 :]
+        abs(first - second) >= minimum_column_separation
+        for index, first in enumerate(repeated_starts)
+        for second in repeated_starts[index + 1 :]
     )
 
 
@@ -340,14 +362,16 @@ def _target_for_rectangle(
         round(bbox[2] / page_width, 8),
         round(bbox[3] / page_height, 8),
     )
-    identity_material = "|".join(
+    identity_material = json.dumps(
         (
             project_id,
             redacted_document_version_id,
-            str(page_index),
-            *(f"{coordinate:.8f}" for coordinate in normalized),
+            page_index,
+            normalized,
             DETECTOR_VERSION,
-        )
+        ),
+        ensure_ascii=False,
+        separators=(",", ":"),
     )
     digest = sha256(identity_material.encode("utf-8")).hexdigest()[:24]
     return RedactionTarget(
@@ -616,10 +640,21 @@ def detect_targets(
                         )
                         for rectangle in rectangles
                     ]
+                    text_related_boxes = [
+                        bbox
+                        for bbox in rectangle_boxes
+                        if any(
+                            str(char.get("text", "")).strip()
+                            and _intersects(bbox, _char_bbox(char))
+                            for char in chars
+                        )
+                        or _same_text_flow(bbox, chars)
+                        or _near_text_block(bbox, chars)
+                    ]
                     if any(
                         _intersects(first, second)
-                        for index, first in enumerate(rectangle_boxes)
-                        for second in rectangle_boxes[index + 1 :]
+                        for index, first in enumerate(text_related_boxes)
+                        for second in text_related_boxes[index + 1 :]
                     ):
                         return _unsupported(
                             source_sha256,

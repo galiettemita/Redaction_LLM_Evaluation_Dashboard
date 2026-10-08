@@ -183,6 +183,27 @@ def test_target_ids_are_scoped_to_project(tmp_path: Path) -> None:
     )
 
 
+def test_target_identity_encoding_is_unambiguous(tmp_path: Path) -> None:
+    pdf_bytes = _fixture_bytes("two_boxes", tmp_path)
+
+    first = detect_targets(
+        pdf_bytes,
+        project_id="a|b",
+        redacted_document_version_id="c",
+    )
+    second = detect_targets(
+        pdf_bytes,
+        project_id="a",
+        redacted_document_version_id="b|c",
+    )
+
+    assert first.status is DetectionStatus.SUPPORTED
+    assert second.status is DetectionStatus.SUPPORTED
+    assert {target.target_id for target in first.targets}.isdisjoint(
+        target.target_id for target in second.targets
+    )
+
+
 def test_ambiguous_two_column_layout_is_unsupported() -> None:
     def draw(canvas: Canvas) -> None:
         canvas.setFont("Helvetica", 11)
@@ -197,6 +218,38 @@ def test_ambiguous_two_column_layout_is_unsupported() -> None:
 
     assert result.status is DetectionStatus.UNSUPPORTED
     assert result.targets == ()
+    assert result.reason_code == "AMBIGUOUS_TEXT_LAYOUT"
+
+
+def test_narrow_gutter_two_column_layout_is_unsupported() -> None:
+    def draw(canvas: Canvas) -> None:
+        canvas.setFont("Helvetica", 11)
+        canvas.drawString(72, 720, "Left first line")
+        canvas.drawString(72, 700, "Left SYNTHETIC_SECRET")
+        canvas.drawString(242, 720, "Right first line")
+        canvas.drawString(242, 700, "Right second line")
+        canvas.setFillColorRGB(0, 0, 0)
+        canvas.rect(94, 697, 120, 14, stroke=0, fill=1)
+
+    result = _detect(_pdf_bytes(draw))
+
+    assert result.status is DetectionStatus.UNSUPPORTED
+    assert result.reason_code == "AMBIGUOUS_TEXT_LAYOUT"
+
+
+def test_staggered_two_column_layout_is_unsupported() -> None:
+    def draw(canvas: Canvas) -> None:
+        canvas.setFont("Helvetica", 11)
+        canvas.drawString(72, 720, "Left first line")
+        canvas.drawString(72, 700, "Left SYNTHETIC_SECRET")
+        canvas.drawString(330, 712, "Right first line")
+        canvas.drawString(330, 692, "Right second line")
+        canvas.setFillColorRGB(0, 0, 0)
+        canvas.rect(94, 697, 120, 14, stroke=0, fill=1)
+
+    result = _detect(_pdf_bytes(draw))
+
+    assert result.status is DetectionStatus.UNSUPPORTED
     assert result.reason_code == "AMBIGUOUS_TEXT_LAYOUT"
 
 
@@ -244,11 +297,41 @@ def test_black_non_text_art_is_excluded() -> None:
     assert result.ignored_artwork_count == 1
 
 
+def test_overlapping_remote_black_art_is_excluded() -> None:
+    def draw(canvas: Canvas) -> None:
+        canvas.setFont("Helvetica", 11)
+        canvas.drawString(72, 700, "Visible synthetic paragraph with no redaction.")
+        canvas.setFillColorRGB(0, 0, 0)
+        canvas.rect(400, 220, 50, 40, stroke=0, fill=1)
+        canvas.rect(425, 230, 50, 40, stroke=0, fill=1)
+
+    result = _detect(_pdf_bytes(draw))
+
+    assert result.status is DetectionStatus.NO_REDACTIONS
+    assert result.targets == ()
+    assert result.ignored_artwork_count == 2
+
+
 def test_standalone_redaction_like_rectangle_is_unsupported() -> None:
     def draw(canvas: Canvas) -> None:
         canvas.setFont("Helvetica", 11)
         canvas.drawString(72, 730, "Visible context before the hidden line.")
         canvas.drawString(72, 670, "Visible context after the hidden line.")
+        canvas.setFillColorRGB(0, 0, 0)
+        canvas.rect(72, 697, 150, 14, stroke=0, fill=1)
+
+    result = _detect(_pdf_bytes(draw))
+
+    assert result.status is DetectionStatus.UNSUPPORTED
+    assert result.targets == ()
+    assert result.reason_code == "AMBIGUOUS_TEXT_FLOW_RECTANGLE"
+
+
+def test_standalone_rectangle_inside_text_column_is_unsupported() -> None:
+    def draw(canvas: Canvas) -> None:
+        canvas.setFont("Helvetica", 11)
+        canvas.drawString(72, 780, "Visible context before the hidden section.")
+        canvas.drawString(72, 630, "Visible context after the hidden section.")
         canvas.setFillColorRGB(0, 0, 0)
         canvas.rect(72, 697, 150, 14, stroke=0, fill=1)
 
