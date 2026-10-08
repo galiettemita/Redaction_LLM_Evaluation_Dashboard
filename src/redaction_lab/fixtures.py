@@ -15,6 +15,7 @@ SYNTHETIC_CASES = (
     "adjacent_boxes",
     "repeated_anchors",
     "still_hidden_reference",
+    "partially_revealed_reference",
     "hidden_text_layer",
 )
 
@@ -106,6 +107,18 @@ def _write_still_hidden_reference(
         )
 
 
+def _write_partially_revealed_reference(
+    canvas: Canvas, redacted: bool, is_reference: bool
+) -> None:
+    canvas.setFont("Helvetica", 11)
+    prefix = "The synthetic authorization code was "
+    canvas.drawString(72, 700, f"{prefix}ORCHARD SEVEN.")
+    if redacted:
+        _cover_text(canvas, 72, 700, prefix, "ORCHARD SEVEN")
+    elif is_reference:
+        _cover_text(canvas, 72, 700, f"{prefix}ORCHARD ", "SEVEN")
+
+
 def _write_hidden_text_layer(canvas: Canvas, redacted: bool, _: bool) -> None:
     canvas.setFont("Helvetica", 11)
     canvas.drawString(72, 700, "The hidden token is SYNTHETIC_TRAP_TOKEN.")
@@ -124,6 +137,7 @@ _WRITERS: dict[str, Callable[[Canvas, bool, bool], None]] = {
     "adjacent_boxes": _write_adjacent_boxes,
     "repeated_anchors": _write_repeated_anchors,
     "still_hidden_reference": _write_still_hidden_reference,
+    "partially_revealed_reference": _write_partially_revealed_reference,
     "hidden_text_layer": _write_hidden_text_layer,
 }
 

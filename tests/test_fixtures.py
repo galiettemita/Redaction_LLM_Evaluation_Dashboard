@@ -42,6 +42,7 @@ def test_synthetic_fixture_is_reproducible(tmp_path: Path) -> None:
         "adjacent_boxes",
         "repeated_anchors",
         "still_hidden_reference",
+        "partially_revealed_reference",
         "hidden_text_layer",
     ],
 )
@@ -99,6 +100,11 @@ def test_hidden_text_layer_trap_is_extractable_beneath_overlay(
             [(700, "The synthetic destination was ", "ORCHARD SEVEN")],
         ),
         (
+            "partially_revealed_reference",
+            "reference",
+            [(700, "The synthetic authorization code was ORCHARD ", "SEVEN")],
+        ),
+        (
             "hidden_text_layer",
             "redacted",
             [(700, "The hidden token is ", "SYNTHETIC_TRAP_TOKEN")],
@@ -130,8 +136,29 @@ def test_case_registry_is_explicit_and_unknown_cases_fail(tmp_path: Path) -> Non
         "adjacent_boxes",
         "repeated_anchors",
         "still_hidden_reference",
+        "partially_revealed_reference",
         "hidden_text_layer",
     )
 
     with pytest.raises(ValueError, match="unknown synthetic case"):
         make_synthetic_pair("not-a-case", tmp_path)
+
+
+def test_partial_reference_reveals_only_part_of_one_contiguous_target(
+    tmp_path: Path,
+) -> None:
+    redacted, reference = make_synthetic_pair("partially_revealed_reference", tmp_path)
+    redacted_rectangles = _rectangles(redacted)
+    reference_rectangles = _rectangles(reference)
+
+    full_start = 72 + stringWidth(
+        "The synthetic authorization code was ", "Helvetica", 11
+    )
+    partial_start = full_start + stringWidth("ORCHARD ", "Helvetica", 11)
+
+    assert any(x <= full_start for x, _, _, _ in redacted_rectangles)
+    assert any(
+        x <= partial_start and x > full_start
+        for x, _, _, _ in reference_rectangles
+    )
+    assert "ORCHARD SEVEN" in _text(reference)
