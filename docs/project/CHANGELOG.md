@@ -63,6 +63,14 @@ The owner approved the detailed Oct 14 implementation plan and asked whether to 
 
 Receivers: Backend (Codex), Research for semantic contract review, QA for independent candidate review. No ACK presumed.
 
+## 2026-10-08 | E0008 | RL-MVP-001 candidate ready for independent review
+
+Verified on GitHub: `main` at `5743b7a8ff6cc32c3e2a582392030d79047455e8`; branch `codex/rl-mvp-001-contracts-fixtures` at `b0282281e72f37c1cd1f7899d09691024991d150`, including implementation `8fff5f11cd9ce0c1e2ca7943aab7d02f629eff58` and published Backend handoff. Compared candidate to approved baseline: only five scoped implementation files plus one handoff. Codex reports 19 tests passed, but Lead did not independently run tests.
+
+Prepared exact-candidate read-only QA and Research review packets. Preliminary static contract questions include nested mutability, free-form settings/reference isolation, and scoreability invariants. No code changes, scientific approval, independent review, merge, or next-task authorization.
+
+**Receivers:** QA and Research at their next active task checkpoint; no automatic notification/ACK claimed.
+
 ## Entry format
 
 Date / epoch / task or decision ID; approved change vs proposal; affected files/contracts; source/approval evidence; test/benchmark impact; migration/rollback; required receivers; unresolved issues. Never backfill a success claim without evidence.
