@@ -111,6 +111,10 @@ DEC-020 records owner's change from October 14 to October 12, 2026, with no chan
 
 QA and Research request additional RL-MVP-002 fixes; Correction 02 routed within existing Task 2 scope. No code, test execution, merge, Task 3, paid calls, scientific scoring approval or deployment claimed. Receivers: Backend/Codex, QA, Research, Frontend at next active checkpoint; no ACK presumed.
 
+## 2026-10-08 | E0016 | RL-MVP-002 Correction 02 review routing
+
+Verified Codex published implementation `ea930abef319832cf494df5851be1b19d3e2cf1c` and Backend handoff at `e5333602c43d304a21980fc96103d19599e2dd27`. Correction modifies detector and its tests only; Backend reports 51 focused and 94 full tests passing, compileall and diff checks. Lead did not independently execute tests. Routed [exact-candidate QA/Research packet](task_packets/RL-MVP-002-CORRECTION-02-REVIEW.md). No independent PASS, merge, Task 3, paid calls or deployment. October 12 deadline remains at risk under DEC-020.
+
 ## Entry format
 
 Date / epoch / task or decision ID; approved change vs proposal; affected files/contracts; source/approval evidence; test/benchmark impact; migration/rollback; required receivers; unresolved issues. Never backfill a success claim without evidence.
