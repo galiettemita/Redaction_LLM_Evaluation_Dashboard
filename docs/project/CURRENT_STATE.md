@@ -1,12 +1,12 @@
 # Current state
 
-Updated: 2026-10-08 (America/New_York). Coordination epoch: **E0033**.
+Updated: 2026-10-08 (America/New_York). Coordination epoch: **E0034**.
 Integration branch: `main`. Canonical writer: **Lead/Architect**, within the owner's approved scope.
 Resolve the actual HEAD with GitHub; do not infer a current SHA from this file's timestamp.
 
 ## Read this first
 
-**Stage:** S1 / October 12 MVP implementation. **Execution boundary:** RL-MVP-001, RL-MVP-002 and RL-MVP-003 are merged. Task 4 and later implementation remain unapproved.
+**Stage:** S1 / October 12 MVP implementation. **Execution boundary:** RL-MVP-001, RL-MVP-002 and RL-MVP-003 are merged. RL-MVP-004 is approved for mock-tested implementation and read-only local feasibility preflight only. Task 5+ remains unapproved.
 **Product implementation:** RL-MVP-001 merged in PR #1 (`ba60aaa8`); RL-MVP-002 merged in PR #2 (`35281fb9`); RL-MVP-003 merged in PR #3 (`733ae024`).
 **Scoring validity:** not established. **Deployment:** none established here.
 **Active background agents / scheduler:** none installed by this setup.
@@ -16,7 +16,7 @@ The eight shared files and root agent instructions define a coordination protoco
 
 ## Holds and urgent changes
 
-E0033: owner-approved Task 3 merged through PR #3 after exact-SHA QA and Research PASS. No Task 4, paid model calls, scientific scoring or deployment authorized. Standing hold: no application code, live model calls, migrations, cloud resources or deployment without the relevant approved task and decisions. Private data must not be put in this public repository.
+E0034: owner approved bounded RL-MVP-004 mock-tested adapter/durable-worker implementation and read-only machine/model feasibility preflight. No real inference, downloads, paid calls, scientific scoring or deployment authorized. Standing hold: no application code, live model calls, migrations, cloud resources or deployment without the relevant approved task and decisions. Private data must not be put in this public repository.
 
 On a critical new change, the Lead records affected task IDs here as `ON_HOLD`, increments the epoch and links the decision. This stops work only when an active agent next checks; it is not a remote kill switch.
 
@@ -29,6 +29,7 @@ On a critical new change, the Lead records affected task IDs here as `ON_HOLD`, 
 | RL-MVP-001 | MERGED | Backend | [Contracts and synthetic fixtures](task_packets/RL-MVP-001-contracts-and-synthetic-fixtures.md); corrected implementation `a1d8311`, branch head `c698cd4`; QA and Research both PASS for Task 1; owner-approved merge complete. |
 | RL-MVP-002 | MERGED | Backend/Codex + Lead integration | Reviewed implementation `736fa18`, owner-approved PR #2 merged as `35281fb9`; QA PASS and Research Task-2 semantics PASS. |
 | RL-MVP-003 | MERGED | Backend/Codex + Lead integration | Exact candidate `97db3615`, published branch head `139921de`, owner-authorized [PR #3](https://github.com/galiettemita/Redaction_LLM_Evaluation_Dashboard/pull/3) merged as `733ae024`. QA PASS; Research Task-3 semantics PASS. Synthetic-only pairing, no D03 approval. |
+| RL-MVP-004 | APPROVED; NOT STARTED | Backend/Codex | [Bounded adapter/durable worker packet](task_packets/RL-MVP-004-prediction-adapter-durable-worker-PROPOSED.md). Mock-only implementation + read-only local preflight. No real inference, downloads, extra spend, merge or deployment. |
 | RL-S1-001 | PROPOSED | Lead + Backend | Define document/target/reference records and initial input limits; D01/D02/D03 and component plan required. |
 | RL-S2-001 | PROPOSED | Research | Propose rubric, human benchmark and release criteria; D03/D04/D05; no invented thresholds. |
 | RL-UX-001 | PROPOSED | Frontend | Synthetic-data workflow proposal only; D09 and scoped approval before implementation. |
@@ -37,11 +38,9 @@ These proposed items are not claimed, running or approved to execute. The Lead a
 
 ## Remaining gates and next action
 
-**October 12 MVP remains AT RISK.** Tasks 1–3 are merged; Task 4 and later work are not authorized.
+**October 12 MVP remains AT RISK.** Tasks 1–3 merged. The owner approved [RL-MVP-004](task_packets/RL-MVP-004-prediction-adapter-durable-worker-PROPOSED.md) for Codex to implement a strictly redacted-only provider-neutral prediction adapter, mock-tested loopback transport and durable SQLite one-shot worker, plus a **read-only local hardware/model/license preflight**. No real inference, model download/install, external API, additional spend, deployment or Task 5+ authorization.
 
-The owner explicitly approved merging independently reviewed Task 3. [PR #3](https://github.com/galiettemita/Redaction_LLM_Evaluation_Dashboard/pull/3) merged successfully at `733ae0245350439d795f86a7b68d3552cca6a3d2` (parents `3741a3d8` and Backend head `139921de`). Exact implementation `97db3615c65b9e31d0f94dca443baab760340c5f` received independent QA PASS and Research PASS for scoped Task-3 trust/truth semantics. Lead verified GitHub merge, both parents and all four implementation/test files plus Backend handoff on main. Codex reported 180 full tests passed; QA and Research performed independent targeted checks but did not rerun full pytest. Lead did not run application tests.
-
-**Next:** propose a bounded Task-4 packet for owner approval before Codex starts. Only synthetic `two_boxes` is registered; arbitrary uploaded references remain NOT_SCOREABLE/null. No scientific D03 scoring validity, real-document alignment accuracy, paid calls, private data, deployment or Task-4 authorization is implied by this merge.
+Codex must create a new isolated Task-4 branch, perform TDD, publish one unique Backend handoff and submit an exact candidate for independent QA and Research review. If the approved file/contract scope is insufficient or the in-doubt retry boundary cannot be represented safely, STOP for review. No local model or hardware has been verified; mocks do not count as a real-model demonstration. D03 scientific scoring validity remains pending.
 
 ## What is present / absent
 
@@ -50,7 +49,7 @@ Present on main: typed contracts, synthetic PDF fixtures, vector-PDF redaction d
 
 ## Latest important change
 
-E0033: owner-authorized RL-MVP-003 merged through PR #3 at `733ae024`. Task 4 remains unapproved.
+E0034: owner-approved Task-4 mock-only implementation and read-only feasibility preflight; no inference or merge.
 
 ## Maintenance rule
 

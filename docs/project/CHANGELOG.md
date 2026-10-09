@@ -201,6 +201,10 @@ Owner explicitly approved merge of the independently reviewed Task-3 branch. [PR
 
 Task 3 is MERGED, not scientifically validated or deployed. DEC-022 permits reference confirmation only for pinned synthetic `two_boxes`; arbitrary uploads remain unknown/null. Task 4, paid calls, private data, D03 scoring validation and deployment remain unauthorized.
 
+## 2026-10-09 | E0034 | Owner approval of RL-MVP-004
+
+Owner explicitly approved bounded Task-4 mock-tested redacted-only prediction adapter, strictly loopback local transport, durable SQLite one-shot worker and read-only hardware/model/license preflight. [Approved packet](task_packets/RL-MVP-004-prediction-adapter-durable-worker-PROPOSED.md) remains at its original stable path. No real inference, model installation/download, external APIs, extra spending, scoring, Task 5+, deployment or merge authorized. Backend/Codex must publish new task branch and unique handoff; QA and Research independently review exact SHA. Lead ran no application tests or hardware preflight.
+
 ## Entry format
 
 Date / epoch / task or decision ID; approved change vs proposal; affected files/contracts; source/approval evidence; test/benchmark impact; migration/rollback; required receivers; unresolved issues. Never backfill a success claim without evidence.

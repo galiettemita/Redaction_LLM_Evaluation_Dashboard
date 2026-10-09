@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (- [ ]) syntax for tracking.
 
-**Status:** OWNER APPROVED 2026-10-07; first-checkpoint date amended to October 12, 2026 (DEC-020, 2026-10-08). RL-MVP-001 merged; RL-MVP-002 Correction 02 routed under its existing authorization; Tasks 3+ NOT APPROVED. No paid calls, external data transfer, automatic merge or deployment.
+**Status:** OWNER APPROVED 2026-10-07; first-checkpoint date amended to October 12, 2026 (DEC-020, 2026-10-08). Tasks 1–3 merged; Task 4 approved for mock-tested adapter/worker and read-only local preflight only; Task 5+ NOT APPROVED. No real inference, model downloads, extra spend, automatic merge or deployment. No paid calls, external data transfer, automatic merge or deployment.
 **Goal:** By October 12, demonstrate two PDF uploads, automatic supported text-redaction detection, exact reference alignment, one REAL prediction model, a DIFFERENT evaluation model, and per-target/document/model results.
 **Architecture:** Local modular Python backend; redacted-only manifests feed a provider-neutral prediction adapter, while reference truth is isolated in a separate evaluator. Frozen attempts, versioned mappings, durable SQLite job state and a thin web UI allow later additional models without changing core contracts.
 **Tech Stack:** Proposed Python 3.11+, Pydantic v2, pytest, pdfplumber/pdfminer.six, ReportLab synthetic fixtures, FastAPI, SQLite, HTTPX, local Ollama-compatible predictor, local NLI judge via Transformers, React/Vite/TypeScript. Verify licenses, hardware and exact versions in Task 0. No production stack approved.
