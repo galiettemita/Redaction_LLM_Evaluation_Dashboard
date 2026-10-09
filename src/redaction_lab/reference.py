@@ -25,7 +25,10 @@ from redaction_lab.pdf_detector import (
     _suppress_parser_debug_logs,
     detect_targets,
 )
-from redaction_lab.reference_registry import resolve_approved_synthetic_pair
+from redaction_lab.reference_registry import (
+    ApprovedSyntheticReferencePair,
+    resolve_approved_synthetic_pair,
+)
 
 
 MAPPING_METHOD_VERSION = "text-first-reference-v2"
@@ -254,23 +257,26 @@ def _redacted_records_match_pdf(
     redacted_pdf: bytes,
     redacted: CanonicalRedactedDocument,
     targets: tuple[RedactionTarget, ...],
+    trusted_pair: ApprovedSyntheticReferencePair,
 ) -> bool:
     """Rebuild caller-supplied derived records from the pinned redacted bytes."""
 
     try:
         detection = detect_targets(
             redacted_pdf,
-            project_id=redacted.project_id,
-            redacted_document_version_id=redacted.redacted_document_version_id,
+            project_id=trusted_pair.project_id,
+            redacted_document_version_id=trusted_pair.redacted_version_id,
         )
         if detection.status is not DetectionStatus.SUPPORTED:
             return False
         rebuilt = canonicalize_redacted(
             redacted_pdf,
             detection,
-            project_id=redacted.project_id,
-            redacted_document_version_id=redacted.redacted_document_version_id,
-            canonical_document_version_id=redacted.canonical_document_version_id,
+            project_id=trusted_pair.project_id,
+            redacted_document_version_id=trusted_pair.redacted_version_id,
+            canonical_document_version_id=(
+                trusted_pair.redacted_canonical_version_id
+            ),
         )
         return rebuilt == redacted and detection.targets == targets
     except Exception:
@@ -1157,18 +1163,29 @@ def align_reference(
         if reference_canonical_version_id and reference_canonical_version_id.strip()
         else None
     )
-    if (
-        safe_reference_version_id is None
-        or safe_reference_canonical_id is None
-        or resolve_approved_synthetic_pair(
+    trusted_pair = None
+    if safe_reference_version_id is not None:
+        trusted_pair = resolve_approved_synthetic_pair(
             redacted_pdf=redacted_pdf,
             reference_pdf=reference_pdf,
             project_id=redacted.project_id,
             redacted_version_id=redacted.redacted_document_version_id,
-            reference_version_id=reference_document_version_id,
+            reference_version_id=safe_reference_version_id,
         )
-        is None
-        or not _redacted_records_match_pdf(redacted_pdf, redacted, targets)
+    if (
+        safe_reference_version_id is None
+        or safe_reference_canonical_id is None
+        or trusted_pair is None
+        or redacted.canonical_document_version_id
+        != trusted_pair.redacted_canonical_version_id
+        or safe_reference_canonical_id
+        != trusted_pair.reference_canonical_version_id
+        or not _redacted_records_match_pdf(
+            redacted_pdf,
+            redacted,
+            targets,
+            trusted_pair,
+        )
     ):
         return [
             _unconfirmed(
@@ -1176,8 +1193,10 @@ def align_reference(
                 target,
                 status=ReferenceStatus.CONFLICTING,
                 mapping_version=mapping_version,
-                reference_document_version_id=safe_reference_version_id,
-                reference_canonical_version_id=safe_reference_canonical_id,
+                reference_document_version_id=(
+                    trusted_pair.reference_version_id if trusted_pair else None
+                ),
+                reference_canonical_version_id=None,
                 reference_hash=None,
                 readable=None,
             )
@@ -1187,7 +1206,9 @@ def align_reference(
         redacted,
         reference_pdf,
         targets=targets,
-        reference_document_version_id=reference_document_version_id,
-        reference_canonical_version_id=reference_canonical_version_id,
+        reference_document_version_id=trusted_pair.reference_version_id,
+        reference_canonical_version_id=(
+            trusted_pair.reference_canonical_version_id
+        ),
         mapping_version=mapping_version,
     )

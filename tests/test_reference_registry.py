@@ -15,7 +15,9 @@ from redaction_lab.reference_registry import (
 
 PROJECT_ID = "project-rl-mvp-003"
 REDACTED_VERSION_ID = "redacted-document-v1"
+REDACTED_CANONICAL_VERSION_ID = "redacted-canonical-v1"
 REFERENCE_VERSION_ID = "reference-document-v1"
+REFERENCE_CANONICAL_VERSION_ID = "reference-canonical-v1"
 EXPECTED_REDACTED_SHA256 = (
     "2ce777d994b52281fe51f15194f4beecf47e1feb6332dfdc6873114dfe37faa2"
 )
@@ -44,8 +46,10 @@ def test_two_boxes_pins_are_literal_and_reproducible(tmp_path: Path) -> None:
     assert pair.project_id == PROJECT_ID
     assert pair.redacted_document_id == "synthetic-two-boxes-redacted"
     assert pair.redacted_version_id == REDACTED_VERSION_ID
+    assert pair.redacted_canonical_version_id == REDACTED_CANONICAL_VERSION_ID
     assert pair.reference_document_id == "synthetic-two-boxes-reference"
     assert pair.reference_version_id == REFERENCE_VERSION_ID
+    assert pair.reference_canonical_version_id == REFERENCE_CANONICAL_VERSION_ID
     assert pair.fixture_case == "two_boxes"
     assert pair.generator_provenance == (
         "redaction_lab.fixtures.make_synthetic_pair@fixture-generator-v1"

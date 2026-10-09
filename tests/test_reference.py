@@ -162,6 +162,14 @@ def test_extracts_exact_spans_between_anchors(tmp_path: Path) -> None:
         "12 paper stars",
     ]
     assert all(
+        mapping.redacted_canonical_version_id == REDACTED_CANONICAL_ID
+        for mapping in mappings
+    )
+    assert all(
+        mapping.reference_canonical_version_id == REFERENCE_CANONICAL_ID
+        for mapping in mappings
+    )
+    assert all(
         mapping.scoreability is ReferenceScoreability.SCOREABLE
         for mapping in mappings
     )
@@ -181,6 +189,47 @@ def test_extracts_exact_spans_between_anchors(tmp_path: Path) -> None:
         for mapping in mappings
         if mapping.exact_revealed_text is not None
     )
+
+
+@pytest.mark.parametrize(
+    ("redacted_canonical_id", "reference_canonical_id"),
+    [
+        ("forged-redacted-canonical", REFERENCE_CANONICAL_ID),
+        (None, REFERENCE_CANONICAL_ID),
+        ("", REFERENCE_CANONICAL_ID),
+        (REDACTED_CANONICAL_ID, "forged-reference-canonical"),
+    ],
+)
+def test_registered_pair_rejects_untrusted_canonical_version_identities(
+    redacted_canonical_id: str | None,
+    reference_canonical_id: str,
+    tmp_path: Path,
+) -> None:
+    redacted_path, reference_path = make_synthetic_pair("two_boxes", tmp_path)
+    redacted_pdf = redacted_path.read_bytes()
+    canonical, targets = _redacted_context(redacted_pdf)
+    supplied_canonical = canonical.model_copy(
+        update={"canonical_document_version_id": redacted_canonical_id}
+    )
+
+    mappings = align_reference(
+        supplied_canonical,
+        reference_path.read_bytes(),
+        redacted_pdf=redacted_pdf,
+        targets=targets,
+        reference_document_version_id=REFERENCE_VERSION_ID,
+        reference_canonical_version_id=reference_canonical_id,
+        mapping_version=MAPPING_VERSION,
+    )
+
+    assert {mapping.status for mapping in mappings} == {ReferenceStatus.CONFLICTING}
+    assert all(
+        mapping.scoreability is ReferenceScoreability.NOT_SCOREABLE
+        for mapping in mappings
+    )
+    assert all(mapping.exact_revealed_text is None for mapping in mappings)
+    assert all(mapping.redacted_canonical_version_id is None for mapping in mappings)
+    assert all(mapping.reference_canonical_version_id is None for mapping in mappings)
 
 
 def test_repeated_anchors_are_ambiguous_and_hide_candidates(tmp_path: Path) -> None:
@@ -604,6 +653,14 @@ def test_registered_pair_is_resolved_from_both_actual_pdf_streams(
         "Agent Cedar",
         "12 paper stars",
     ]
+    assert all(
+        mapping.redacted_canonical_version_id == REDACTED_CANONICAL_ID
+        for mapping in mappings
+    )
+    assert all(
+        mapping.reference_canonical_version_id == REFERENCE_CANONICAL_ID
+        for mapping in mappings
+    )
 
 
 @pytest.mark.parametrize("changed_side", ["redacted", "reference"])

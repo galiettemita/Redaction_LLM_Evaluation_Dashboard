@@ -14,9 +14,11 @@ class ApprovedSyntheticReferencePair:
     project_id: str
     redacted_document_id: str
     redacted_version_id: str
+    redacted_canonical_version_id: str
     redacted_sha256: str
     reference_document_id: str
     reference_version_id: str
+    reference_canonical_version_id: str
     reference_sha256: str
     fixture_case: str
     generator_provenance: str
@@ -27,11 +29,13 @@ APPROVED_SYNTHETIC_REFERENCE_PAIRS = (
         project_id="project-rl-mvp-003",
         redacted_document_id="synthetic-two-boxes-redacted",
         redacted_version_id="redacted-document-v1",
+        redacted_canonical_version_id="redacted-canonical-v1",
         redacted_sha256=(
             "2ce777d994b52281fe51f15194f4beecf47e1feb6332dfdc6873114dfe37faa2"
         ),
         reference_document_id="synthetic-two-boxes-reference",
         reference_version_id="reference-document-v1",
+        reference_canonical_version_id="reference-canonical-v1",
         reference_sha256=(
             "8316ae58f9a6e86c42764f3c47cb37a7e284e546eceba84dcfb3934bc5908eb4"
         ),
