@@ -183,6 +183,10 @@ Published [trust-boundary proposal](task_packets/RL-MVP-003-TRUST-BOUNDARY-PROPO
 
 Owner explicitly approved a synthetic-only trusted pairing registry for the October 12 demo. Published [scoped Task-3 packet](task_packets/RL-MVP-003-TRUSTED-SYNTHETIC-CORRECTION.md): pin both PDF hashes and immutable pair identity, reject forged caller trust, preserve two-sided global alignment and exact punctuation/whitespace or null, require independent QA/Research. Arbitrary uploaded reference truth remains unknown; redacted-only prediction remains permitted. Rejected local `80f9ee1` is NOT PUBLISHED. No Lead application tests, code merge, Task 4, paid calls, scientific D03 approval or deployment.
 
+## 2026-10-09 | E0029 | RL-MVP-003 DEC-022 candidate ready for independent review
+
+Verified implementation `8a751d4af27c8daada1071ec6c9c4fce45581d61`, published Backend head `cd4cbfafbfe0152adc8c8e68a6cf337f20348814` and scoped file deltas (four code/test files plus one unique handoff). Codex reports 56 focused/176 full tests passed, compileall and dependency/diff checks; Lead did not rerun tests. Published [exact-SHA independent QA/Research review packet](task_packets/RL-MVP-003-DEC022-INDEPENDENT-REVIEW.md). One synthetic `two_boxes` pair is pinned; no real-document trust or scientific D03 validation. No merge, Task 4, paid calls or deployment.
+
 ## Entry format
 
 Date / epoch / task or decision ID; approved change vs proposal; affected files/contracts; source/approval evidence; test/benchmark impact; migration/rollback; required receivers; unresolved issues. Never backfill a success claim without evidence.
