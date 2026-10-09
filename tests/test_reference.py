@@ -25,6 +25,7 @@ from redaction_lab.pdf_detector import DetectionStatus, detect_targets
 from redaction_lab.reference import (
     _Candidate,
     _Token,
+    _align_reference_content,
     _globally_supported,
     align_reference,
 )
@@ -36,9 +37,6 @@ REDACTED_CANONICAL_ID = "redacted-canonical-v1"
 REFERENCE_VERSION_ID = "reference-document-v1"
 REFERENCE_CANONICAL_ID = "reference-canonical-v1"
 MAPPING_VERSION = "mapping-v1"
-_DEFAULT_TRUSTED_RECORD = object()
-
-
 def _pdf_bytes(draw) -> bytes:
     output = BytesIO()
     canvas = Canvas(output, pagesize=letter, invariant=1, pageCompression=0)
@@ -103,20 +101,14 @@ def _align(
     targets,
     reference_pdf: bytes | None,
     *,
-    trusted_reference_document=_DEFAULT_TRUSTED_RECORD,
     reference_document_version_id: str | None = None,
 ):
     if reference_document_version_id is None and reference_pdf is not None:
         reference_document_version_id = REFERENCE_VERSION_ID
-    if trusted_reference_document is _DEFAULT_TRUSTED_RECORD:
-        trusted_reference_document = (
-            _trusted_reference(reference_pdf) if reference_pdf is not None else None
-        )
-    return align_reference(
+    return _align_reference_content(
         canonical,
         reference_pdf,
         targets=targets,
-        trusted_reference_document=trusted_reference_document,
         reference_document_version_id=reference_document_version_id,
         reference_canonical_version_id=(
             REFERENCE_CANONICAL_ID if reference_pdf is not None else None
@@ -543,9 +535,19 @@ def test_adjacent_targets_without_two_textual_sides_are_not_scoreable(
 
 
 def test_missing_reference_returns_absent_for_every_target(tmp_path: Path) -> None:
-    canonical, targets, _ = _fixture_context("two_boxes", tmp_path)
+    redacted_path, _ = make_synthetic_pair("two_boxes", tmp_path)
+    redacted_pdf = redacted_path.read_bytes()
+    canonical, targets = _redacted_context(redacted_pdf)
 
-    mappings = _align(canonical, targets, None)
+    mappings = align_reference(
+        canonical,
+        None,
+        redacted_pdf=redacted_pdf,
+        targets=targets,
+        reference_document_version_id=None,
+        reference_canonical_version_id=None,
+        mapping_version=MAPPING_VERSION,
+    )
 
     assert len(mappings) == len(targets)
     assert {mapping.status for mapping in mappings} == {ReferenceStatus.ABSENT}
@@ -553,72 +555,269 @@ def test_missing_reference_returns_absent_for_every_target(tmp_path: Path) -> No
     assert all(mapping.exact_revealed_text is None for mapping in mappings)
 
 
-def test_reference_without_trusted_document_binding_is_not_confirmed(
+def test_arbitrary_unregistered_upload_pair_is_not_scoreable(
     tmp_path: Path,
 ) -> None:
-    canonical, targets, reference_pdf = _fixture_context("two_boxes", tmp_path)
+    redacted_path, reference_path = make_synthetic_pair("adjacent_boxes", tmp_path)
+    redacted_pdf = redacted_path.read_bytes()
+    canonical, targets = _redacted_context(redacted_pdf)
 
-    mappings = _align(
+    mappings = align_reference(
         canonical,
-        targets,
-        reference_pdf,
-        trusted_reference_document=None,
+        reference_path.read_bytes(),
+        redacted_pdf=redacted_pdf,
+        targets=targets,
+        reference_document_version_id=REFERENCE_VERSION_ID,
+        reference_canonical_version_id=REFERENCE_CANONICAL_ID,
+        mapping_version=MAPPING_VERSION,
     )
 
     assert {mapping.status for mapping in mappings} == {
         ReferenceStatus.CONFLICTING
     }
     assert all(mapping.exact_revealed_text is None for mapping in mappings)
+
+
+def test_registered_pair_is_resolved_from_both_actual_pdf_streams(
+    tmp_path: Path,
+) -> None:
+    redacted_path, reference_path = make_synthetic_pair("two_boxes", tmp_path)
+    redacted_pdf = redacted_path.read_bytes()
+    reference_pdf = reference_path.read_bytes()
+    canonical, targets = _redacted_context(redacted_pdf)
+
+    mappings = align_reference(
+        canonical,
+        reference_pdf,
+        redacted_pdf=redacted_pdf,
+        targets=targets,
+        reference_document_version_id=REFERENCE_VERSION_ID,
+        reference_canonical_version_id=REFERENCE_CANONICAL_ID,
+        mapping_version=MAPPING_VERSION,
+    )
+
+    assert [mapping.status for mapping in mappings] == [
+        ReferenceStatus.CONFIRMED,
+        ReferenceStatus.CONFIRMED,
+    ]
+    assert [mapping.exact_revealed_text for mapping in mappings] == [
+        "Agent Cedar",
+        "12 paper stars",
+    ]
+
+
+@pytest.mark.parametrize("changed_side", ["redacted", "reference"])
+def test_changed_registered_pair_bytes_are_not_scoreable(
+    changed_side: str,
+    tmp_path: Path,
+) -> None:
+    redacted_path, reference_path = make_synthetic_pair("two_boxes", tmp_path)
+    redacted_pdf = redacted_path.read_bytes()
+    reference_pdf = reference_path.read_bytes()
+    canonical, targets = _redacted_context(redacted_pdf)
+    if changed_side == "redacted":
+        supplied_redacted = redacted_pdf + b"\x00"
+        supplied_reference = reference_pdf
+    else:
+        supplied_redacted = redacted_pdf
+        supplied_reference = reference_pdf + b"\x00"
+
+    mappings = align_reference(
+        canonical,
+        supplied_reference,
+        redacted_pdf=supplied_redacted,
+        targets=targets,
+        reference_document_version_id=REFERENCE_VERSION_ID,
+        reference_canonical_version_id=REFERENCE_CANONICAL_ID,
+        mapping_version=MAPPING_VERSION,
+    )
+
+    assert {mapping.status for mapping in mappings} == {ReferenceStatus.CONFLICTING}
+    assert all(
+        mapping.scoreability is ReferenceScoreability.NOT_SCOREABLE
+        for mapping in mappings
+    )
+    assert all(mapping.exact_revealed_text is None for mapping in mappings)
+
+
+def test_swapped_registered_pair_is_not_scoreable(tmp_path: Path) -> None:
+    redacted_path, reference_path = make_synthetic_pair("two_boxes", tmp_path)
+    redacted_pdf = redacted_path.read_bytes()
+    reference_pdf = reference_path.read_bytes()
+    canonical, targets = _redacted_context(redacted_pdf)
+
+    mappings = align_reference(
+        canonical,
+        redacted_pdf,
+        redacted_pdf=reference_pdf,
+        targets=targets,
+        reference_document_version_id=REFERENCE_VERSION_ID,
+        reference_canonical_version_id=REFERENCE_CANONICAL_ID,
+        mapping_version=MAPPING_VERSION,
+    )
+
+    assert {mapping.status for mapping in mappings} == {ReferenceStatus.CONFLICTING}
+    assert all(mapping.exact_revealed_text is None for mapping in mappings)
+
+
+def test_registered_bytes_with_cross_project_or_version_claims_are_not_scoreable(
+    tmp_path: Path,
+) -> None:
+    redacted_path, reference_path = make_synthetic_pair("two_boxes", tmp_path)
+    redacted_pdf = redacted_path.read_bytes()
+    reference_pdf = reference_path.read_bytes()
+    canonical, targets = _redacted_context(redacted_pdf)
+
+    for changed_canonical, reference_version_id in (
+        (
+            canonical.model_copy(update={"project_id": "forged-project"}),
+            REFERENCE_VERSION_ID,
+        ),
+        (
+            canonical.model_copy(
+                update={"redacted_document_version_id": "forged-redacted-version"}
+            ),
+            REFERENCE_VERSION_ID,
+        ),
+        (canonical, "forged-reference-version"),
+    ):
+        changed_targets = tuple(
+            target.model_copy(
+                update={
+                    "project_id": changed_canonical.project_id,
+                    "redacted_document_version_id": (
+                        changed_canonical.redacted_document_version_id
+                    ),
+                }
+            )
+            for target in targets
+        )
+        mappings = align_reference(
+            changed_canonical,
+            reference_pdf,
+            redacted_pdf=redacted_pdf,
+            targets=changed_targets,
+            reference_document_version_id=reference_version_id,
+            reference_canonical_version_id=REFERENCE_CANONICAL_ID,
+            mapping_version=MAPPING_VERSION,
+        )
+
+        assert {mapping.status for mapping in mappings} == {
+            ReferenceStatus.CONFLICTING
+        }
+        assert all(mapping.exact_revealed_text is None for mapping in mappings)
 
 
 @pytest.mark.parametrize(
-    ("record_updates", "expected_version"),
+    ("reference_version_id", "reference_canonical_version_id"),
     [
-        ({"role": DocumentRole.REDACTED}, REFERENCE_VERSION_ID),
-        ({"project_id": "other-project"}, REFERENCE_VERSION_ID),
-        ({"version_id": "other-reference-version"}, REFERENCE_VERSION_ID),
-        ({"sha256": "0" * 64}, REFERENCE_VERSION_ID),
+        (None, REFERENCE_CANONICAL_ID),
+        ("", REFERENCE_CANONICAL_ID),
+        (REFERENCE_VERSION_ID, None),
+        (REFERENCE_VERSION_ID, " "),
     ],
 )
-def test_mismatched_trusted_reference_metadata_is_not_confirmed(
-    record_updates: dict[str, object],
-    expected_version: str,
+def test_missing_or_blank_reference_identity_is_not_scoreable(
+    reference_version_id: str | None,
+    reference_canonical_version_id: str | None,
     tmp_path: Path,
 ) -> None:
-    canonical, targets, reference_pdf = _fixture_context("two_boxes", tmp_path)
-    trusted = _trusted_reference(reference_pdf, **record_updates)
+    redacted_path, reference_path = make_synthetic_pair("two_boxes", tmp_path)
+    redacted_pdf = redacted_path.read_bytes()
+    canonical, targets = _redacted_context(redacted_pdf)
 
-    mappings = _align(
+    mappings = align_reference(
         canonical,
-        targets,
-        reference_pdf,
-        trusted_reference_document=trusted,
-        reference_document_version_id=expected_version,
+        reference_path.read_bytes(),
+        redacted_pdf=redacted_pdf,
+        targets=targets,
+        reference_document_version_id=reference_version_id,
+        reference_canonical_version_id=reference_canonical_version_id,
+        mapping_version=MAPPING_VERSION,
     )
 
-    assert {mapping.status for mapping in mappings} == {
-        ReferenceStatus.CONFLICTING
-    }
+    assert {mapping.status for mapping in mappings} == {ReferenceStatus.CONFLICTING}
+    assert all(
+        mapping.scoreability is ReferenceScoreability.NOT_SCOREABLE
+        for mapping in mappings
+    )
     assert all(mapping.exact_revealed_text is None for mapping in mappings)
 
 
-def test_trusted_reference_version_must_match_expected_version(
+def test_caller_created_trust_objects_and_registry_claims_are_rejected(
     tmp_path: Path,
 ) -> None:
-    canonical, targets, reference_pdf = _fixture_context("two_boxes", tmp_path)
-    trusted = _trusted_reference(reference_pdf)
+    redacted_path, reference_path = make_synthetic_pair("two_boxes", tmp_path)
+    redacted_pdf = redacted_path.read_bytes()
+    reference_pdf = reference_path.read_bytes()
+    canonical, targets = _redacted_context(redacted_pdf)
+    forged_document = _trusted_reference(reference_pdf)
+    common = {
+        "redacted_pdf": redacted_pdf,
+        "targets": targets,
+        "reference_document_version_id": REFERENCE_VERSION_ID,
+        "reference_canonical_version_id": REFERENCE_CANONICAL_ID,
+        "mapping_version": MAPPING_VERSION,
+    }
 
-    mappings = _align(
-        canonical,
-        targets,
-        reference_pdf,
-        trusted_reference_document=trusted,
-        reference_document_version_id="unexpected-reference-version",
+    with pytest.raises(TypeError, match="trusted_reference_document"):
+        align_reference(
+            canonical,
+            reference_pdf,
+            trusted_reference_document=forged_document,
+            **common,
+        )
+    with pytest.raises(TypeError, match="fixture_case"):
+        align_reference(
+            canonical,
+            reference_pdf,
+            fixture_case="two_boxes",
+            **common,
+        )
+    with pytest.raises(TypeError, match="registry"):
+        align_reference(
+            canonical,
+            reference_pdf,
+            registry=object(),
+            **common,
+        )
+
+
+@pytest.mark.parametrize("forged_record", ["canonical", "target"])
+def test_registered_bytes_do_not_authorize_forged_derived_records(
+    forged_record: str,
+    tmp_path: Path,
+) -> None:
+    redacted_path, reference_path = make_synthetic_pair("two_boxes", tmp_path)
+    redacted_pdf = redacted_path.read_bytes()
+    canonical, targets = _redacted_context(redacted_pdf)
+    supplied_canonical = canonical
+    supplied_targets = targets
+    if forged_record == "canonical":
+        supplied_canonical = canonical.model_copy(
+            update={"canonicalizer_version": "forged-canonicalizer"}
+        )
+    else:
+        supplied_targets = (
+            targets[0].model_copy(update={"target_version": "forged-target"}),
+            *targets[1:],
+        )
+
+    mappings = align_reference(
+        supplied_canonical,
+        reference_path.read_bytes(),
+        redacted_pdf=redacted_pdf,
+        targets=supplied_targets,
+        reference_document_version_id=REFERENCE_VERSION_ID,
+        reference_canonical_version_id=REFERENCE_CANONICAL_ID,
+        mapping_version=MAPPING_VERSION,
     )
 
-    assert {mapping.status for mapping in mappings} == {
-        ReferenceStatus.CONFLICTING
-    }
+    assert {mapping.status for mapping in mappings} == {ReferenceStatus.CONFLICTING}
+    assert all(
+        mapping.scoreability is ReferenceScoreability.NOT_SCOREABLE
+        for mapping in mappings
+    )
     assert all(mapping.exact_revealed_text is None for mapping in mappings)
 
 

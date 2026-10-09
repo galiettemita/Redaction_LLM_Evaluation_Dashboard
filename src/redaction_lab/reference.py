@@ -13,8 +13,6 @@ import pdfplumber
 from redaction_lab.canonical import canonicalize_redacted
 from redaction_lab.contracts import (
     CanonicalRedactedDocument,
-    DocumentRole,
-    DocumentVersion,
     RedactionTarget,
     ReferenceMapping,
     ReferenceScoreability,
@@ -27,6 +25,7 @@ from redaction_lab.pdf_detector import (
     _suppress_parser_debug_logs,
     detect_targets,
 )
+from redaction_lab.reference_registry import resolve_approved_synthetic_pair
 
 
 MAPPING_METHOD_VERSION = "text-first-reference-v2"
@@ -154,22 +153,6 @@ def _validate_inputs(
     return markers
 
 
-def _trusted_reference_binding_is_valid(
-    redacted: CanonicalRedactedDocument,
-    reference_pdf: bytes,
-    trusted_reference_document: DocumentVersion | None,
-    expected_reference_version_id: str | None,
-) -> bool:
-    if trusted_reference_document is None or not expected_reference_version_id:
-        return False
-    return (
-        trusted_reference_document.role is DocumentRole.REFERENCE
-        and trusted_reference_document.project_id == redacted.project_id
-        and trusted_reference_document.version_id == expected_reference_version_id
-        and trusted_reference_document.sha256 == sha256(reference_pdf).hexdigest()
-    )
-
-
 def _mapping_id(
     redacted: CanonicalRedactedDocument,
     target: RedactionTarget,
@@ -265,6 +248,33 @@ def _reference_document(
         return detection, canonical
     except Exception:
         return None
+
+
+def _redacted_records_match_pdf(
+    redacted_pdf: bytes,
+    redacted: CanonicalRedactedDocument,
+    targets: tuple[RedactionTarget, ...],
+) -> bool:
+    """Rebuild caller-supplied derived records from the pinned redacted bytes."""
+
+    try:
+        detection = detect_targets(
+            redacted_pdf,
+            project_id=redacted.project_id,
+            redacted_document_version_id=redacted.redacted_document_version_id,
+        )
+        if detection.status is not DetectionStatus.SUPPORTED:
+            return False
+        rebuilt = canonicalize_redacted(
+            redacted_pdf,
+            detection,
+            project_id=redacted.project_id,
+            redacted_document_version_id=redacted.redacted_document_version_id,
+            canonical_document_version_id=redacted.canonical_document_version_id,
+        )
+        return rebuilt == redacted and detection.targets == targets
+    except Exception:
+        return False
 
 
 def _line_context(
@@ -780,25 +790,23 @@ def _expanded_pairs(
     )
 
 
-def align_reference(
+def _align_reference_content(
     redacted: CanonicalRedactedDocument,
     reference_pdf: bytes | None,
     *,
     targets: tuple[RedactionTarget, ...],
-    trusted_reference_document: DocumentVersion | None,
     reference_document_version_id: str | None,
     reference_canonical_version_id: str | None,
     mapping_version: str,
 ) -> list[ReferenceMapping]:
-    """Align against bytes bound to a caller-authenticated DocumentVersion."""
+    """Align content after the public entry point establishes pair authority."""
 
     markers = _validate_inputs(redacted, targets)
     if not mapping_version or not mapping_version.strip():
         raise ValueError("mapping version is required")
     if reference_pdf is None:
         if (
-            trusted_reference_document is not None
-            or reference_document_version_id is not None
+            reference_document_version_id is not None
             or reference_canonical_version_id is not None
         ):
             raise ValueError(
@@ -817,12 +825,7 @@ def align_reference(
             for target in targets
         ]
     if (
-        not _trusted_reference_binding_is_valid(
-            redacted,
-            reference_pdf,
-            trusted_reference_document,
-            reference_document_version_id,
-        )
+        not reference_document_version_id
         or not reference_canonical_version_id
         or not reference_canonical_version_id.strip()
     ):
@@ -1118,3 +1121,73 @@ def align_reference(
                 readable=True,
             )
     return results
+
+
+def align_reference(
+    redacted: CanonicalRedactedDocument,
+    reference_pdf: bytes | None,
+    *,
+    redacted_pdf: bytes,
+    targets: tuple[RedactionTarget, ...],
+    reference_document_version_id: str | None,
+    reference_canonical_version_id: str | None,
+    mapping_version: str,
+) -> list[ReferenceMapping]:
+    """Align only an application-approved, byte-identical synthetic PDF pair."""
+
+    _validate_inputs(redacted, targets)
+    if not mapping_version or not mapping_version.strip():
+        raise ValueError("mapping version is required")
+    if reference_pdf is None:
+        return _align_reference_content(
+            redacted,
+            None,
+            targets=targets,
+            reference_document_version_id=reference_document_version_id,
+            reference_canonical_version_id=reference_canonical_version_id,
+            mapping_version=mapping_version,
+        )
+    safe_reference_version_id = (
+        reference_document_version_id
+        if reference_document_version_id and reference_document_version_id.strip()
+        else None
+    )
+    safe_reference_canonical_id = (
+        reference_canonical_version_id
+        if reference_canonical_version_id and reference_canonical_version_id.strip()
+        else None
+    )
+    if (
+        safe_reference_version_id is None
+        or safe_reference_canonical_id is None
+        or resolve_approved_synthetic_pair(
+            redacted_pdf=redacted_pdf,
+            reference_pdf=reference_pdf,
+            project_id=redacted.project_id,
+            redacted_version_id=redacted.redacted_document_version_id,
+            reference_version_id=reference_document_version_id,
+        )
+        is None
+        or not _redacted_records_match_pdf(redacted_pdf, redacted, targets)
+    ):
+        return [
+            _unconfirmed(
+                redacted,
+                target,
+                status=ReferenceStatus.CONFLICTING,
+                mapping_version=mapping_version,
+                reference_document_version_id=safe_reference_version_id,
+                reference_canonical_version_id=safe_reference_canonical_id,
+                reference_hash=None,
+                readable=None,
+            )
+            for target in targets
+        ]
+    return _align_reference_content(
+        redacted,
+        reference_pdf,
+        targets=targets,
+        reference_document_version_id=reference_document_version_id,
+        reference_canonical_version_id=reference_canonical_version_id,
+        mapping_version=mapping_version,
+    )
