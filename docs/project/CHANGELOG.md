@@ -187,6 +187,10 @@ Owner explicitly approved a synthetic-only trusted pairing registry for the Octo
 
 Verified implementation `8a751d4af27c8daada1071ec6c9c4fce45581d61`, published Backend head `cd4cbfafbfe0152adc8c8e68a6cf337f20348814` and scoped file deltas (four code/test files plus one unique handoff). Codex reports 56 focused/176 full tests passed, compileall and dependency/diff checks; Lead did not rerun tests. Published [exact-SHA independent QA/Research review packet](task_packets/RL-MVP-003-DEC022-INDEPENDENT-REVIEW.md). One synthetic `two_boxes` pair is pinned; no real-document trust or scientific D03 validation. No merge, Task 4, paid calls or deployment.
 
+## 2026-10-09 | E0031 | Task 3 Correction 02 intake and independent review routing
+
+Verified exact implementation `97db3615c65b9e31d0f94dca443baab760340c5f` and Backend publication head `139921de76f9f3d0a67af19217e0969464f88ffd`. Implementation commit changes only four authorized reference/registry code and test files; the handoff commit adds one unique Backend handoff. Codex reports 60 focused/180 full tests passing; Lead did not rerun them. Published [exact-SHA QA/Research packet](task_packets/RL-MVP-003-DEC022-CORRECTION-02-REVIEW.md). Prior QA FAIL/Research Task-3 PASS apply to older SHA. No merge, Task 4, paid calls, deployment or scientific D03 validation.
+
 ## Entry format
 
 Date / epoch / task or decision ID; approved change vs proposal; affected files/contracts; source/approval evidence; test/benchmark impact; migration/rollback; required receivers; unresolved issues. Never backfill a success claim without evidence.
