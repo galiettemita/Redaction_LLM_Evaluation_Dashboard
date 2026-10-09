@@ -211,6 +211,10 @@ Verified implementation `c3a928ce1aaf2039bc778cb91c272b435fb93aa4`, published Ba
 
 Read-only preflight found no installed local model runtime/cache or verifiable license. Real-model demonstration BLOCKED; no model download, inference, paid call, Task 5, merge, scientific scoring validation or deployment.
 
+## 2026-10-09 | E0036 | RL-MVP-004 Correction 01 merged
+
+Owner approved bounded trusted-source, SQLite, transport, model-provenance and wrapped-timeout correction including ten code/test files. Published Correction 01 packet in task_packets. Exact corrected implementation `b9ce8182751f26109fbd857bcb8d909720bafd13` with Backend head `fb4c1f0`; QA independent scoped PASS (102 focused/255 full pytest, 27 selected and 15 custom probes) and Research scoped protocol PASS. Separately owner-authorized PR #4 merged as `8f4d2f18` after reconciling existing main records; no application tests run by Lead. Internal-only ingestion remains unauthenticated to arbitrary users; no licensed local runtime/model. Real inference, D03/D05 scoring/protocol approval, Task 5, costs and deployment remain blocked/not authorized.
+
 ## Entry format
 
 Date / epoch / task or decision ID; approved change vs proposal; affected files/contracts; source/approval evidence; test/benchmark impact; migration/rollback; required receivers; unresolved issues. Never backfill a success claim without evidence.

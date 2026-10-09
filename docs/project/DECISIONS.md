@@ -1,6 +1,6 @@
 # Decision register
 
-Baseline: [MASTER_SPEC.md](MASTER_SPEC.md), imported 2026-10-06. Epoch E0035.
+Baseline: [MASTER_SPEC.md](MASTER_SPEC.md), imported 2026-10-06. Epoch E0036.
 Product decision IDs `DEC-...` are distinct from the source PDF's open-decision IDs `D01`-`D10`.
 
 ## Authority
@@ -47,6 +47,10 @@ Source B1 is identified in MASTER_SPEC. These IDs normalize previously stated re
 | ID | Decision | Status / effects |
 | --- | --- | --- |
 | DEC-022 | For the October 12 synthetic-only demonstration, permit a trusted test-fixture manifest/registry of immutable redacted/reference pairs and hashes, accessible only through a trusted bootstrap/resolver; require full two-sided text evidence and exact spans or null. Unregistered/user-uploaded references remain NOT_SCOREABLE pending a separately authorized authenticated provenance/pairing system. | **APPROVED by product owner on 2026-10-08 (explicit yes).** [Scoped implementation packet](task_packets/RL-MVP-003-TRUSTED-SYNTHETIC-CORRECTION.md). Only byte-hash-pinned synthetic pairs can pass the checkpoint fixture-pairing gate; arbitrary uploaded references remain unknown/null while prediction remains allowed. This does not approve scientific D03 validation, real-document provenance, extra costs, merge, Task 4 or deployment. |
+
+## E0036 implementation authorization (not scientific approval)
+
+The owner approved RL-MVP-004 Correction 01's scoped expansion and separately authorized integration of exact corrected implementation `b9ce8182751f26109fbd857bcb8d909720bafd13` after independent QA/Research review and reconciliation. PR #4 merged as `8f4d2f18aa2c565e3228d4f3568a2bd8c1714b0f`. This is an implementation/integration authorization, **not** a new DEC-numbered product-method change; DEC-001..022 remain in effect. The trust boundary is internal-only with no authenticated upload API. D03/D05, model/license, data/vendor and deployment approvals remain open. No Task 5, inference, downloads or spending authorized.
 
 ## Installed coordination rules (not research approvals)
 

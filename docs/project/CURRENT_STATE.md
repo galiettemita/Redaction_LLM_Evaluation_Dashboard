@@ -1,12 +1,12 @@
 # Current state
 
-Updated: 2026-10-08 (America/New_York). Coordination epoch: **E0035**.
+Updated: 2026-10-09 (America/New_York). Coordination epoch: **E0036**.
 Integration branch: `main`. Canonical writer: **Lead/Architect**, within the owner's approved scope.
 Resolve the actual HEAD with GitHub; do not infer a current SHA from this file's timestamp.
 
 ## Read this first
 
-**Stage:** S1 / October 12 MVP implementation. **Execution boundary:** RL-MVP-001, RL-MVP-002 and RL-MVP-003 are merged. RL-MVP-004 is approved for mock-tested implementation and read-only local feasibility preflight only. Task 5+ remains unapproved.
+**Stage:** S1 / October 12 MVP implementation. **Execution boundary:** RL-MVP-001, RL-MVP-002 and RL-MVP-003 are merged. RL-MVP-004 has been owner-authorized and MERGED following Correction 01 independent QA and Research PASS; Task 5+ remains unapproved.
 **Product implementation:** RL-MVP-001 merged in PR #1 (`ba60aaa8`); RL-MVP-002 merged in PR #2 (`35281fb9`); RL-MVP-003 merged in PR #3 (`733ae024`).
 **Scoring validity:** not established. **Deployment:** none established here.
 **Active background agents / scheduler:** none installed by this setup.
@@ -16,7 +16,7 @@ The eight shared files and root agent instructions define a coordination protoco
 
 ## Holds and urgent changes
 
-E0035: Task-4 mock-tested candidate published; QA and Research reviews pending. Read-only preflight found no local runtime/model; real inference BLOCKED. No merge, paid calls or deployment. Standing hold: no application code, live model calls, migrations, cloud resources or deployment without the relevant approved task and decisions. Private data must not be put in this public repository.
+E0036: Owner-approved Task-4 Correction 01 merged via PR #4 at `8f4d2f18` after scoped QA and Research PASS on exact implementation `b9ce818`. Real inference remains BLOCKED by missing verified runtime/model/license. No Task 5, paid calls or deployment. Standing hold: no application code, live model calls, migrations, cloud resources or deployment without the relevant approved task and decisions. Private data must not be put in this public repository.
 
 On a critical new change, the Lead records affected task IDs here as `ON_HOLD`, increments the epoch and links the decision. This stops work only when an active agent next checks; it is not a remote kill switch.
 
@@ -29,7 +29,7 @@ On a critical new change, the Lead records affected task IDs here as `ON_HOLD`, 
 | RL-MVP-001 | MERGED | Backend | [Contracts and synthetic fixtures](task_packets/RL-MVP-001-contracts-and-synthetic-fixtures.md); corrected implementation `a1d8311`, branch head `c698cd4`; QA and Research both PASS for Task 1; owner-approved merge complete. |
 | RL-MVP-002 | MERGED | Backend/Codex + Lead integration | Reviewed implementation `736fa18`, owner-approved PR #2 merged as `35281fb9`; QA PASS and Research Task-2 semantics PASS. |
 | RL-MVP-003 | MERGED | Backend/Codex + Lead integration | Exact candidate `97db3615`, published branch head `139921de`, owner-authorized [PR #3](https://github.com/galiettemita/Redaction_LLM_Evaluation_Dashboard/pull/3) merged as `733ae024`. QA PASS; Research Task-3 semantics PASS. Synthetic-only pairing, no D03 approval. |
-| RL-MVP-004 | READY_FOR_REVIEW; REAL_MODEL_BLOCKED | Backend/Codex | Implementation `c3a928ce`, branch head `de9ad26f`; Codex reports 46 focused/226 full tests passed. [Independent review packet](task_packets/RL-MVP-004-INDEPENDENT-REVIEW.md). No merge, inference or Task 5. |
+| RL-MVP-004 | MERGED; REAL_MODEL_BLOCKED | Backend/Codex + Lead integration | Correction 01 exact implementation `b9ce818`, Backend head `fb4c1f0`; independent QA and Research PASS for scoped infrastructure/protocol, owner-authorized PR #4 merged `8f4d2f18`. Real inference/D03/D05 not validated; Task 5 unapproved. |
 | RL-S1-001 | PROPOSED | Lead + Backend | Define document/target/reference records and initial input limits; D01/D02/D03 and component plan required. |
 | RL-S2-001 | PROPOSED | Research | Propose rubric, human benchmark and release criteria; D03/D04/D05; no invented thresholds. |
 | RL-UX-001 | PROPOSED | Frontend | Synthetic-data workflow proposal only; D09 and scoped approval before implementation. |
@@ -38,18 +38,16 @@ These proposed items are not claimed, running or approved to execute. The Lead a
 
 ## Remaining gates and next action
 
-**October 12 MVP remains AT RISK.** Tasks 1–3 merged. Task-4 candidate `c3a928ce1aaf2039bc778cb91c272b435fb93aa4` is published on Backend branch head `de9ad26f7225f5717d2c6ace683e1f21b0fed2fa` but not merged. GitHub verifies exactly six approved code/test files plus a unique Backend handoff. Codex reports 46 focused/226 full tests passed; Lead has not independently executed application tests.
-
-[Independent QA/Research review packet](task_packets/RL-MVP-004-INDEPENDENT-REVIEW.md) covers redacted-only isolation, loopback transport, durable at-most-once dispatch, crash/timeout ambiguity and provenance. No reviewer verdict yet. Read-only Backend preflight found Apple M5 with 32 GB memory but no installed local runtime/model/cache or verified license. Real-model demo remains BLOCKED. No inference, downloads, paid calls, Task 5, D03 scoring approval or deployment authorized.
+**October 12 MVP remains AT RISK.** Tasks 1–4 merged. Task-4 Correction 01 on exact implementation `b9ce8182751f26109fbd857bcb8d909720bafd13` was independently reviewed: QA PASS with 102 focused/255 full pytest, 27 selected cases and 15 custom probes; Research PASS for scoped prediction-protocol semantics (isolated probes, full pytest not independently run by Research). PR #4 merged at `8f4d2f18aa2c565e3228d4f3568a2bd8c1714b0f`. See owner-approved [Correction 01 packet](task_packets/RL-MVP-004-CORRECTION-01.md) and QA/Research published branch handoffs. Local model/runtime/license absent; real inference BLOCKED. D03/D05 scientific approvals and lab data/vendor authorization NOT OBTAINED. No inference, downloads, paid calls, Task 5 or deployment authorized.
 
 ## What is present / absent
 
 Present: source-aligned product digest, decision register, proposed architectural and record boundaries, research guardrails, operating guide, role prompts, handoff and PR templates.
-Present on main: typed contracts, synthetic PDF fixtures, vector-PDF redaction detector, safe canonicalizer, text-first reference aligner, synthetic two_boxes trust registry, package metadata and Task 1–3 tests. Absent: persistence, API, workers, model adapters, evaluator, UI and deployment. No CI or cron is installed.
+Present on main: Tasks 1–4 contracts, synthetic fixtures, PDF detector, canonicalizer, synthetic-only reference aligner/registry, trusted internal prediction-source ingestion, local-only adapter, SQLite one-shot worker and tests. Absent: authenticated API, evaluation/scoring engine, UI, deployment, licensed local runtime/model. No CI or cron established.
 
 ## Latest important change
 
-E0035: Task-4 candidate published for independent review; real local inference blocked by preflight.
+E0036: Task-4 Correction 01 independently reviewed and merged in PR #4. Real inference blocked; Task 5 not authorized.
 
 ## Maintenance rule
 
