@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
+import errno
 from hashlib import sha256
 import json
-import socket
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
 from urllib.request import (
@@ -25,7 +24,6 @@ from redaction_lab.adapters.base import (
 from redaction_lab.contracts import AttemptStatus, PredictionManifest, TokenUsage
 
 
-Transport = Callable[[str, bytes, float], Awaitable[bytes]]
 MAX_RESPONSE_BYTES = 1_048_576
 
 
@@ -59,7 +57,7 @@ def _validated_endpoint(endpoint: str) -> str:
 
 
 class OllamaAdapter(PredictionAdapter):
-    """One-shot local adapter with injected transport support for tests."""
+    """One-shot local adapter with a fixed loopback-only production transport."""
 
     def __init__(
         self,
@@ -68,7 +66,6 @@ class OllamaAdapter(PredictionAdapter):
         model_id: str,
         model_config_id: str,
         timeout_seconds: float = 60,
-        transport: Transport | None = None,
     ) -> None:
         if not model_id.strip() or not model_config_id.strip():
             raise ValueError("model and configuration IDs must be nonblank")
@@ -80,7 +77,6 @@ class OllamaAdapter(PredictionAdapter):
         self.timeout_seconds = float(timeout_seconds)
         self.http_handlers = (ProxyHandler({}), _NoRedirectHandler())
         self._opener = build_opener(*self.http_handlers)
-        self._transport = transport or self._stdlib_transport
 
     def prepare(self, manifest: PredictionManifest) -> PreparedPrediction:
         if manifest.model_id != self.model_id:
@@ -150,6 +146,7 @@ class OllamaAdapter(PredictionAdapter):
         raw: bytes | None = None,
         prediction: str | None = None,
         usage: TokenUsage | None = None,
+        provider_model_id: str | None = None,
     ) -> PredictionResponse:
         return PredictionResponse(
             status=status,
@@ -160,26 +157,46 @@ class OllamaAdapter(PredictionAdapter):
             model_config_id=self.model_config_id,
             started_at=started_at,
             completed_at=datetime.now(UTC),
+            provider_model_id=provider_model_id,
         )
+
+    @staticmethod
+    def _is_timeout_exception(error: BaseException, *, limit: int = 24) -> bool:
+        pending: list[BaseException] = [error]
+        seen: set[int] = set()
+        while pending and len(seen) < limit:
+            current = pending.pop()
+            if id(current) in seen:
+                continue
+            seen.add(id(current))
+            if isinstance(current, TimeoutError):
+                return True
+            if isinstance(current, OSError) and current.errno == errno.ETIMEDOUT:
+                return True
+            related = (
+                getattr(current, "reason", None),
+                current.__cause__,
+                current.__context__,
+            )
+            pending.extend(value for value in related if isinstance(value, BaseException))
+        return False
 
     async def predict(self, manifest: PredictionManifest) -> PredictionResponse:
         prepared = self.prepare(manifest)
         started_at = datetime.now(UTC)
         try:
-            raw = await self._transport(
+            raw = await self._stdlib_transport(
                 f"{self.endpoint}/api/generate",
                 prepared.body,
                 self.timeout_seconds,
             )
-        except (TimeoutError, socket.timeout):
+        except (HTTPError, URLError, OSError, ValueError, TypeError) as error:
             return self._response(
-                status=AttemptStatus.TIMEOUT,
-                request_hash=prepared.request_hash,
-                started_at=started_at,
-            )
-        except (HTTPError, URLError, OSError, ValueError, TypeError):
-            return self._response(
-                status=AttemptStatus.ERROR,
+                status=(
+                    AttemptStatus.TIMEOUT
+                    if self._is_timeout_exception(error)
+                    else AttemptStatus.ERROR
+                ),
                 request_hash=prepared.request_hash,
                 started_at=started_at,
             )
@@ -218,6 +235,29 @@ class OllamaAdapter(PredictionAdapter):
                 request_hash=prepared.request_hash,
                 started_at=started_at,
                 raw=raw,
+                provider_model_id=(
+                    payload.get("model")
+                    if isinstance(payload.get("model"), str)
+                    and payload["model"].strip()
+                    else None
+                ),
+            )
+
+        returned_model = payload.get("model")
+        if not isinstance(returned_model, str) or not returned_model.strip():
+            return self._response(
+                status=AttemptStatus.MALFORMED,
+                request_hash=prepared.request_hash,
+                started_at=started_at,
+                raw=raw,
+            )
+        if returned_model != self.model_id:
+            return self._response(
+                status=AttemptStatus.ERROR,
+                request_hash=prepared.request_hash,
+                started_at=started_at,
+                raw=raw,
+                provider_model_id=returned_model,
             )
 
         response_text = payload.get("response")
@@ -231,6 +271,7 @@ class OllamaAdapter(PredictionAdapter):
                 request_hash=prepared.request_hash,
                 started_at=started_at,
                 raw=raw,
+                provider_model_id=returned_model,
             )
         try:
             model_payload = json.loads(response_text)
@@ -242,6 +283,7 @@ class OllamaAdapter(PredictionAdapter):
                 request_hash=prepared.request_hash,
                 started_at=started_at,
                 raw=raw,
+                provider_model_id=returned_model,
             )
         if (
             not isinstance(model_payload, dict)
@@ -255,6 +297,7 @@ class OllamaAdapter(PredictionAdapter):
                 request_hash=prepared.request_hash,
                 started_at=started_at,
                 raw=raw,
+                provider_model_id=returned_model,
             )
 
         counts = (payload.get("prompt_eval_count"), payload.get("eval_count"))
@@ -268,6 +311,7 @@ class OllamaAdapter(PredictionAdapter):
                 request_hash=prepared.request_hash,
                 started_at=started_at,
                 raw=raw,
+                provider_model_id=returned_model,
             )
         input_tokens, output_tokens = counts
         total_tokens = (
@@ -286,4 +330,5 @@ class OllamaAdapter(PredictionAdapter):
                 output_tokens=output_tokens,
                 total_tokens=total_tokens,
             ),
+            provider_model_id=returned_model,
         )

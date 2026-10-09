@@ -37,6 +37,7 @@ async def run_pending_once(store: RunStore, adapter: PredictionAdapter) -> bool:
         target_id=pending.manifest.target_id,
         target_version=pending.manifest.target_version,
         model_id=pending.manifest.model_id,
+        provider_model_id=response.provider_model_id,
         model_config_id=response.model_config_id,
         request_hash=response.request_hash,
         response_hash=response.response_hash,

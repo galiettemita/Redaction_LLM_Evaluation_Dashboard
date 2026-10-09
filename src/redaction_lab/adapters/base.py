@@ -40,6 +40,7 @@ class PredictionResponse:
     model_config_id: str
     started_at: datetime
     completed_at: datetime
+    provider_model_id: str | None = None
 
 
 class PredictionAdapter(ABC):

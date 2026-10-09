@@ -2,16 +2,22 @@ from __future__ import annotations
 
 import asyncio
 from datetime import UTC, datetime
+import errno
 from hashlib import sha256
 import json
-from urllib.error import HTTPError
+import socket
+from urllib.error import HTTPError, URLError
 from urllib.request import Request
 from urllib.request import ProxyHandler
 
 import pytest
 
 from redaction_lab.adapters.base import build_prediction_manifest
-from redaction_lab.adapters.ollama import OllamaAdapter, _NoRedirectHandler
+from redaction_lab.adapters.ollama import (
+    MAX_RESPONSE_BYTES,
+    OllamaAdapter,
+    _NoRedirectHandler,
+)
 from redaction_lab.contracts import (
     AttemptStatus,
     CanonicalRedactedDocument,
@@ -145,7 +151,6 @@ def test_request_serialization_has_no_reference_or_cross_target_answer_channel()
         endpoint="http://127.0.0.1:11434",
         model_id="local-model",
         model_config_id="local-model-config-v1",
-        transport=lambda *_: None,
     )
     prepared = adapter.prepare(_manifest())
     request = json.loads(prepared.body)
@@ -218,13 +223,26 @@ def test_default_http_opener_disables_proxies_and_redirects() -> None:
         )
 
 
-def test_strict_success_response_and_hashes_are_deterministic() -> None:
+def test_constructor_rejects_public_transport_injection() -> None:
+    with pytest.raises(TypeError, match="transport"):
+        OllamaAdapter(
+            endpoint="http://127.0.0.1:11434",
+            model_id="local-model",
+            model_config_id="config-v1",
+            transport=lambda *_: None,
+        )
+
+
+def test_strict_success_response_and_hashes_are_deterministic(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     calls: list[tuple[str, bytes, float]] = []
 
     async def transport(endpoint: str, body: bytes, timeout: float) -> bytes:
         calls.append((endpoint, body, timeout))
         return json.dumps(
             {
+                "model": "local-model",
                 "response": json.dumps(
                     {"status": "prediction", "text": "  Agent Cedar, Ph.D.  "}
                 ),
@@ -239,9 +257,9 @@ def test_strict_success_response_and_hashes_are_deterministic() -> None:
         endpoint="http://127.0.0.1:11434",
         model_id="local-model",
         model_config_id="config-v1",
-        transport=transport,
         timeout_seconds=9,
     )
+    monkeypatch.setattr(adapter, "_stdlib_transport", transport)
     manifest = _manifest()
     first = asyncio.run(adapter.predict(manifest))
     second = asyncio.run(adapter.predict(manifest))
@@ -253,6 +271,7 @@ def test_strict_success_response_and_hashes_are_deterministic() -> None:
     assert first.usage.total_tokens == 23
     assert first.request_hash == second.request_hash == adapter.prepare(manifest).request_hash
     assert first.response_hash == second.response_hash
+    assert first.provider_model_id == "local-model"
     assert calls[0][0] == "http://127.0.0.1:11434/api/generate"
     assert calls[0][2] == 9
 
@@ -262,6 +281,7 @@ def test_strict_success_response_and_hashes_are_deterministic() -> None:
     [
         (
             {
+                "model": "local-model",
                 "response": json.dumps({"status": "refused"}),
                 "done": True,
                 "done_reason": "stop",
@@ -285,7 +305,7 @@ def test_strict_success_response_and_hashes_are_deterministic() -> None:
     ],
 )
 def test_refusal_malformed_and_error_are_distinct(
-    payload: object, expected: AttemptStatus
+    payload: object, expected: AttemptStatus, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     async def transport(*_: object) -> bytes:
         return json.dumps(payload).encode()
@@ -294,15 +314,15 @@ def test_refusal_malformed_and_error_are_distinct(
         endpoint="http://127.0.0.1:11434",
         model_id="local-model",
         model_config_id="config-v1",
-        transport=transport,
     )
+    monkeypatch.setattr(adapter, "_stdlib_transport", transport)
     response = asyncio.run(adapter.predict(_manifest()))
 
     assert response.status is expected
     assert response.prediction is None
 
 
-def test_timeout_is_not_folded_into_error() -> None:
+def test_timeout_is_not_folded_into_error(monkeypatch: pytest.MonkeyPatch) -> None:
     async def transport(*_: object) -> bytes:
         raise TimeoutError("ambiguous local timeout")
 
@@ -310,8 +330,8 @@ def test_timeout_is_not_folded_into_error() -> None:
         endpoint="http://127.0.0.1:11434",
         model_id="local-model",
         model_config_id="config-v1",
-        transport=transport,
     )
+    monkeypatch.setattr(adapter, "_stdlib_transport", transport)
     response = asyncio.run(adapter.predict(_manifest()))
 
     assert response.status is AttemptStatus.TIMEOUT
@@ -319,7 +339,9 @@ def test_timeout_is_not_folded_into_error() -> None:
     assert response.response_hash is None
 
 
-def test_adapter_has_no_pdf_or_hidden_text_input_channel() -> None:
+def test_adapter_has_no_pdf_or_hidden_text_input_channel(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     hidden_selectable_text = "REFERENCE-ONLY SECRET"
     seen_body = b""
 
@@ -328,6 +350,7 @@ def test_adapter_has_no_pdf_or_hidden_text_input_channel() -> None:
         seen_body = body
         return json.dumps(
             {
+                "model": "local-model",
                 "response": json.dumps(
                     {"status": "prediction", "text": "guess"}
                 ),
@@ -340,9 +363,140 @@ def test_adapter_has_no_pdf_or_hidden_text_input_channel() -> None:
         endpoint="http://127.0.0.1:11434",
         model_id="local-model",
         model_config_id="config-v1",
-        transport=transport,
     )
+    monkeypatch.setattr(adapter, "_stdlib_transport", transport)
     asyncio.run(adapter.predict(_manifest()))
 
     assert hidden_selectable_text.encode() not in seen_body
     assert b"%PDF" not in seen_body
+
+
+@pytest.mark.parametrize(
+    "provider_model",
+    [None, "", "different-model"],
+)
+def test_success_requires_exact_provider_model_identity(
+    provider_model: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    payload = {
+        "model": provider_model,
+        "response": json.dumps({"status": "prediction", "text": "guess"}),
+        "done": True,
+    }
+
+    async def transport(*_: object) -> bytes:
+        return json.dumps(payload).encode()
+
+    adapter = OllamaAdapter(
+        endpoint="http://127.0.0.1:11434",
+        model_id="local-model",
+        model_config_id="config-v1",
+    )
+    monkeypatch.setattr(adapter, "_stdlib_transport", transport)
+
+    response = asyncio.run(adapter.predict(_manifest()))
+
+    expected = AttemptStatus.ERROR if provider_model == "different-model" else AttemptStatus.MALFORMED
+    assert response.status is expected
+    assert response.prediction is None
+    assert response.provider_model_id == (
+        "different-model" if provider_model == "different-model" else None
+    )
+    assert response.response_hash is not None
+
+
+def test_matching_provider_model_allows_refusal(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def transport(*_: object) -> bytes:
+        return json.dumps(
+            {
+                "model": "local-model",
+                "response": json.dumps({"status": "refused"}),
+                "done": True,
+            }
+        ).encode()
+
+    adapter = OllamaAdapter(
+        endpoint="http://127.0.0.1:11434",
+        model_id="local-model",
+        model_config_id="config-v1",
+    )
+    monkeypatch.setattr(adapter, "_stdlib_transport", transport)
+
+    response = asyncio.run(adapter.predict(_manifest()))
+    assert response.status is AttemptStatus.REFUSED
+    assert response.provider_model_id == "local-model"
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        URLError(socket.timeout("wrapped")),
+        URLError(OSError(errno.ETIMEDOUT, "wrapped")),
+        OSError(errno.ETIMEDOUT, "direct"),
+    ],
+)
+def test_wrapped_timeout_is_timeout(
+    error: BaseException, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def transport(*_: object) -> bytes:
+        raise error
+
+    adapter = OllamaAdapter(
+        endpoint="http://127.0.0.1:11434",
+        model_id="local-model",
+        model_config_id="config-v1",
+    )
+    monkeypatch.setattr(adapter, "_stdlib_transport", transport)
+
+    assert asyncio.run(adapter.predict(_manifest())).status is AttemptStatus.TIMEOUT
+
+
+def test_non_timeout_url_error_remains_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def transport(*_: object) -> bytes:
+        raise URLError("connection refused")
+
+    adapter = OllamaAdapter(
+        endpoint="http://127.0.0.1:11434",
+        model_id="local-model",
+        model_config_id="config-v1",
+    )
+    monkeypatch.setattr(adapter, "_stdlib_transport", transport)
+
+    assert asyncio.run(adapter.predict(_manifest())).status is AttemptStatus.ERROR
+
+
+def test_cyclic_timeout_exception_chain_is_bounded(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    error = URLError("outer")
+    error.__context__ = error
+
+    async def transport(*_: object) -> bytes:
+        raise error
+
+    adapter = OllamaAdapter(
+        endpoint="http://127.0.0.1:11434",
+        model_id="local-model",
+        model_config_id="config-v1",
+    )
+    monkeypatch.setattr(adapter, "_stdlib_transport", transport)
+
+    assert asyncio.run(adapter.predict(_manifest())).status is AttemptStatus.ERROR
+
+
+def test_private_transport_mock_cannot_bypass_response_size_limit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def transport(*_: object) -> bytes:
+        return b"x" * (MAX_RESPONSE_BYTES + 1)
+
+    adapter = OllamaAdapter(
+        endpoint="http://127.0.0.1:11434",
+        model_id="local-model",
+        model_config_id="config-v1",
+    )
+    monkeypatch.setattr(adapter, "_stdlib_transport", transport)
+
+    response = asyncio.run(adapter.predict(_manifest()))
+    assert response.status is AttemptStatus.MALFORMED
+    assert response.prediction is None
