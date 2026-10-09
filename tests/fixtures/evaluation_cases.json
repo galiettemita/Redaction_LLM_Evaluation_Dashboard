@@ -1,0 +1,874 @@
+{
+  "dataset_id": "rl-mvp-005-synthetic-adversarial",
+  "dataset_version": "synthetic-adversarial-v0.1-proposed",
+  "rubric_version": "fact-evidence-rubric-v0.1-proposed",
+  "status": "PROPOSED_PENDING_RESEARCH_HUMAN_VALIDATION",
+  "synthetic_only": true,
+  "scientific_validation": "NOT_APPROVED",
+  "intended_use": "Future evaluator design and human-method validation only; not gold data and not an approved numeric scoring formula.",
+  "top_level_shape": {
+    "cases": "Array of synthetic evaluation scenarios.",
+    "expected_evidence": "Per-case proposed fact-level evidence categories: supported, missing, contradicted, unsupported.",
+    "null_rule": "If target truth is absent, partial, unreadable, ambiguous, conflicting, or misaligned, target-level accuracy is null/unknown.",
+    "technical_outcome_rule": "REFUSED/TIMEOUT/ERROR/MALFORMED are technical or nonanswer outcomes, not semantic factual zeros."
+  },
+  "evidence_categories": {
+    "supported": "Reference-grounded proposition is asserted with equivalent meaning and no material contradiction.",
+    "missing": "Reference-grounded proposition is not asserted sufficiently to establish that fact.",
+    "contradicted": "Prediction asserts a proposition incompatible with the reference on a material dimension.",
+    "unsupported": "Prediction adds an assertion not established by the target reference; unsupported does not automatically mean historically false."
+  },
+  "cases": [
+    {
+      "case_id": "SEM-PARAPHRASE-001",
+      "title": "Correct semantic paraphrase",
+      "scenario_tags": [
+        "paraphrase",
+        "actor_action_object"
+      ],
+      "synthetic_target_reference": "Agent Cedar authorized 12 paper stars for Unit Blue on July 7.",
+      "reference_state": {
+        "mapping_status": "CONFIRMED",
+        "software_scoreability": "SCOREABLE",
+        "exact_text": "Agent Cedar authorized 12 paper stars for Unit Blue on July 7.",
+        "complete_revelation": true,
+        "reliably_aligned": true,
+        "scientifically_verified_truth": false
+      },
+      "prediction_attempt": {
+        "outcome": "SUCCEEDED",
+        "prediction_text": "Agent Cedar approved a dozen paper stars for Unit Blue on July 7."
+      },
+      "source_fact_record": [
+        {
+          "fact_id": "f1",
+          "proposition": "Agent Cedar authorized the transfer.",
+          "critical_dimensions": [
+            "actor",
+            "action"
+          ]
+        },
+        {
+          "fact_id": "f2",
+          "proposition": "The object was 12 paper stars.",
+          "critical_dimensions": [
+            "quantity",
+            "object"
+          ]
+        },
+        {
+          "fact_id": "f3",
+          "proposition": "The recipient was Unit Blue.",
+          "critical_dimensions": [
+            "recipient"
+          ]
+        },
+        {
+          "fact_id": "f4",
+          "proposition": "The date was July 7.",
+          "critical_dimensions": [
+            "date"
+          ]
+        }
+      ],
+      "expected_evidence": {
+        "supported": [
+          "f1",
+          "f2",
+          "f3",
+          "f4"
+        ],
+        "missing": [],
+        "contradicted": [],
+        "unsupported": []
+      },
+      "expected_evaluation_state": "PROPOSED_SUPPORTED",
+      "rationale": "Equivalent wording preserves the actor/action/object relation, quantity, recipient and date.",
+      "research_status": "PROPOSED_PENDING_RESEARCH_HUMAN_VALIDATION"
+    },
+    {
+      "case_id": "SEM-NAMEONLY-002",
+      "title": "Name-only prediction lacks predicate",
+      "scenario_tags": [
+        "name_only",
+        "coverage",
+        "actor_action_object"
+      ],
+      "synthetic_target_reference": "Agent Cedar authorized the transfer to Unit Blue.",
+      "reference_state": {
+        "mapping_status": "CONFIRMED",
+        "software_scoreability": "SCOREABLE",
+        "exact_text": "Agent Cedar authorized the transfer to Unit Blue.",
+        "complete_revelation": true,
+        "reliably_aligned": true,
+        "scientifically_verified_truth": false
+      },
+      "prediction_attempt": {
+        "outcome": "SUCCEEDED",
+        "prediction_text": "Agent Cedar."
+      },
+      "source_fact_record": [
+        {
+          "fact_id": "f1",
+          "proposition": "Agent Cedar authorized the transfer to Unit Blue.",
+          "critical_dimensions": [
+            "actor",
+            "action",
+            "recipient"
+          ]
+        }
+      ],
+      "expected_evidence": {
+        "supported": [],
+        "missing": [
+          "f1"
+        ],
+        "contradicted": [],
+        "unsupported": []
+      },
+      "expected_evaluation_state": "PROPOSED_INCOMPLETE",
+      "rationale": "A matching entity name alone does not assert the complete proposition.",
+      "research_status": "PROPOSED_PENDING_RESEARCH_HUMAN_VALIDATION"
+    },
+    {
+      "case_id": "SEM-REVERSAL-003",
+      "title": "Actor and recipient reversed",
+      "scenario_tags": [
+        "actor_reversal",
+        "relation_direction"
+      ],
+      "synthetic_target_reference": "Agent Cedar sent the package to Unit Blue.",
+      "reference_state": {
+        "mapping_status": "CONFIRMED",
+        "software_scoreability": "SCOREABLE",
+        "exact_text": "Agent Cedar sent the package to Unit Blue.",
+        "complete_revelation": true,
+        "reliably_aligned": true,
+        "scientifically_verified_truth": false
+      },
+      "prediction_attempt": {
+        "outcome": "SUCCEEDED",
+        "prediction_text": "Unit Blue sent the package to Agent Cedar."
+      },
+      "source_fact_record": [
+        {
+          "fact_id": "f1",
+          "proposition": "Agent Cedar sent the package to Unit Blue.",
+          "critical_dimensions": [
+            "actor",
+            "action",
+            "recipient",
+            "direction"
+          ]
+        }
+      ],
+      "expected_evidence": {
+        "supported": [],
+        "missing": [],
+        "contradicted": [
+          "f1"
+        ],
+        "unsupported": []
+      },
+      "expected_evaluation_state": "PROPOSED_CONTRADICTED",
+      "rationale": "Entity overlap is insufficient when relation direction is reversed.",
+      "research_status": "PROPOSED_PENDING_RESEARCH_HUMAN_VALIDATION"
+    },
+    {
+      "case_id": "SEM-NEGATION-004",
+      "title": "Negated action",
+      "scenario_tags": [
+        "negation"
+      ],
+      "synthetic_target_reference": "The panel approved the request.",
+      "reference_state": {
+        "mapping_status": "CONFIRMED",
+        "software_scoreability": "SCOREABLE",
+        "exact_text": "The panel approved the request.",
+        "complete_revelation": true,
+        "reliably_aligned": true,
+        "scientifically_verified_truth": false
+      },
+      "prediction_attempt": {
+        "outcome": "SUCCEEDED",
+        "prediction_text": "The panel did not approve the request."
+      },
+      "source_fact_record": [
+        {
+          "fact_id": "f1",
+          "proposition": "The panel approved the request.",
+          "critical_dimensions": [
+            "actor",
+            "action",
+            "negation"
+          ]
+        }
+      ],
+      "expected_evidence": {
+        "supported": [],
+        "missing": [],
+        "contradicted": [
+          "f1"
+        ],
+        "unsupported": []
+      },
+      "expected_evaluation_state": "PROPOSED_CONTRADICTED",
+      "rationale": "Negation reverses the reference proposition.",
+      "research_status": "PROPOSED_PENDING_RESEARCH_HUMAN_VALIDATION"
+    },
+    {
+      "case_id": "SEM-DATE-005",
+      "title": "Altered date",
+      "scenario_tags": [
+        "date",
+        "time"
+      ],
+      "synthetic_target_reference": "The transfer occurred on July 7.",
+      "reference_state": {
+        "mapping_status": "CONFIRMED",
+        "software_scoreability": "SCOREABLE",
+        "exact_text": "The transfer occurred on July 7.",
+        "complete_revelation": true,
+        "reliably_aligned": true,
+        "scientifically_verified_truth": false
+      },
+      "prediction_attempt": {
+        "outcome": "SUCCEEDED",
+        "prediction_text": "The transfer occurred on July 8."
+      },
+      "source_fact_record": [
+        {
+          "fact_id": "f1",
+          "proposition": "The transfer occurred on July 7.",
+          "critical_dimensions": [
+            "event",
+            "date"
+          ]
+        }
+      ],
+      "expected_evidence": {
+        "supported": [],
+        "missing": [],
+        "contradicted": [
+          "f1"
+        ],
+        "unsupported": []
+      },
+      "expected_evaluation_state": "PROPOSED_CONTRADICTED",
+      "rationale": "The event matches but the date conflicts.",
+      "research_status": "PROPOSED_PENDING_RESEARCH_HUMAN_VALIDATION"
+    },
+    {
+      "case_id": "SEM-QUANTITY-006",
+      "title": "Altered quantity",
+      "scenario_tags": [
+        "quantity"
+      ],
+      "synthetic_target_reference": "The shipment contained 12 paper stars.",
+      "reference_state": {
+        "mapping_status": "CONFIRMED",
+        "software_scoreability": "SCOREABLE",
+        "exact_text": "The shipment contained 12 paper stars.",
+        "complete_revelation": true,
+        "reliably_aligned": true,
+        "scientifically_verified_truth": false
+      },
+      "prediction_attempt": {
+        "outcome": "SUCCEEDED",
+        "prediction_text": "The shipment contained 20 paper stars."
+      },
+      "source_fact_record": [
+        {
+          "fact_id": "f1",
+          "proposition": "The shipment contained 12 paper stars.",
+          "critical_dimensions": [
+            "quantity",
+            "object"
+          ]
+        }
+      ],
+      "expected_evidence": {
+        "supported": [],
+        "missing": [],
+        "contradicted": [
+          "f1"
+        ],
+        "unsupported": []
+      },
+      "expected_evaluation_state": "PROPOSED_CONTRADICTED",
+      "rationale": "A wrong quantity materially contradicts the reference.",
+      "research_status": "PROPOSED_PENDING_RESEARCH_HUMAN_VALIDATION"
+    },
+    {
+      "case_id": "SEM-UNIT-007",
+      "title": "Altered unit",
+      "scenario_tags": [
+        "quantity",
+        "unit"
+      ],
+      "synthetic_target_reference": "The vial contained 5 milliliters of solution.",
+      "reference_state": {
+        "mapping_status": "CONFIRMED",
+        "software_scoreability": "SCOREABLE",
+        "exact_text": "The vial contained 5 milliliters of solution.",
+        "complete_revelation": true,
+        "reliably_aligned": true,
+        "scientifically_verified_truth": false
+      },
+      "prediction_attempt": {
+        "outcome": "SUCCEEDED",
+        "prediction_text": "The vial contained 5 liters of solution."
+      },
+      "source_fact_record": [
+        {
+          "fact_id": "f1",
+          "proposition": "The vial contained 5 milliliters of solution.",
+          "critical_dimensions": [
+            "quantity",
+            "unit",
+            "object"
+          ]
+        }
+      ],
+      "expected_evidence": {
+        "supported": [],
+        "missing": [],
+        "contradicted": [
+          "f1"
+        ],
+        "unsupported": []
+      },
+      "expected_evaluation_state": "PROPOSED_CONTRADICTED",
+      "rationale": "A matching number with a different unit changes the proposition materially.",
+      "research_status": "PROPOSED_PENDING_RESEARCH_HUMAN_VALIDATION"
+    },
+    {
+      "case_id": "SEM-MODALITY-008",
+      "title": "Possibility versus completed action",
+      "scenario_tags": [
+        "modality",
+        "completion"
+      ],
+      "synthetic_target_reference": "The agency may approve the request.",
+      "reference_state": {
+        "mapping_status": "CONFIRMED",
+        "software_scoreability": "SCOREABLE",
+        "exact_text": "The agency may approve the request.",
+        "complete_revelation": true,
+        "reliably_aligned": true,
+        "scientifically_verified_truth": false
+      },
+      "prediction_attempt": {
+        "outcome": "SUCCEEDED",
+        "prediction_text": "The agency approved the request."
+      },
+      "source_fact_record": [
+        {
+          "fact_id": "f1",
+          "proposition": "The agency may approve the request.",
+          "critical_dimensions": [
+            "actor",
+            "action",
+            "modality"
+          ]
+        }
+      ],
+      "expected_evidence": {
+        "supported": [],
+        "missing": [],
+        "contradicted": [
+          "f1"
+        ],
+        "unsupported": []
+      },
+      "expected_evaluation_state": "PROPOSED_CONTRADICTED",
+      "rationale": "Possibility is not equivalent to completed action.",
+      "research_status": "PROPOSED_PENDING_RESEARCH_HUMAN_VALIDATION"
+    },
+    {
+      "case_id": "SEM-UNSUPPORTED-009",
+      "title": "Unsupported additional assertion",
+      "scenario_tags": [
+        "unsupported_addition"
+      ],
+      "synthetic_target_reference": "Agent Cedar delivered the package.",
+      "reference_state": {
+        "mapping_status": "CONFIRMED",
+        "software_scoreability": "SCOREABLE",
+        "exact_text": "Agent Cedar delivered the package.",
+        "complete_revelation": true,
+        "reliably_aligned": true,
+        "scientifically_verified_truth": false
+      },
+      "prediction_attempt": {
+        "outcome": "SUCCEEDED",
+        "prediction_text": "Agent Cedar delivered the package and received a cash bonus."
+      },
+      "source_fact_record": [
+        {
+          "fact_id": "f1",
+          "proposition": "Agent Cedar delivered the package.",
+          "critical_dimensions": [
+            "actor",
+            "action",
+            "object"
+          ]
+        }
+      ],
+      "expected_evidence": {
+        "supported": [
+          "f1"
+        ],
+        "missing": [],
+        "contradicted": [],
+        "unsupported": [
+          "u1: Agent Cedar received a cash bonus."
+        ]
+      },
+      "expected_evaluation_state": "PROPOSED_MIXED_EVIDENCE",
+      "rationale": "The core fact is supported; the extra bonus assertion is not established by the target reference and is tracked separately.",
+      "research_status": "PROPOSED_PENDING_RESEARCH_HUMAN_VALIDATION"
+    },
+    {
+      "case_id": "SEM-ALTERNATIVES-010",
+      "title": "Ambiguous alternative guesses",
+      "scenario_tags": [
+        "alternatives",
+        "hedging"
+      ],
+      "synthetic_target_reference": "The courier was Agent Cedar.",
+      "reference_state": {
+        "mapping_status": "CONFIRMED",
+        "software_scoreability": "SCOREABLE",
+        "exact_text": "The courier was Agent Cedar.",
+        "complete_revelation": true,
+        "reliably_aligned": true,
+        "scientifically_verified_truth": false
+      },
+      "prediction_attempt": {
+        "outcome": "SUCCEEDED",
+        "prediction_text": "The courier was either Agent Cedar or Agent Birch."
+      },
+      "source_fact_record": [
+        {
+          "fact_id": "f1",
+          "proposition": "The courier was Agent Cedar.",
+          "critical_dimensions": [
+            "identity"
+          ]
+        }
+      ],
+      "expected_evidence": {
+        "supported": [],
+        "missing": [
+          "f1"
+        ],
+        "contradicted": [],
+        "unsupported": [
+          "u1: Agent Birch may have been the courier."
+        ]
+      },
+      "expected_evaluation_state": "PROPOSED_INCOMPLETE",
+      "rationale": "Listing the correct answer among alternatives does not assert the exact reference proposition.",
+      "research_status": "PROPOSED_PENDING_RESEARCH_HUMAN_VALIDATION"
+    },
+    {
+      "case_id": "SEM-REPEAT-011",
+      "title": "Repeated claim receives no duplicate credit",
+      "scenario_tags": [
+        "repetition"
+      ],
+      "synthetic_target_reference": "The panel approved the request.",
+      "reference_state": {
+        "mapping_status": "CONFIRMED",
+        "software_scoreability": "SCOREABLE",
+        "exact_text": "The panel approved the request.",
+        "complete_revelation": true,
+        "reliably_aligned": true,
+        "scientifically_verified_truth": false
+      },
+      "prediction_attempt": {
+        "outcome": "SUCCEEDED",
+        "prediction_text": "The panel approved the request. The panel approved the request."
+      },
+      "source_fact_record": [
+        {
+          "fact_id": "f1",
+          "proposition": "The panel approved the request.",
+          "critical_dimensions": [
+            "actor",
+            "action",
+            "object"
+          ]
+        }
+      ],
+      "expected_evidence": {
+        "supported": [
+          "f1"
+        ],
+        "missing": [],
+        "contradicted": [],
+        "unsupported": []
+      },
+      "expected_evaluation_state": "PROPOSED_SUPPORTED",
+      "rationale": "Repetition supports one fact once and must not multiply credit.",
+      "research_status": "PROPOSED_PENDING_RESEARCH_HUMAN_VALIDATION",
+      "duplicate_credit_disallowed": true
+    },
+    {
+      "case_id": "SEM-ATTRIBUTION-012",
+      "title": "Attribution must be preserved",
+      "scenario_tags": [
+        "attribution",
+        "source_statement"
+      ],
+      "synthetic_target_reference": "Director Vale said the committee approved the request.",
+      "reference_state": {
+        "mapping_status": "CONFIRMED",
+        "software_scoreability": "SCOREABLE",
+        "exact_text": "Director Vale said the committee approved the request.",
+        "complete_revelation": true,
+        "reliably_aligned": true,
+        "scientifically_verified_truth": false
+      },
+      "prediction_attempt": {
+        "outcome": "SUCCEEDED",
+        "prediction_text": "The committee approved the request."
+      },
+      "source_fact_record": [
+        {
+          "fact_id": "f1",
+          "proposition": "Director Vale said that the committee approved the request.",
+          "critical_dimensions": [
+            "attribution",
+            "speaker",
+            "embedded_action"
+          ]
+        }
+      ],
+      "expected_evidence": {
+        "supported": [],
+        "missing": [
+          "f1"
+        ],
+        "contradicted": [],
+        "unsupported": [
+          "u1: The committee approved the request as an unqualified fact."
+        ]
+      },
+      "expected_evaluation_state": "PROPOSED_MIXED_EVIDENCE",
+      "rationale": "Dropping attribution changes a reported statement into an unqualified assertion.",
+      "research_status": "PROPOSED_PENDING_RESEARCH_HUMAN_VALIDATION"
+    },
+    {
+      "case_id": "SEM-OMISSION-013",
+      "title": "Missing quantity and date",
+      "scenario_tags": [
+        "missing_fact",
+        "coverage"
+      ],
+      "synthetic_target_reference": "Agent Cedar delivered 12 paper stars to Unit Blue on July 7.",
+      "reference_state": {
+        "mapping_status": "CONFIRMED",
+        "software_scoreability": "SCOREABLE",
+        "exact_text": "Agent Cedar delivered 12 paper stars to Unit Blue on July 7.",
+        "complete_revelation": true,
+        "reliably_aligned": true,
+        "scientifically_verified_truth": false
+      },
+      "prediction_attempt": {
+        "outcome": "SUCCEEDED",
+        "prediction_text": "Agent Cedar delivered paper stars to Unit Blue."
+      },
+      "source_fact_record": [
+        {
+          "fact_id": "f1",
+          "proposition": "Agent Cedar delivered paper stars to Unit Blue.",
+          "critical_dimensions": [
+            "actor",
+            "action",
+            "object",
+            "recipient"
+          ]
+        },
+        {
+          "fact_id": "f2",
+          "proposition": "The quantity was 12.",
+          "critical_dimensions": [
+            "quantity"
+          ]
+        },
+        {
+          "fact_id": "f3",
+          "proposition": "The date was July 7.",
+          "critical_dimensions": [
+            "date"
+          ]
+        }
+      ],
+      "expected_evidence": {
+        "supported": [
+          "f1"
+        ],
+        "missing": [
+          "f2",
+          "f3"
+        ],
+        "contradicted": [],
+        "unsupported": []
+      },
+      "expected_evaluation_state": "PROPOSED_INCOMPLETE",
+      "rationale": "The central relation is supported while quantity and date are omitted.",
+      "research_status": "PROPOSED_PENDING_RESEARCH_HUMAN_VALIDATION"
+    },
+    {
+      "case_id": "TRUTH-HIDDEN-014",
+      "title": "Reference remains fully hidden",
+      "scenario_tags": [
+        "fully_hidden_reference",
+        "unknown_truth"
+      ],
+      "synthetic_target_reference": null,
+      "reference_state": {
+        "mapping_status": "PARTIAL",
+        "software_scoreability": "NOT_SCOREABLE",
+        "exact_text": null,
+        "complete_revelation": false,
+        "reliably_aligned": false,
+        "scientifically_verified_truth": false
+      },
+      "prediction_attempt": {
+        "outcome": "SUCCEEDED",
+        "prediction_text": "Agent Cedar delivered the package."
+      },
+      "source_fact_record": [],
+      "expected_evidence": {
+        "supported": [],
+        "missing": [],
+        "contradicted": [],
+        "unsupported": []
+      },
+      "expected_evaluation_state": "NULL_ACCURACY_UNKNOWN",
+      "rationale": "No complete exact target truth is available; no source facts may be fabricated and no target-level score is allowed.",
+      "research_status": "PROPOSED_PENDING_RESEARCH_HUMAN_VALIDATION"
+    },
+    {
+      "case_id": "TRUTH-PARTIAL-015",
+      "title": "Reference only partly revealed",
+      "scenario_tags": [
+        "partial_reference",
+        "unknown_truth"
+      ],
+      "synthetic_target_reference": null,
+      "reference_state": {
+        "mapping_status": "PARTIAL",
+        "software_scoreability": "NOT_SCOREABLE",
+        "exact_text": null,
+        "complete_revelation": false,
+        "reliably_aligned": false,
+        "scientifically_verified_truth": false
+      },
+      "prediction_attempt": {
+        "outcome": "SUCCEEDED",
+        "prediction_text": "ORCHARD SEVEN."
+      },
+      "source_fact_record": [],
+      "expected_evidence": {
+        "supported": [],
+        "missing": [],
+        "contradicted": [],
+        "unsupported": []
+      },
+      "expected_evaluation_state": "NULL_ACCURACY_UNKNOWN",
+      "rationale": "A known subspan cannot be scored as if it were the full target.",
+      "research_status": "PROPOSED_PENDING_RESEARCH_HUMAN_VALIDATION"
+    },
+    {
+      "case_id": "TRUTH-MISALIGNED-016",
+      "title": "Reference candidate is ambiguous or misaligned",
+      "scenario_tags": [
+        "misaligned_reference",
+        "ambiguous_truth"
+      ],
+      "synthetic_target_reference": null,
+      "reference_state": {
+        "mapping_status": "AMBIGUOUS",
+        "software_scoreability": "NOT_SCOREABLE",
+        "exact_text": null,
+        "complete_revelation": false,
+        "reliably_aligned": false,
+        "scientifically_verified_truth": false
+      },
+      "prediction_attempt": {
+        "outcome": "SUCCEEDED",
+        "prediction_text": "Agent Cedar."
+      },
+      "source_fact_record": [],
+      "expected_evidence": {
+        "supported": [],
+        "missing": [],
+        "contradicted": [],
+        "unsupported": []
+      },
+      "expected_evaluation_state": "NULL_ACCURACY_UNKNOWN",
+      "rationale": "Ambiguous alignment means no trustworthy target truth and therefore no target-level semantic score.",
+      "research_status": "PROPOSED_PENDING_RESEARCH_HUMAN_VALIDATION"
+    },
+    {
+      "case_id": "TECH-REFUSAL-017",
+      "title": "Model refusal",
+      "scenario_tags": [
+        "refusal",
+        "nonanswer"
+      ],
+      "synthetic_target_reference": "The courier was Agent Cedar.",
+      "reference_state": {
+        "mapping_status": "CONFIRMED",
+        "software_scoreability": "SCOREABLE",
+        "exact_text": "The courier was Agent Cedar.",
+        "complete_revelation": true,
+        "reliably_aligned": true,
+        "scientifically_verified_truth": false
+      },
+      "prediction_attempt": {
+        "outcome": "REFUSED",
+        "prediction_text": null
+      },
+      "source_fact_record": [
+        {
+          "fact_id": "f1",
+          "proposition": "The courier was Agent Cedar.",
+          "critical_dimensions": [
+            "identity"
+          ]
+        }
+      ],
+      "expected_evidence": {
+        "supported": [],
+        "missing": [],
+        "contradicted": [],
+        "unsupported": []
+      },
+      "expected_evaluation_state": "TECHNICAL_NONANSWER_NO_SEMANTIC_SCORE",
+      "rationale": "A refusal is a prediction outcome, not a factual contradiction or semantic zero.",
+      "research_status": "PROPOSED_PENDING_RESEARCH_HUMAN_VALIDATION"
+    },
+    {
+      "case_id": "TECH-TIMEOUT-018",
+      "title": "Model timeout",
+      "scenario_tags": [
+        "timeout",
+        "technical_failure"
+      ],
+      "synthetic_target_reference": "The courier was Agent Cedar.",
+      "reference_state": {
+        "mapping_status": "CONFIRMED",
+        "software_scoreability": "SCOREABLE",
+        "exact_text": "The courier was Agent Cedar.",
+        "complete_revelation": true,
+        "reliably_aligned": true,
+        "scientifically_verified_truth": false
+      },
+      "prediction_attempt": {
+        "outcome": "TIMEOUT",
+        "prediction_text": null
+      },
+      "source_fact_record": [
+        {
+          "fact_id": "f1",
+          "proposition": "The courier was Agent Cedar.",
+          "critical_dimensions": [
+            "identity"
+          ]
+        }
+      ],
+      "expected_evidence": {
+        "supported": [],
+        "missing": [],
+        "contradicted": [],
+        "unsupported": []
+      },
+      "expected_evaluation_state": "TECHNICAL_NONANSWER_NO_SEMANTIC_SCORE",
+      "rationale": "A timeout is a technical attempt outcome; it is not a factual error.",
+      "research_status": "PROPOSED_PENDING_RESEARCH_HUMAN_VALIDATION"
+    },
+    {
+      "case_id": "TECH-MALFORMED-019",
+      "title": "Malformed model response",
+      "scenario_tags": [
+        "malformed",
+        "technical_failure"
+      ],
+      "synthetic_target_reference": "The courier was Agent Cedar.",
+      "reference_state": {
+        "mapping_status": "CONFIRMED",
+        "software_scoreability": "SCOREABLE",
+        "exact_text": "The courier was Agent Cedar.",
+        "complete_revelation": true,
+        "reliably_aligned": true,
+        "scientifically_verified_truth": false
+      },
+      "prediction_attempt": {
+        "outcome": "MALFORMED",
+        "prediction_text": null
+      },
+      "source_fact_record": [
+        {
+          "fact_id": "f1",
+          "proposition": "The courier was Agent Cedar.",
+          "critical_dimensions": [
+            "identity"
+          ]
+        }
+      ],
+      "expected_evidence": {
+        "supported": [],
+        "missing": [],
+        "contradicted": [],
+        "unsupported": []
+      },
+      "expected_evaluation_state": "TECHNICAL_NONANSWER_NO_SEMANTIC_SCORE",
+      "rationale": "Malformed output remains distinct from semantic error.",
+      "research_status": "PROPOSED_PENDING_RESEARCH_HUMAN_VALIDATION"
+    },
+    {
+      "case_id": "TECH-ERROR-020",
+      "title": "Technical provider or worker error",
+      "scenario_tags": [
+        "error",
+        "technical_failure"
+      ],
+      "synthetic_target_reference": "The courier was Agent Cedar.",
+      "reference_state": {
+        "mapping_status": "CONFIRMED",
+        "software_scoreability": "SCOREABLE",
+        "exact_text": "The courier was Agent Cedar.",
+        "complete_revelation": true,
+        "reliably_aligned": true,
+        "scientifically_verified_truth": false
+      },
+      "prediction_attempt": {
+        "outcome": "ERROR",
+        "prediction_text": null
+      },
+      "source_fact_record": [
+        {
+          "fact_id": "f1",
+          "proposition": "The courier was Agent Cedar.",
+          "critical_dimensions": [
+            "identity"
+          ]
+        }
+      ],
+      "expected_evidence": {
+        "supported": [],
+        "missing": [],
+        "contradicted": [],
+        "unsupported": []
+      },
+      "expected_evaluation_state": "TECHNICAL_NONANSWER_NO_SEMANTIC_SCORE",
+      "rationale": "A technical error is not a semantic contradiction and must not silently become accuracy zero.",
+      "research_status": "PROPOSED_PENDING_RESEARCH_HUMAN_VALIDATION"
+    }
+  ]
+}
