@@ -16,6 +16,8 @@ Revised critical-path sequence (conditional; task-by-task approvals still requir
 
 **Schedule risk:** As of October 8, only Task 1 is merged; Task 2 is under correction and Tasks 3–8 remain unbuilt. No guarantee of a working real-model demo or research-validated scoring by October 12. Do not skip safety, review, or no-spend requirements. Keep the scope unchanged; defer only features already outside the approved first MVP.
 
+**October 8 scope amendment (DEC-022):** for the October 12 demonstration, reference-pair trust and potential exact target matching are limited to pinned synthetic redacted/reference PDF pairs. Arbitrary uploaded references may support predictions from the redacted PDF but cannot yield confirmed truth or verified scores. This is a checkpoint limitation, not a change to the long-term product. Tasks 1–2 merged; Task 3 under approved trust-boundary correction; Tasks 4+ not yet authorized. A working real predictor/evaluator/UI and research validation remain at risk.
+
 ## Later checkpoints (conditional; dates not automatically changed by DEC-020)
 
 - Oct 21: additional provider adapters and fair multi-model comparison, only after vendor/data/cost authorization; keep shared context and versioned attempts.
