@@ -205,6 +205,12 @@ Task 3 is MERGED, not scientifically validated or deployed. DEC-022 permits refe
 
 Owner explicitly approved bounded Task-4 mock-tested redacted-only prediction adapter, strictly loopback local transport, durable SQLite one-shot worker and read-only hardware/model/license preflight. [Approved packet](task_packets/RL-MVP-004-prediction-adapter-durable-worker-PROPOSED.md) remains at its original stable path. No real inference, model installation/download, external APIs, extra spending, scoring, Task 5+, deployment or merge authorized. Backend/Codex must publish new task branch and unique handoff; QA and Research independently review exact SHA. Lead ran no application tests or hardware preflight.
 
+## 2026-10-09 | E0035 | RL-MVP-004 candidate routed to independent review
+
+Verified implementation `c3a928ce1aaf2039bc778cb91c272b435fb93aa4`, published Backend head `de9ad26f7225f5717d2c6ace683e1f21b0fed2fa`, and exactly six authorized code/test files plus one Backend handoff. Codex reports 46 focused/226 full tests passing, compilation, 21 compatible packages and diff check; Lead has not run pytest. Published [QA/Research packet](task_packets/RL-MVP-004-INDEPENDENT-REVIEW.md).
+
+Read-only preflight found no installed local model runtime/cache or verifiable license. Real-model demonstration BLOCKED; no model download, inference, paid call, Task 5, merge, scientific scoring validation or deployment.
+
 ## Entry format
 
 Date / epoch / task or decision ID; approved change vs proposal; affected files/contracts; source/approval evidence; test/benchmark impact; migration/rollback; required receivers; unresolved issues. Never backfill a success claim without evidence.
