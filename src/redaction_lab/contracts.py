@@ -286,6 +286,7 @@ class ModelAttempt(FrozenRecord):
     target_id: NonEmptyStr
     target_version: NonEmptyStr
     model_id: NonEmptyStr
+    provider_model_id: NonEmptyStr | None = None
     model_config_id: NonEmptyStr
     request_hash: Sha256
     response_hash: Sha256 | None = None
@@ -297,6 +298,12 @@ class ModelAttempt(FrozenRecord):
 
     @model_validator(mode="after")
     def enforce_success_payload(self) -> ModelAttempt:
+        if (
+            self.status in (AttemptStatus.SUCCEEDED, AttemptStatus.REFUSED)
+            and self.provider_model_id is not None
+            and self.provider_model_id != self.model_id
+        ):
+            raise ValueError("successful/refused provider model must match requested model")
         if self.status is AttemptStatus.SUCCEEDED:
             if not self.prediction or self.response_hash is None:
                 raise ValueError("successful attempts require prediction and response hash")

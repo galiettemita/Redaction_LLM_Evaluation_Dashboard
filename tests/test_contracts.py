@@ -91,6 +91,56 @@ def _run_definition(**overrides: object) -> contracts.RunDefinition:
     return contracts.RunDefinition.model_validate(values)
 
 
+def test_model_attempt_provider_identity_is_optional_for_legacy_rows() -> None:
+    values = {
+        "attempt_id": "attempt-001",
+        "project_id": "project-001",
+        "run_id": "run-001",
+        "target_id": "target-001",
+        "target_version": "target-v1",
+        "model_id": "requested-model",
+        "model_config_id": "config-v1",
+        "request_hash": HASH_A,
+        "response_hash": HASH_B,
+        "prediction": "guess",
+        "status": "SUCCEEDED",
+        "usage": {},
+        "started_at": NOW,
+        "completed_at": NOW,
+    }
+
+    legacy = contracts.ModelAttempt.model_validate(values)
+    verified = contracts.ModelAttempt.model_validate(
+        {**values, "provider_model_id": "requested-model"}
+    )
+
+    assert legacy.provider_model_id is None
+    assert verified.model_id == verified.provider_model_id == "requested-model"
+
+
+def test_model_attempt_rejects_success_with_mismatched_provider_identity() -> None:
+    with pytest.raises(ValidationError, match="provider model"):
+        contracts.ModelAttempt.model_validate(
+            {
+                "attempt_id": "attempt-001",
+                "project_id": "project-001",
+                "run_id": "run-001",
+                "target_id": "target-001",
+                "target_version": "target-v1",
+                "model_id": "requested-model",
+                "provider_model_id": "different-model",
+                "model_config_id": "config-v1",
+                "request_hash": HASH_A,
+                "response_hash": HASH_B,
+                "prediction": "guess",
+                "status": "SUCCEEDED",
+                "usage": {},
+                "started_at": NOW,
+                "completed_at": NOW,
+            }
+        )
+
+
 def _evaluation(**overrides: object) -> contracts.EvaluationRecord:
     values: dict[str, object] = {
         "evaluation_id": "evaluation-001",
