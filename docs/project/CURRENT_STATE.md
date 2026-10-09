@@ -1,6 +1,6 @@
 # Current state
 
-Updated: 2026-10-08 (America/New_York). Coordination epoch: **E0027**.
+Updated: 2026-10-08 (America/New_York). Coordination epoch: **E0028**.
 Integration branch: `main`. Canonical writer: **Lead/Architect**, within the owner's approved scope.
 Resolve the actual HEAD with GitHub; do not infer a current SHA from this file's timestamp.
 
@@ -16,7 +16,7 @@ The eight shared files and root agent instructions define a coordination protoco
 
 ## Holds and urgent changes
 
-E0027 HOLD: Backend stopped Task-3 Correction 01 after local false-CONFIRMED probe using fabricated DocumentVersion; rejected candidate NOT PUBLISHED. Trusted reference provenance/pairing decision pending. No merge, Task 4, paid model calls, scoring or deployment. Standing hold: no application code, live model calls, migrations, cloud resources or deployment without the relevant approved task and decisions. Private data must not be put in this public repository.
+E0028: owner approved DEC-022 and scoped synthetic-fixture trust correction. Backend may resume Task 3 within the new packet. Rejected local candidate NOT PUBLISHED. No merge, Task 4, paid calls, scientific scoring or deployment. Standing hold: no application code, live model calls, migrations, cloud resources or deployment without the relevant approved task and decisions. Private data must not be put in this public repository.
 
 On a critical new change, the Lead records affected task IDs here as `ON_HOLD`, increments the epoch and links the decision. This stops work only when an active agent next checks; it is not a remote kill switch.
 
@@ -28,7 +28,7 @@ On a critical new change, the Lead records affected task IDs here as `ON_HOLD`, 
 | RL-MVP-PLAN-001 | PLAN_APPROVED | Lead/Architect | [Oct 12 design (legacy filename)](../../docs/superpowers/specs/2026-10-07-oct14-mvp-design.md) and [weekly roadmap](plans/2026-10-07-weekly-implementation-roadmap.md); [detailed plan](../../docs/superpowers/plans/2026-10-07-oct14-mvp-implementation.md) owner approved 2026-10-07; RL-MVP-001 merged; RL-MVP-002 coding approved within its packet. |
 | RL-MVP-001 | MERGED | Backend | [Contracts and synthetic fixtures](task_packets/RL-MVP-001-contracts-and-synthetic-fixtures.md); corrected implementation `a1d8311`, branch head `c698cd4`; QA and Research both PASS for Task 1; owner-approved merge complete. |
 | RL-MVP-002 | MERGED | Backend/Codex + Lead integration | Reviewed implementation `736fa18`, owner-approved PR #2 merged as `35281fb9`; QA PASS and Research Task-2 semantics PASS. |
-| RL-MVP-003 | BLOCKED; TRUST_BOUNDARY_PROPOSED | Backend/Codex + Lead | Backend stopped on fabricated-record false CONFIRMED and partially hidden edge punctuation; local rejected candidate `80f9ee1` NOT PUBLISHED. [Owner decision proposal](task_packets/RL-MVP-003-TRUST-BOUNDARY-PROPOSAL.md). No merge/Task 4. |
+| RL-MVP-003 | TRUST_CORRECTION_APPROVED; NOT PUBLISHED | Backend/Codex | Owner approved DEC-022; [synthetic registry correction packet](task_packets/RL-MVP-003-TRUSTED-SYNTHETIC-CORRECTION.md). Rejected local `80f9ee1` remains unpushed; new QA/Research exact-SHA reviews required. No merge/Task 4. |
 | RL-S1-001 | PROPOSED | Lead + Backend | Define document/target/reference records and initial input limits; D01/D02/D03 and component plan required. |
 | RL-S2-001 | PROPOSED | Research | Propose rubric, human benchmark and release criteria; D03/D04/D05; no invented thresholds. |
 | RL-UX-001 | PROPOSED | Frontend | Synthetic-data workflow proposal only; D09 and scoped approval before implementation. |
@@ -37,11 +37,11 @@ These proposed items are not claimed, running or approved to execute. The Lead a
 
 ## Remaining gates and next action
 
-**October 12, 2026 MVP remains AT RISK.** Tasks 1 and 2 merged; Task 3 BLOCKED; Tasks 4+ unauthorized.
+**October 12 MVP remains AT RISK.** Tasks 1 and 2 merged; Task 3 approved for bounded trust correction but unmerged; Tasks 4+ unauthorized.
 
-Backend reports stopping Correction 01 after an independent local probe falsely CONFIRMED ground truth when a caller fabricated a matching DocumentVersion. SHA-256 checks only establish byte consistency, not the record's authority or true document pairing. A second local finding shows partially covered edge punctuation can be omitted while CONFIRMED. Backend reports 159 full tests passed on local candidate `80f9ee1`, but it is **rejected and NOT PUBLISHED**; Lead has not inspected it or run its tests. Remote Task-3 branch remains at `2d79ee6`.
+Owner approved **DEC-022**: only a source-controlled allowlist of pre-authorized synthetic redacted/reference PDF pairs with both byte SHA-256 hashes and explicit project/version pairing may establish fixture trust for the October 12 demo. Arbitrary uploaded references remain NOT_SCOREABLE/null; redacted-only prediction is still allowed. This narrows checkpoint scoreability, not the long-term product. Fixture membership does not establish full-target truth or scientific D03 validity.
 
-[Owner decision proposal](task_packets/RL-MVP-003-TRUST-BOUNDARY-PROPOSAL.md): for October 12, use an explicitly trusted synthetic-fixture pairing registry/manifest and keep arbitrary uploaded references unconfirmed/null; or authorize a broader authenticated intake/persistence boundary. Neither option is yet approved. Do not resume Task-3 implementation, merge, start Task 4, use paid services or claim D03 scientific validation without the required approval.
+[Approved Task-3 packet](task_packets/RL-MVP-003-TRUSTED-SYNTHETIC-CORRECTION.md) permits only reference alignment, new synthetic-pair registry, their tests and a Backend handoff on the existing branch. Both-side word evidence, exact edge punctuation/whitespace or null, independent pinned-hash verification and no leakage are required. Local rejected `80f9ee1` remains NOT PUBLISHED; remote branch was `2d79ee6` at approval. Fresh QA/Research reviews and separate owner merge authorization required. No Task 4, paid calls, private data or deployment.
 
 ## What is present / absent
 
@@ -50,7 +50,7 @@ Present on main: typed contracts, synthetic PDF fixtures, vector-PDF redaction d
 
 ## Latest important change
 
-E0027: Task-3 Correction 01 blocked on missing trusted reference provenance; local rejected candidate not published. Owner decision requested; no new design approved.
+E0028: owner approved DEC-022 synthetic-only fixture pairing and scoped RL-MVP-003 correction; no new code published yet.
 
 ## Maintenance rule
 
