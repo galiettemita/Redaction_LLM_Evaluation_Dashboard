@@ -1,6 +1,6 @@
 # Current state
 
-Updated: 2026-10-08 (America/New_York). Coordination epoch: **E0031**.
+Updated: 2026-10-08 (America/New_York). Coordination epoch: **E0032**.
 Integration branch: `main`. Canonical writer: **Lead/Architect**, within the owner's approved scope.
 Resolve the actual HEAD with GitHub; do not infer a current SHA from this file's timestamp.
 
@@ -16,7 +16,7 @@ The eight shared files and root agent instructions define a coordination protoco
 
 ## Holds and urgent changes
 
-E0031: Task 3 Correction 02 published at `97db3615` and routed for fresh QA/Research review; no merge or Task 4. Standing hold: no application code, live model calls, migrations, cloud resources or deployment without the relevant approved task and decisions. Private data must not be put in this public repository.
+E0032: Task 3 Correction 02 passed independent QA and Research reviews for scoped synthetic reference trust. Awaiting owner merge authorization; no merge or Task 4. Standing hold: no application code, live model calls, migrations, cloud resources or deployment without the relevant approved task and decisions. Private data must not be put in this public repository.
 
 On a critical new change, the Lead records affected task IDs here as `ON_HOLD`, increments the epoch and links the decision. This stops work only when an active agent next checks; it is not a remote kill switch.
 
@@ -28,7 +28,7 @@ On a critical new change, the Lead records affected task IDs here as `ON_HOLD`, 
 | RL-MVP-PLAN-001 | PLAN_APPROVED | Lead/Architect | [Oct 12 design (legacy filename)](../../docs/superpowers/specs/2026-10-07-oct14-mvp-design.md) and [weekly roadmap](plans/2026-10-07-weekly-implementation-roadmap.md); [detailed plan](../../docs/superpowers/plans/2026-10-07-oct14-mvp-implementation.md) owner approved 2026-10-07; RL-MVP-001 merged; RL-MVP-002 coding approved within its packet. |
 | RL-MVP-001 | MERGED | Backend | [Contracts and synthetic fixtures](task_packets/RL-MVP-001-contracts-and-synthetic-fixtures.md); corrected implementation `a1d8311`, branch head `c698cd4`; QA and Research both PASS for Task 1; owner-approved merge complete. |
 | RL-MVP-002 | MERGED | Backend/Codex + Lead integration | Reviewed implementation `736fa18`, owner-approved PR #2 merged as `35281fb9`; QA PASS and Research Task-2 semantics PASS. |
-| RL-MVP-003 | CORRECTION_02_READY_FOR_REVIEW | Backend/Codex | Implementation `97db3615`, branch head `139921de`; Codex reports 60 focused/180 full tests passed. [Fresh review packet](task_packets/RL-MVP-003-DEC022-CORRECTION-02-REVIEW.md). No merge/Task 4. |
+| RL-MVP-003 | REVIEW_PASSED_AWAITING_MERGE_APPROVAL | Backend/Codex + Lead | Exact candidate `97db3615`, branch head `139921de`; [QA PASS](https://github.com/galiettemita/Redaction_LLM_Evaluation_Dashboard/blob/b43682a241bae616b7735c6980553036ff693d5e/docs/project/handoffs/RL-MVP-003-qa-20261009T024200Z-97db361.md) and [Research Task-3 PASS](https://github.com/galiettemita/Redaction_LLM_Evaluation_Dashboard/blob/12ff6e67770f841a4c4dfbf9928cc5e8e32a102b/docs/project/handoffs/RL-MVP-003-research-20261009T025500Z-dec022-correction02.md). No merge or Task 4. |
 | RL-S1-001 | PROPOSED | Lead + Backend | Define document/target/reference records and initial input limits; D01/D02/D03 and component plan required. |
 | RL-S2-001 | PROPOSED | Research | Propose rubric, human benchmark and release criteria; D03/D04/D05; no invented thresholds. |
 | RL-UX-001 | PROPOSED | Frontend | Synthetic-data workflow proposal only; D09 and scoped approval before implementation. |
@@ -37,11 +37,11 @@ These proposed items are not claimed, running or approved to execute. The Lead a
 
 ## Remaining gates and next action
 
-**October 12 MVP remains AT RISK.** Tasks 1–2 merged. Task 3 Correction 02 is published on its isolated branch but unmerged; Tasks 4+ unauthorized.
+**October 12 MVP remains AT RISK.** Tasks 1–2 merged. Task 3 Correction 02 passed scoped independent review but remains unmerged; Tasks 4+ unauthorized.
 
-Codex published `97db3615c65b9e31d0f94dca443baab760340c5f`, Backend handoff head `139921de76f9f3d0a67af19217e0969464f88ffd`. The exact implementation changes four approved reference/registry code and test files; the next commit adds one handoff. Codex reports 60 focused and 180 full tests passing, compilation, dependency and diff checks; Lead has not run the suite independently.
+Exact implementation `97db3615c65b9e31d0f94dca443baab760340c5f`, Backend publication head `139921de76f9f3d0a67af19217e0969464f88ffd`, received [QA PASS](https://github.com/galiettemita/Redaction_LLM_Evaluation_Dashboard/blob/b43682a241bae616b7735c6980553036ff693d5e/docs/project/handoffs/RL-MVP-003-qa-20261009T024200Z-97db361.md) and [Research PASS for Task-3 trust/truth semantics](https://github.com/galiettemita/Redaction_LLM_Evaluation_Dashboard/blob/12ff6e67770f841a4c4dfbf9928cc5e8e32a102b/docs/project/handoffs/RL-MVP-003-research-20261009T025500Z-dec022-correction02.md). QA independently verified literal synthetic PDF hashes, canonical IDs, forged/blank/missing identities, hidden-text suppression and edge whitespace. Research independently ran 20/20 synthetic provenance/truth probes. Neither reviewer could run the full exact-candidate repository suite due GitHub checkout DNS restrictions; Codex reports 60 focused and 180 full tests passed. No remaining Task-3 software blocker was identified in the reviewed scope.
 
-[Fresh independent QA/Research review packet](task_packets/RL-MVP-003-DEC022-CORRECTION-02-REVIEW.md) targets forged redacted/reference canonical-version IDs, registry-pinned provenance and prior reference isolation/unknown safeguards. Earlier QA FAIL and Research Task-3 PASS apply only to `8a751d4`. Only synthetic `two_boxes` is registered; arbitrary reference uploads remain unknown/null. No new reviewer verdict, merge, Task 4, paid calls, deployment or D03 scientific validation.
+**Next gate:** explicit owner authorization to integrate Task 3. The approved `two_boxes` fixture is the only registered pair; arbitrary uploaded reference truth stays NOT_SCOREABLE/null. Passing software reviews do not establish D03 scientific scoring validity, real-document alignment accuracy, institutional data authorization or production readiness. No merge, Task 4, paid calls or deployment without separate authority.
 
 ## What is present / absent
 
@@ -50,7 +50,7 @@ Present on main: typed contracts, synthetic PDF fixtures, vector-PDF redaction d
 
 ## Latest important change
 
-E0031: Correction 02 candidate `97db3615` published and routed to independent QA/Research review. No merge or Task 4.
+E0032: both independent reviewers passed Task-3 Correction 02 on `97db3615` within synthetic-only scope; owner merge authorization pending.
 
 ## Maintenance rule
 
