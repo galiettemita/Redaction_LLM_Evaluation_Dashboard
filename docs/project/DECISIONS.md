@@ -1,6 +1,6 @@
 # Decision register
 
-Baseline: [MASTER_SPEC.md](MASTER_SPEC.md), imported 2026-10-06. Epoch E0037.
+Baseline: [MASTER_SPEC.md](MASTER_SPEC.md), imported 2026-10-06. Epoch E0038.
 Product decision IDs `DEC-...` are distinct from the source PDF's open-decision IDs `D01`-`D10`.
 
 ## Authority
@@ -55,6 +55,10 @@ The owner approved RL-MVP-004 Correction 01's scoped expansion and separately au
 ## E0037 Task 5 research-only authorization (not scientific approval)
 
 On 2026-10-09, the owner explicitly approved RL-MVP-005 strictly for a research proposal: `docs/project/research_proposals/RL-MVP-005-evaluation-rubric.md`, `tests/fixtures/evaluation_cases.json` (synthetic only), and one unique Research handoff on an isolated branch. The [approved packet](task_packets/RL-MVP-005-RESEARCH-PROPOSAL.md) defines acceptance and stops. No evaluator implementation, merge of Research artifacts, real inference, model downloads, spending, Task 6, deployment or scientific-method approval. D03/D04/D05/D06 remain open. This is a task authorization, not a new DEC-numbered methodological decision.
+
+## E0038 Task 6 implementation authorization (not scientific-method approval)
+
+On 2026-10-09 the owner explicitly approved bounded RL-MVP-006 synthetic/mock-only evaluator evidence and target/document/model summary code: six proposed source/test files, necessary scoped changes in contracts.py and test_contracts.py, and one unique Backend handoff. The owner requires the final [Task 6 packet](task_packets/RL-MVP-006-EVALUATOR-SUMMARIES.md) on main before Codex work and fresh independent QA and Research review. No D03/D04/D05/D06 scientific approval, numeric score formula/weights/thresholds, live model inference, installation/download, new unapproved dependencies, merge, Task 7, spending or deployment. This is task execution authorization, not a DEC-numbered methodological amendment.
 
 ## Installed coordination rules (not research approvals)
 

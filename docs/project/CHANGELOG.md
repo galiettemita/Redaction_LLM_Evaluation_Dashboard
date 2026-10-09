@@ -219,6 +219,10 @@ Owner approved bounded trusted-source, SQLite, transport, model-provenance and w
 
 Owner expressly approved a narrowly scoped Task-5 Research rubric/adversarial benchmark proposal. The packet initially published on isolated Lead branch `fe7a5031` was not visible on main, causing Research to correctly stop. Lead integrated the packet and recorded the authorization on main; only two synthetic proposal files and one Research handoff on an isolated branch are permitted. D03/D04/D05/D06 remain unapproved; no Task 6, evaluator implementation, merge of Research work, inference, spend or deployment.
 
+## 2026-10-09 | E0038 | RL-MVP-006 implementation authorization
+
+Product owner approved a bounded Task-6 synthetic/mock-only evaluator evidence and three-level summary implementation. Lead published the final packet to main before Codex execution, limiting scope to six named new source/test files, conditional contracts.py/test_contracts.py and one Backend handoff. Task-5 proposal is not research-human-validated, and no D03–D06 scoring/aggregation approval is granted. No models, costs, merge, Task 7 or deployment.
+
 ## Entry format
 
 Date / epoch / task or decision ID; approved change vs proposal; affected files/contracts; source/approval evidence; test/benchmark impact; migration/rollback; required receivers; unresolved issues. Never backfill a success claim without evidence.
