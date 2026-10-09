@@ -1,6 +1,6 @@
 # Current state
 
-Updated: 2026-10-08 (America/New_York). Coordination epoch: **E0029**.
+Updated: 2026-10-08 (America/New_York). Coordination epoch: **E0030**.
 Integration branch: `main`. Canonical writer: **Lead/Architect**, within the owner's approved scope.
 Resolve the actual HEAD with GitHub; do not infer a current SHA from this file's timestamp.
 
@@ -16,7 +16,7 @@ The eight shared files and root agent instructions define a coordination protoco
 
 ## Holds and urgent changes
 
-E0029: DEC-022 Task-3 correction published on Backend branch; fresh independent QA and Research reviews pending. No merge, Task 4, paid calls, scientific scoring or deployment. Standing hold: no application code, live model calls, migrations, cloud resources or deployment without the relevant approved task and decisions. Private data must not be put in this public repository.
+E0030: QA requested changes to Task 3 canonical-version provenance. Research passed Task-3 trust semantics. Correction 02 routed; no merge or Task 4. Standing hold: no application code, live model calls, migrations, cloud resources or deployment without the relevant approved task and decisions. Private data must not be put in this public repository.
 
 On a critical new change, the Lead records affected task IDs here as `ON_HOLD`, increments the epoch and links the decision. This stops work only when an active agent next checks; it is not a remote kill switch.
 
