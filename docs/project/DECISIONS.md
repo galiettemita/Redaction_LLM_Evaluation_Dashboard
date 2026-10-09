@@ -1,6 +1,6 @@
 # Decision register
 
-Baseline: [MASTER_SPEC.md](MASTER_SPEC.md), imported 2026-10-06. Epoch E0036.
+Baseline: [MASTER_SPEC.md](MASTER_SPEC.md), imported 2026-10-06. Epoch E0037.
 Product decision IDs `DEC-...` are distinct from the source PDF's open-decision IDs `D01`-`D10`.
 
 ## Authority
@@ -51,6 +51,10 @@ Source B1 is identified in MASTER_SPEC. These IDs normalize previously stated re
 ## E0036 implementation authorization (not scientific approval)
 
 The owner approved RL-MVP-004 Correction 01's scoped expansion and separately authorized integration of exact corrected implementation `b9ce8182751f26109fbd857bcb8d909720bafd13` after independent QA/Research review and reconciliation. PR #4 merged as `8f4d2f18aa2c565e3228d4f3568a2bd8c1714b0f`. This is an implementation/integration authorization, **not** a new DEC-numbered product-method change; DEC-001..022 remain in effect. The trust boundary is internal-only with no authenticated upload API. D03/D05, model/license, data/vendor and deployment approvals remain open. No Task 5, inference, downloads or spending authorized.
+
+## E0037 Task 5 research-only authorization (not scientific approval)
+
+On 2026-10-09, the owner explicitly approved RL-MVP-005 strictly for a research proposal: `docs/project/research_proposals/RL-MVP-005-evaluation-rubric.md`, `tests/fixtures/evaluation_cases.json` (synthetic only), and one unique Research handoff on an isolated branch. The [approved packet](task_packets/RL-MVP-005-RESEARCH-PROPOSAL.md) defines acceptance and stops. No evaluator implementation, merge of Research artifacts, real inference, model downloads, spending, Task 6, deployment or scientific-method approval. D03/D04/D05/D06 remain open. This is a task authorization, not a new DEC-numbered methodological decision.
 
 ## Installed coordination rules (not research approvals)
 

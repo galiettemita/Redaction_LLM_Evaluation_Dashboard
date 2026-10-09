@@ -215,6 +215,10 @@ Read-only preflight found no installed local model runtime/cache or verifiable l
 
 Owner approved bounded trusted-source, SQLite, transport, model-provenance and wrapped-timeout correction including ten code/test files. Published Correction 01 packet in task_packets. Exact corrected implementation `b9ce8182751f26109fbd857bcb8d909720bafd13` with Backend head `fb4c1f0`; QA independent scoped PASS (102 focused/255 full pytest, 27 selected and 15 custom probes) and Research scoped protocol PASS. Separately owner-authorized PR #4 merged as `8f4d2f18` after reconciling existing main records; no application tests run by Lead. Internal-only ingestion remains unauthenticated to arbitrary users; no licensed local runtime/model. Real inference, D03/D05 scoring/protocol approval, Task 5, costs and deployment remain blocked/not authorized.
 
+## 2026-10-09 | E0037 | RL-MVP-005 research-only authorization
+
+Owner expressly approved a narrowly scoped Task-5 Research rubric/adversarial benchmark proposal. The packet initially published on isolated Lead branch `fe7a5031` was not visible on main, causing Research to correctly stop. Lead integrated the packet and recorded the authorization on main; only two synthetic proposal files and one Research handoff on an isolated branch are permitted. D03/D04/D05/D06 remain unapproved; no Task 6, evaluator implementation, merge of Research work, inference, spend or deployment.
+
 ## Entry format
 
 Date / epoch / task or decision ID; approved change vs proposal; affected files/contracts; source/approval evidence; test/benchmark impact; migration/rollback; required receivers; unresolved issues. Never backfill a success claim without evidence.

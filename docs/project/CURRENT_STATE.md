@@ -1,12 +1,12 @@
 # Current state
 
-Updated: 2026-10-09 (America/New_York). Coordination epoch: **E0036**.
+Updated: 2026-10-09 (America/New_York). Coordination epoch: **E0037**.
 Integration branch: `main`. Canonical writer: **Lead/Architect**, within the owner's approved scope.
 Resolve the actual HEAD with GitHub; do not infer a current SHA from this file's timestamp.
 
 ## Read this first
 
-**Stage:** S1 / October 12 MVP implementation. **Execution boundary:** RL-MVP-001, RL-MVP-002 and RL-MVP-003 are merged. RL-MVP-004 has been owner-authorized and MERGED following Correction 01 independent QA and Research PASS; Task 5+ remains unapproved.
+**Stage:** S1 / October 12 MVP implementation. **Execution boundary:** RL-MVP-001, RL-MVP-002 and RL-MVP-003 are merged. RL-MVP-004 has been owner-authorized and MERGED following Correction 01 independent QA and Research PASS; Task 5 is owner-approved for a research-only proposal on an isolated Research branch; Task 6+ remains unapproved.
 **Product implementation:** RL-MVP-001 merged in PR #1 (`ba60aaa8`); RL-MVP-002 merged in PR #2 (`35281fb9`); RL-MVP-003 merged in PR #3 (`733ae024`).
 **Scoring validity:** not established. **Deployment:** none established here.
 **Active background agents / scheduler:** none installed by this setup.
@@ -16,7 +16,7 @@ The eight shared files and root agent instructions define a coordination protoco
 
 ## Holds and urgent changes
 
-E0036: Owner-approved Task-4 Correction 01 merged via PR #4 at `8f4d2f18` after scoped QA and Research PASS on exact implementation `b9ce818`. Real inference remains BLOCKED by missing verified runtime/model/license. No Task 5, paid calls or deployment. Standing hold: no application code, live model calls, migrations, cloud resources or deployment without the relevant approved task and decisions. Private data must not be put in this public repository.
+E0036: Owner-approved Task-4 Correction 01 merged via PR #4 at `8f4d2f18` after scoped QA and Research PASS on exact implementation `b9ce818`. Real inference remains BLOCKED by missing verified runtime/model/license. No Task 5 implementation beyond its approved research-only proposal, paid calls or deployment. Standing hold: no application code, live model calls, migrations, cloud resources or deployment without the relevant approved task and decisions. Private data must not be put in this public repository.
 
 On a critical new change, the Lead records affected task IDs here as `ON_HOLD`, increments the epoch and links the decision. This stops work only when an active agent next checks; it is not a remote kill switch.
 
@@ -31,6 +31,7 @@ On a critical new change, the Lead records affected task IDs here as `ON_HOLD`, 
 | RL-MVP-003 | MERGED | Backend/Codex + Lead integration | Exact candidate `97db3615`, published branch head `139921de`, owner-authorized [PR #3](https://github.com/galiettemita/Redaction_LLM_Evaluation_Dashboard/pull/3) merged as `733ae024`. QA PASS; Research Task-3 semantics PASS. Synthetic-only pairing, no D03 approval. |
 | RL-MVP-004 | MERGED; REAL_MODEL_BLOCKED | Backend/Codex + Lead integration | Correction 01 exact implementation `b9ce818`, Backend head `fb4c1f0`; independent QA and Research PASS for scoped infrastructure/protocol, owner-authorized PR #4 merged `8f4d2f18`. Real inference/D03/D05 not validated; Task 5 unapproved. |
 | RL-S1-001 | PROPOSED | Lead + Backend | Define document/target/reference records and initial input limits; D01/D02/D03 and component plan required. |
+| RL-MVP-005 | APPROVED_RESEARCH_PROPOSAL; NOT IMPLEMENTED | Research/Evaluation | [Research-only Task 5 packet](task_packets/RL-MVP-005-RESEARCH-PROPOSAL.md) explicitly approved by owner; two synthetic proposal artifacts and one unique Research handoff on an isolated branch. No evaluator, merge, scientific-method approval or Task 6. |
 | RL-S2-001 | PROPOSED | Research | Propose rubric, human benchmark and release criteria; D03/D04/D05; no invented thresholds. |
 | RL-UX-001 | PROPOSED | Frontend | Synthetic-data workflow proposal only; D09 and scoped approval before implementation. |
 
@@ -38,7 +39,7 @@ These proposed items are not claimed, running or approved to execute. The Lead a
 
 ## Remaining gates and next action
 
-**October 12 MVP remains AT RISK.** Tasks 1–4 merged. Task-4 Correction 01 on exact implementation `b9ce8182751f26109fbd857bcb8d909720bafd13` was independently reviewed: QA PASS with 102 focused/255 full pytest, 27 selected cases and 15 custom probes; Research PASS for scoped prediction-protocol semantics (isolated probes, full pytest not independently run by Research). PR #4 merged at `8f4d2f18aa2c565e3228d4f3568a2bd8c1714b0f`. See owner-approved [Correction 01 packet](task_packets/RL-MVP-004-CORRECTION-01.md) and QA/Research published branch handoffs. Local model/runtime/license absent; real inference BLOCKED. D03/D05 scientific approvals and lab data/vendor authorization NOT OBTAINED. No inference, downloads, paid calls, Task 5 or deployment authorized.
+**October 12 MVP remains AT RISK.** Tasks 1–4 merged. Task-4 Correction 01 on exact implementation `b9ce8182751f26109fbd857bcb8d909720bafd13` was independently reviewed: QA PASS with 102 focused/255 full pytest, 27 selected cases and 15 custom probes; Research PASS for scoped prediction-protocol semantics (isolated probes, full pytest not independently run by Research). PR #4 merged at `8f4d2f18aa2c565e3228d4f3568a2bd8c1714b0f`. See owner-approved [Correction 01 packet](task_packets/RL-MVP-004-CORRECTION-01.md) and QA/Research published branch handoffs. Local model/runtime/license absent; real inference BLOCKED. D03/D05 scientific approvals and lab data/vendor authorization NOT OBTAINED. No inference, downloads, paid calls, Task 5 evaluator implementation, Task 6 or deployment authorized. Task 5 research-only proposal is approved.
 
 ## What is present / absent
 
@@ -47,7 +48,7 @@ Present on main: Tasks 1–4 contracts, synthetic fixtures, PDF detector, canoni
 
 ## Latest important change
 
-E0036: Task-4 Correction 01 independently reviewed and merged in PR #4. Real inference blocked; Task 5 not authorized.
+E0037: Task 5 research-only proposal authorized; packet published to main. Task 4 remains merged, real inference blocked.
 
 ## Maintenance rule
 
