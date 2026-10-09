@@ -1,6 +1,6 @@
 # Current state
 
-Updated: 2026-10-08 (America/New_York). Coordination epoch: **E0034**.
+Updated: 2026-10-08 (America/New_York). Coordination epoch: **E0035**.
 Integration branch: `main`. Canonical writer: **Lead/Architect**, within the owner's approved scope.
 Resolve the actual HEAD with GitHub; do not infer a current SHA from this file's timestamp.
 
@@ -16,7 +16,7 @@ The eight shared files and root agent instructions define a coordination protoco
 
 ## Holds and urgent changes
 
-E0034: owner approved bounded RL-MVP-004 mock-tested adapter/durable-worker implementation and read-only machine/model feasibility preflight. No real inference, downloads, paid calls, scientific scoring or deployment authorized. Standing hold: no application code, live model calls, migrations, cloud resources or deployment without the relevant approved task and decisions. Private data must not be put in this public repository.
+E0035: Task-4 mock-tested candidate published; QA and Research reviews pending. Read-only preflight found no local runtime/model; real inference BLOCKED. No merge, paid calls or deployment. Standing hold: no application code, live model calls, migrations, cloud resources or deployment without the relevant approved task and decisions. Private data must not be put in this public repository.
 
 On a critical new change, the Lead records affected task IDs here as `ON_HOLD`, increments the epoch and links the decision. This stops work only when an active agent next checks; it is not a remote kill switch.
 
@@ -29,7 +29,7 @@ On a critical new change, the Lead records affected task IDs here as `ON_HOLD`, 
 | RL-MVP-001 | MERGED | Backend | [Contracts and synthetic fixtures](task_packets/RL-MVP-001-contracts-and-synthetic-fixtures.md); corrected implementation `a1d8311`, branch head `c698cd4`; QA and Research both PASS for Task 1; owner-approved merge complete. |
 | RL-MVP-002 | MERGED | Backend/Codex + Lead integration | Reviewed implementation `736fa18`, owner-approved PR #2 merged as `35281fb9`; QA PASS and Research Task-2 semantics PASS. |
 | RL-MVP-003 | MERGED | Backend/Codex + Lead integration | Exact candidate `97db3615`, published branch head `139921de`, owner-authorized [PR #3](https://github.com/galiettemita/Redaction_LLM_Evaluation_Dashboard/pull/3) merged as `733ae024`. QA PASS; Research Task-3 semantics PASS. Synthetic-only pairing, no D03 approval. |
-| RL-MVP-004 | APPROVED; NOT STARTED | Backend/Codex | [Bounded adapter/durable worker packet](task_packets/RL-MVP-004-prediction-adapter-durable-worker-PROPOSED.md). Mock-only implementation + read-only local preflight. No real inference, downloads, extra spend, merge or deployment. |
+| RL-MVP-004 | READY_FOR_REVIEW; REAL_MODEL_BLOCKED | Backend/Codex | Implementation `c3a928ce`, branch head `de9ad26f`; Codex reports 46 focused/226 full tests passed. [Independent review packet](task_packets/RL-MVP-004-INDEPENDENT-REVIEW.md). No merge, inference or Task 5. |
 | RL-S1-001 | PROPOSED | Lead + Backend | Define document/target/reference records and initial input limits; D01/D02/D03 and component plan required. |
 | RL-S2-001 | PROPOSED | Research | Propose rubric, human benchmark and release criteria; D03/D04/D05; no invented thresholds. |
 | RL-UX-001 | PROPOSED | Frontend | Synthetic-data workflow proposal only; D09 and scoped approval before implementation. |
@@ -38,9 +38,9 @@ These proposed items are not claimed, running or approved to execute. The Lead a
 
 ## Remaining gates and next action
 
-**October 12 MVP remains AT RISK.** Tasks 1–3 merged. The owner approved [RL-MVP-004](task_packets/RL-MVP-004-prediction-adapter-durable-worker-PROPOSED.md) for Codex to implement a strictly redacted-only provider-neutral prediction adapter, mock-tested loopback transport and durable SQLite one-shot worker, plus a **read-only local hardware/model/license preflight**. No real inference, model download/install, external API, additional spend, deployment or Task 5+ authorization.
+**October 12 MVP remains AT RISK.** Tasks 1–3 merged. Task-4 candidate `c3a928ce1aaf2039bc778cb91c272b435fb93aa4` is published on Backend branch head `de9ad26f7225f5717d2c6ace683e1f21b0fed2fa` but not merged. GitHub verifies exactly six approved code/test files plus a unique Backend handoff. Codex reports 46 focused/226 full tests passed; Lead has not independently executed application tests.
 
-Codex must create a new isolated Task-4 branch, perform TDD, publish one unique Backend handoff and submit an exact candidate for independent QA and Research review. If the approved file/contract scope is insufficient or the in-doubt retry boundary cannot be represented safely, STOP for review. No local model or hardware has been verified; mocks do not count as a real-model demonstration. D03 scientific scoring validity remains pending.
+[Independent QA/Research review packet](task_packets/RL-MVP-004-INDEPENDENT-REVIEW.md) covers redacted-only isolation, loopback transport, durable at-most-once dispatch, crash/timeout ambiguity and provenance. No reviewer verdict yet. Read-only Backend preflight found Apple M5 with 32 GB memory but no installed local runtime/model/cache or verified license. Real-model demo remains BLOCKED. No inference, downloads, paid calls, Task 5, D03 scoring approval or deployment authorized.
 
 ## What is present / absent
 
@@ -49,7 +49,7 @@ Present on main: typed contracts, synthetic PDF fixtures, vector-PDF redaction d
 
 ## Latest important change
 
-E0034: owner-approved Task-4 mock-only implementation and read-only feasibility preflight; no inference or merge.
+E0035: Task-4 candidate published for independent review; real local inference blocked by preflight.
 
 ## Maintenance rule
 
