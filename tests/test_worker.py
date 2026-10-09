@@ -363,6 +363,59 @@ def test_source_run_manifest_attempt_and_state_are_immutable(tmp_path) -> None:
     assert store.job(job_id).state == "COMPLETE"
 
 
+def test_database_rejects_new_untrusted_direct_manifest_rows(tmp_path) -> None:
+    path = tmp_path / "run.sqlite3"
+    RunStore(path)
+    manifest = _forged_manifest()
+    connection = sqlite3.connect(path)
+
+    with pytest.raises(sqlite3.IntegrityError, match="trusted source binding"):
+        connection.execute(
+            """INSERT INTO jobs (
+                job_id, scope_key, project_id, run_id, target_id,
+                target_version, model_id, attempt_policy, manifest_json,
+                state, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?)""",
+            (
+                "direct-forged-job", "direct-forged-scope", manifest.project_id,
+                manifest.run_id, manifest.target_id, manifest.target_version,
+                manifest.model_id, "one-frozen-attempt", manifest.model_dump_json(),
+                NOW.isoformat(), NOW.isoformat(),
+            ),
+        )
+    connection.close()
+
+
+def test_trusted_looking_but_forged_database_job_never_reaches_adapter(tmp_path) -> None:
+    path = tmp_path / "run.sqlite3"
+    store = RunStore(path)
+    source = _ingest(store, tmp_path)
+    run = _run(source)
+    forged = _forged_manifest()
+    connection = sqlite3.connect(path)
+    connection.execute(
+        """INSERT INTO jobs (
+            job_id, scope_key, project_id, run_id, target_id, target_version,
+            model_id, attempt_policy, manifest_json, source_id, run_json,
+            trust_version, state, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?)""",
+        (
+            "forged-bound-job", "forged-bound-scope", source.project_id,
+            run.run_id, forged.target_id, forged.target_version, forged.model_id,
+            run.attempt_policy, forged.model_dump_json(), source.source_id,
+            run.model_dump_json(), "canonical-source-binding-v1", NOW.isoformat(),
+            NOW.isoformat(),
+        ),
+    )
+    connection.commit()
+    connection.close()
+    adapter = MockAdapter()
+
+    with pytest.raises(ValueError, match="target"):
+        asyncio.run(run_pending_once(store, adapter))
+    assert adapter.calls == 0
+
+
 def test_corrupted_source_is_revalidated_before_claim_and_never_dispatched(tmp_path) -> None:
     path = tmp_path / "run.sqlite3"
     store = RunStore(path)

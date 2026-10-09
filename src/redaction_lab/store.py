@@ -134,9 +134,11 @@ class RunStore:
             self._add_column_if_missing(connection, "jobs", "trust_version", "TEXT")
             connection.executescript(
                 """
+                BEGIN IMMEDIATE;
                 DROP TRIGGER IF EXISTS attempts_no_update;
                 DROP TRIGGER IF EXISTS attempts_no_delete;
                 DROP TRIGGER IF EXISTS jobs_intent_no_update;
+                DROP TRIGGER IF EXISTS jobs_trusted_insert;
                 DROP TRIGGER IF EXISTS jobs_state_guard;
                 DROP TRIGGER IF EXISTS jobs_no_delete;
                 DROP TRIGGER IF EXISTS canonical_sources_no_update;
@@ -161,6 +163,17 @@ class RunStore:
                     target_version, model_id, attempt_policy, manifest_json,
                     source_id, run_json, trust_version, created_at ON jobs
                 BEGIN SELECT RAISE(ABORT, 'job intent is immutable'); END;
+                CREATE TRIGGER jobs_trusted_insert BEFORE INSERT ON jobs
+                WHEN NEW.trust_version IS NOT 'canonical-source-binding-v1'
+                  OR NEW.source_id IS NULL
+                  OR NEW.run_json IS NULL
+                  OR NOT EXISTS (
+                      SELECT 1 FROM canonical_sources
+                      WHERE source_id = NEW.source_id
+                        AND project_id = NEW.project_id
+                        AND role = 'REDACTED'
+                  )
+                BEGIN SELECT RAISE(ABORT, 'job requires trusted source binding'); END;
                 CREATE TRIGGER jobs_state_guard
                 BEFORE UPDATE OF state, attempt_id, request_hash, model_config_id ON jobs
                 WHEN NOT (
@@ -177,6 +190,7 @@ class RunStore:
                 BEGIN SELECT RAISE(ABORT, 'invalid job state transition'); END;
                 CREATE TRIGGER jobs_no_delete BEFORE DELETE ON jobs
                 BEGIN SELECT RAISE(ABORT, 'job intent is immutable'); END;
+                COMMIT;
                 """
             )
 
