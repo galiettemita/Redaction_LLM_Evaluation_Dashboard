@@ -161,6 +161,28 @@ Owner explicitly approved starting RL-MVP-003 after the owner-authorized Task-2 
 
 Independent QA/Research review required on exact candidate; D03 human validation and any verified-scoring claims remain unapproved. No merge, Task 4, paid calls, private data or deployment. October 12 target remains at risk.
 
+## 2026-10-08 | E0025 | RL-MVP-003 candidate intake and review routing
+
+Verified exact Codex implementation `931fb1c0012d3b530b837f204d922f0aaa95a602`, published Backend head `2d79ee6a7d5ba2a06148ff257529faa50dfa06e1` and handoff. Compared with main `4e08b7f1579523dbd44294f02c0ff18d51a754a4`: two new approved source/test files and one Backend handoff; no other changed paths. Codex reports 25 focused and 145 full tests passing, compileall and dependency/diff checks; Lead has not executed application tests. Published [independent QA/Research review packet](task_packets/RL-MVP-003-INDEPENDENT-REVIEW.md), including false-confirmation, one-sided global alignment, exact quotation, reference leakage and identity/version checks.
+
+No independent verdict, merge, Task 4, paid calls, research-human scoring approval or deployment. October 12 deadline remains at risk.
+
+## 2026-10-08 | E0026 | RL-MVP-003 Correction 01 approved
+
+Independent QA (FAIL, `007eb0e`) and Research (CHANGES_REQUESTED, `6406a25`) reviewed exact candidate `931fb1c`. Blocking issues: one-sided global anchor acceptance despite contradictory context, wrong-release local-neighbor matches without trusted identity/full-document coherence, and loss of target-edge whitespace. Reviewers did not independently run the complete 145-test repository suite.
+
+Owner explicitly approved DEC-021 and [bounded Correction 01](task_packets/RL-MVP-003-CORRECTION-01.md), including trusted existing DocumentVersion role/project/version/SHA-256 byte verification, two-sided alignment, and exact source span or null. No contracts schema change, merge, Task 4, scientific D03 validation, paid calls or deployment. Codex correction has not yet been published.
+
+## 2026-10-08 | E0027 | Task 3 trust boundary stop and proposed DEC-022
+
+Backend reports stopping RL-MVP-003 Correction 01: a fabricated DocumentVersion can pass byte/role/project/version checks and falsely CONFIRM, and partially hidden edge punctuation may be omitted with CONFIRMED. Local rejected `80f9ee1` and its 159 reported tests are NOT PUBLISHED or independently verified; Backend remote remains `2d79ee6`. No merge or Task 4.
+
+Published [trust-boundary proposal](task_packets/RL-MVP-003-TRUST-BOUNDARY-PROPOSAL.md) and **proposed, not approved** DEC-022: synthetic-fixture trusted pairing manifest for October 12, with arbitrary user-uploaded reference truth null until authenticated pairing exists. This changes the demonstration's scoreable subset and requires owner approval, separate scoped work and fresh QA/Research. No application code or tests run by Lead; no scientific D03 approval, paid calls or deployment.
+
+## 2026-10-08 | E0028 | DEC-022 approved, Task-3 synthetic trust correction
+
+Owner explicitly approved a synthetic-only trusted pairing registry for the October 12 demo. Published [scoped Task-3 packet](task_packets/RL-MVP-003-TRUSTED-SYNTHETIC-CORRECTION.md): pin both PDF hashes and immutable pair identity, reject forged caller trust, preserve two-sided global alignment and exact punctuation/whitespace or null, require independent QA/Research. Arbitrary uploaded reference truth remains unknown; redacted-only prediction remains permitted. Rejected local `80f9ee1` is NOT PUBLISHED. No Lead application tests, code merge, Task 4, paid calls, scientific D03 approval or deployment.
+
 ## Entry format
 
 Date / epoch / task or decision ID; approved change vs proposal; affected files/contracts; source/approval evidence; test/benchmark impact; migration/rollback; required receivers; unresolved issues. Never backfill a success claim without evidence.

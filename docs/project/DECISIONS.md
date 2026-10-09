@@ -1,6 +1,6 @@
 # Decision register
 
-Baseline: [MASTER_SPEC.md](MASTER_SPEC.md), imported 2026-10-06. Epoch E0024.
+Baseline: [MASTER_SPEC.md](MASTER_SPEC.md), imported 2026-10-06. Epoch E0028.
 Product decision IDs `DEC-...` are distinct from the source PDF's open-decision IDs `D01`-`D10`.
 
 ## Authority
@@ -38,7 +38,15 @@ A new user instruction can authorize work within its scope, but a chat statement
 
 | DEC-020 | The owner advances the **first MVP checkpoint from October 14 to October 12, 2026**. The same previously approved MVP scope, zero-additional-spend rule, independent QA/Research reviews, reference-null protections and human approval gates remain. This is a target date, not guaranteed delivery or blanket permission to code, merge or deploy. | Explicit owner direction on 2026-10-08. Supersedes the **date only** in DEC-018/019 and the prior roadmap. Affects plans, design, state, agent guidance and the next task schedule; no scoring-method decision changed. |
 
+| DEC-021 | Owner approves RL-MVP-003 Correction 01: require both available non-boundary anchor sides to agree with global alignment; do not let geometry override conflicting textual evidence; preserve exact target-edge whitespace or leave truth unknown; refine only the reference-alignment callable interface to accept a **trusted existing DocumentVersion** and verify project, reference role, version ID and SHA-256 against reference PDF bytes. Require conservative document-wide context coherence and trustworthy pairing; if the stateless layer cannot establish them, return unconfirmed, not guessed truth. No contract schema change, numeric threshold, scientific D03 approval, or new task authorization. | Explicit owner approval on 2026-10-08 following independent QA FAIL and Research CHANGES_REQUESTED on Task-3 candidate `931fb1c`. Affects only `reference.py`, `test_reference.py`, Task-3 Backend handoff, and future callers. Existing DocumentVersion remains unchanged; future persistence must authenticate record provenance/pairing. New exact-SHA QA/Research review required; no merge/Task 4. |
+
 Source B1 is identified in MASTER_SPEC. These IDs normalize previously stated requirements; they do not approve new numeric methods.
+
+## Checkpoint-specific decision amendments
+
+| ID | Decision | Status / effects |
+| --- | --- | --- |
+| DEC-022 | For the October 12 synthetic-only demonstration, permit a trusted test-fixture manifest/registry of immutable redacted/reference pairs and hashes, accessible only through a trusted bootstrap/resolver; require full two-sided text evidence and exact spans or null. Unregistered/user-uploaded references remain NOT_SCOREABLE pending a separately authorized authenticated provenance/pairing system. | **APPROVED by product owner on 2026-10-08 (explicit yes).** [Scoped implementation packet](task_packets/RL-MVP-003-TRUSTED-SYNTHETIC-CORRECTION.md). Only byte-hash-pinned synthetic pairs can pass the checkpoint fixture-pairing gate; arbitrary uploaded references remain unknown/null while prediction remains allowed. This does not approve scientific D03 validation, real-document provenance, extra costs, merge, Task 4 or deployment. |
 
 ## Installed coordination rules (not research approvals)
 

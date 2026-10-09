@@ -54,6 +54,10 @@ A mapping is eligible for verified scoring only when the exact revealed span is 
 
 Prefer a small local modular Python evaluation/document pipeline, lightweight API/worker and durable local state with a simple web viewer. FastAPI, React and SQLite are candidates, not finalized technology decisions. Use synthetic or explicitly authorized public fixtures, mockable providers and no new paid calls/cloud resources. Preserve reference/prediction isolation, idempotency, immutable versions and recovery.
 
+## October 12 synthetic fixture trust boundary (DEC-022)
+
+The owner approved an application-owned, source-controlled allowlist of pre-authorized **synthetic** redacted/reference PDF pairs. The resolver checks BOTH actual PDF byte hashes and immutable project/document/version pairing against pinned entries. Caller-supplied DocumentVersion records, case names and hashes do not confer trust; runtime self-registration is forbidden. Even a trusted fixture pair needs complete unique readable two-sided text alignment and exact source span to confirm a target. Arbitrary uploaded references remain unknown/null, though redacted-only prediction remains allowed. This is not archival authenticity, scientific D03 validation, a general authenticated registry or a deployment design. See [Task-3 correction packet](task_packets/RL-MVP-003-TRUSTED-SYNTHETIC-CORRECTION.md).
+
 ## Research-critical boundaries
 
 The viewer can display both versions, but the prediction path cannot. Reference-derived filenames, hints, summaries, context, caches and evaluator feedback must not leak into prompts. Target detection must not derive the question from the reference answer. Unknown truth and worker errors are separate states. Completed predictions remain immutable when reference mappings are corrected.

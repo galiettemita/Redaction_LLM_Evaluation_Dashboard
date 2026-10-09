@@ -12,6 +12,10 @@ Prediction may run without a reference. A verified target score requires the ent
 
 Use reference-grounded fact-level coverage, support and contradiction evidence; deterministic entity/date/quantity/negation checks plus semantic paraphrase/actor-action-object matching. A predictor cannot solely grade its own answer. MiniCheck/NLI and F1-like scoring remain candidate methods, not approved numeric formulas. Validate against human-adjudicated and held-out examples, prioritizing false high scores. Baseline is one frozen attempt per model/target. Report verified eligible denominators, unknown/null, refusal/failure and fair common-set comparisons. No extra spend in the seven-day MVP.
 
+## October 12 fixture-trust evidence boundary (DEC-022)
+
+Only pinned, pre-authorized synthetic PDF pairs may be treated as *fixture-paired* for the October 12 demonstration. This does not validate real-document reference provenance, actual model reconstruction accuracy or scientific D03 auto-confirmation. Every confirmed mapping still needs unique, complete, readable, reliable full-target truth; uncertain edge punctuation, partial visibility, repeated anchors or unregistered user uploads remain null. Distinguish software mapping eligibility from independently research-validated verified scores. Report how many targets are synthetic fixture-paired, unknown, unsupported and excluded; do not generalize synthetic success to government PDFs.
+
 ## Proposed evaluation sequence
 
 1. Check scope and scoreability; stop with unknown/review status when necessary.
