@@ -564,3 +564,91 @@ def test_target_ids_are_versioned_and_project_scoped() -> None:
 
     assert target.target_version == "target-v3"
     assert target.project_id == "project-001"
+
+
+def test_task6_fact_evidence_requires_typed_label_and_provenance() -> None:
+    comparison = contracts.FactComparison(
+        fact_id="fact-001",
+        reference_quote="Agent Cedar",
+        reference_proposition="The courier was Agent Cedar.",
+        reference_quote_locator="chars:0-11",
+        critical_dimensions=("identity",),
+        prediction_excerpt="Agent Cedar",
+        comparison_label="SUPPORTED",
+        evidence_label="SUPPORTED",
+        rationale="Synthetic mock evidence only.",
+        provisional=True,
+    )
+
+    assert comparison.evidence_label is contracts.FactEvidenceLabel.SUPPORTED
+    with pytest.raises(ValidationError):
+        comparison.evidence_label = contracts.FactEvidenceLabel.MISSING
+    with pytest.raises(ValidationError, match="evidence label"):
+        contracts.FactComparison.model_validate(
+            {**comparison.model_dump(), "comparison_label": "CONTRADICTED"}
+        )
+
+
+def test_task6_evaluation_schema_requires_complete_binding_and_null_scores() -> None:
+    values = {
+        **_evaluation().model_dump(),
+        "evidence_schema_version": "qualitative-fact-evidence-v1",
+        "run_id": "run-v1",
+        "target_id": "target-001",
+        "target_version": "target-v1",
+        "redacted_document_version_id": "redacted-v1",
+        "redacted_canonical_version_id": "canonical-v1",
+        "model_id": "model-v1",
+        "model_config_id": "config-v1",
+        "condition_id": "condition-v1",
+        "reference_trust": "UNTRUSTED_OR_UNAVAILABLE",
+        "judge_id": "judge",
+        "judge_version": "judge-v1",
+        "qualitative_status": "ACCURACY_UNKNOWN",
+        "attempt_request_hash": HASH_A,
+    }
+    record = contracts.EvaluationRecord.model_validate(values)
+    assert record.verified_score is record.experimental_score is None
+
+    for field in (
+        "run_id",
+        "target_id",
+        "target_version",
+        "redacted_document_version_id",
+        "model_id",
+        "model_config_id",
+        "condition_id",
+        "reference_trust",
+        "judge_id",
+        "judge_version",
+        "qualitative_status",
+        "attempt_request_hash",
+    ):
+        with pytest.raises(ValidationError, match="Task 6 evidence"):
+            contracts.EvaluationRecord.model_validate({**values, field: None})
+
+    with pytest.raises(ValidationError, match="Task 6 evidence requires null"):
+        contracts.EvaluationRecord.model_validate(
+            {
+                **values,
+                "mapping_id": "mapping-1",
+                "mapping_version": "mapping-v1",
+                "mapping_status": "CONFIRMED",
+                "mapping_scoreability": "SCOREABLE",
+                "score_status": "EXPERIMENTAL",
+                "score_scale_id": "forbidden-scale",
+                "experimental_score": 1.0,
+            }
+        )
+
+    with pytest.raises(ValidationError, match="approved synthetic trust"):
+        contracts.EvaluationRecord.model_validate(
+            {
+                **values,
+                "reference_trust": "APPROVED_SYNTHETIC_PAIR",
+                "mapping_id": "mapping-1",
+                "mapping_version": "mapping-v1",
+                "mapping_status": "CONFLICTING",
+                "mapping_scoreability": "NOT_SCOREABLE",
+            }
+        )
