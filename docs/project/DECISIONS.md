@@ -1,6 +1,6 @@
 # Decision register
 
-Baseline: [MASTER_SPEC.md](MASTER_SPEC.md), imported 2026-10-06. Epoch E0027.
+Baseline: [MASTER_SPEC.md](MASTER_SPEC.md), imported 2026-10-06. Epoch E0028.
 Product decision IDs `DEC-...` are distinct from the source PDF's open-decision IDs `D01`-`D10`.
 
 ## Authority
@@ -42,11 +42,11 @@ A new user instruction can authorize work within its scope, but a chat statement
 
 Source B1 is identified in MASTER_SPEC. These IDs normalize previously stated requirements; they do not approve new numeric methods.
 
-## Proposed, not approved
+## Checkpoint-specific decision amendments
 
-| ID | Proposal | Status / effects |
+| ID | Decision | Status / effects |
 | --- | --- | --- |
-| DEC-022 | For the October 12 synthetic-only demonstration, permit a trusted test-fixture manifest/registry of immutable redacted/reference pairs and hashes, accessible only through a trusted bootstrap/resolver; require full two-sided text evidence and exact spans or null. Unregistered/user-uploaded references remain NOT_SCOREABLE pending a separately authorized authenticated provenance/pairing system. | **PROPOSED 2026-10-08; OWNER APPROVAL NOT OBTAINED.** See [trust-boundary proposal](task_packets/RL-MVP-003-TRUST-BOUNDARY-PROPOSAL.md). This would narrow the first checkpoint's scoreable inputs, add a scoped trust-boundary implementation, and require QA/Research review. Does not approve D03 scientific validity, new costs, deployment or Task 4. |
+| DEC-022 | For the October 12 synthetic-only demonstration, permit a trusted test-fixture manifest/registry of immutable redacted/reference pairs and hashes, accessible only through a trusted bootstrap/resolver; require full two-sided text evidence and exact spans or null. Unregistered/user-uploaded references remain NOT_SCOREABLE pending a separately authorized authenticated provenance/pairing system. | **APPROVED by product owner on 2026-10-08 (explicit yes).** [Scoped implementation packet](task_packets/RL-MVP-003-TRUSTED-SYNTHETIC-CORRECTION.md). Only byte-hash-pinned synthetic pairs can pass the checkpoint fixture-pairing gate; arbitrary uploaded references remain unknown/null while prediction remains allowed. This does not approve scientific D03 validation, real-document provenance, extra costs, merge, Task 4 or deployment. |
 
 ## Installed coordination rules (not research approvals)
 
