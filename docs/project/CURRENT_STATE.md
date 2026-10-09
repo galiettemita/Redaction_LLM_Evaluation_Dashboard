@@ -1,13 +1,13 @@
 # Current state
 
-Updated: 2026-10-08 (America/New_York). Coordination epoch: **E0032**.
+Updated: 2026-10-08 (America/New_York). Coordination epoch: **E0033**.
 Integration branch: `main`. Canonical writer: **Lead/Architect**, within the owner's approved scope.
 Resolve the actual HEAD with GitHub; do not infer a current SHA from this file's timestamp.
 
 ## Read this first
 
-**Stage:** S1 / October 12 MVP implementation. **Execution boundary:** RL-MVP-001 and RL-MVP-002 are merged. RL-MVP-003 reference alignment is owner-approved within its task packet; later tasks remain unapproved.
-**Product implementation:** RL-MVP-001 merged in PR #1 (`ba60aaa8`); RL-MVP-002 merged in PR #2 (`35281fb9`).
+**Stage:** S1 / October 12 MVP implementation. **Execution boundary:** RL-MVP-001, RL-MVP-002 and RL-MVP-003 are merged. Task 4 and later implementation remain unapproved.
+**Product implementation:** RL-MVP-001 merged in PR #1 (`ba60aaa8`); RL-MVP-002 merged in PR #2 (`35281fb9`); RL-MVP-003 merged in PR #3 (`733ae024`).
 **Scoring validity:** not established. **Deployment:** none established here.
 **Active background agents / scheduler:** none installed by this setup.
 **Public-data warning:** repository visibility was public at inspection; unchanged.
@@ -16,7 +16,7 @@ The eight shared files and root agent instructions define a coordination protoco
 
 ## Holds and urgent changes
 
-E0032: Task 3 Correction 02 passed independent QA and Research reviews for scoped synthetic reference trust. Awaiting owner merge authorization; no merge or Task 4. Standing hold: no application code, live model calls, migrations, cloud resources or deployment without the relevant approved task and decisions. Private data must not be put in this public repository.
+E0033: owner-approved Task 3 merged through PR #3 after exact-SHA QA and Research PASS. No Task 4, paid model calls, scientific scoring or deployment authorized. Standing hold: no application code, live model calls, migrations, cloud resources or deployment without the relevant approved task and decisions. Private data must not be put in this public repository.
 
 On a critical new change, the Lead records affected task IDs here as `ON_HOLD`, increments the epoch and links the decision. This stops work only when an active agent next checks; it is not a remote kill switch.
 
@@ -25,10 +25,10 @@ On a critical new change, the Lead records affected task IDs here as `ON_HOLD`, 
 | Task | State | Owner role | Scope / gate |
 | --- | --- | --- | --- |
 | RL-OPS-001 | DOCUMENTATION_BASELINE | Lead/Architect | This coordination package. Verify committed files against the setup request; no app tests claimed. |
-| RL-MVP-PLAN-001 | PLAN_APPROVED | Lead/Architect | [Oct 12 design (legacy filename)](../../docs/superpowers/specs/2026-10-07-oct14-mvp-design.md) and [weekly roadmap](plans/2026-10-07-weekly-implementation-roadmap.md); [detailed plan](../../docs/superpowers/plans/2026-10-07-oct14-mvp-implementation.md) owner approved 2026-10-07; RL-MVP-001 merged; RL-MVP-002 coding approved within its packet. |
+| RL-MVP-PLAN-001 | PLAN_APPROVED | Lead/Architect | [Oct 12 design (legacy filename)](../../docs/superpowers/specs/2026-10-07-oct14-mvp-design.md) and [weekly roadmap](plans/2026-10-07-weekly-implementation-roadmap.md); [detailed plan](../../docs/superpowers/plans/2026-10-07-oct14-mvp-implementation.md) owner approved 2026-10-07; RL-MVP-001 merged; Tasks 1–3 merged; Task 4 not approved. |
 | RL-MVP-001 | MERGED | Backend | [Contracts and synthetic fixtures](task_packets/RL-MVP-001-contracts-and-synthetic-fixtures.md); corrected implementation `a1d8311`, branch head `c698cd4`; QA and Research both PASS for Task 1; owner-approved merge complete. |
 | RL-MVP-002 | MERGED | Backend/Codex + Lead integration | Reviewed implementation `736fa18`, owner-approved PR #2 merged as `35281fb9`; QA PASS and Research Task-2 semantics PASS. |
-| RL-MVP-003 | REVIEW_PASSED_AWAITING_MERGE_APPROVAL | Backend/Codex + Lead | Exact candidate `97db3615`, branch head `139921de`; [QA PASS](https://github.com/galiettemita/Redaction_LLM_Evaluation_Dashboard/blob/b43682a241bae616b7735c6980553036ff693d5e/docs/project/handoffs/RL-MVP-003-qa-20261009T024200Z-97db361.md) and [Research Task-3 PASS](https://github.com/galiettemita/Redaction_LLM_Evaluation_Dashboard/blob/12ff6e67770f841a4c4dfbf9928cc5e8e32a102b/docs/project/handoffs/RL-MVP-003-research-20261009T025500Z-dec022-correction02.md). No merge or Task 4. |
+| RL-MVP-003 | MERGED | Backend/Codex + Lead integration | Exact candidate `97db3615`, published branch head `139921de`, owner-authorized [PR #3](https://github.com/galiettemita/Redaction_LLM_Evaluation_Dashboard/pull/3) merged as `733ae024`. QA PASS; Research Task-3 semantics PASS. Synthetic-only pairing, no D03 approval. |
 | RL-S1-001 | PROPOSED | Lead + Backend | Define document/target/reference records and initial input limits; D01/D02/D03 and component plan required. |
 | RL-S2-001 | PROPOSED | Research | Propose rubric, human benchmark and release criteria; D03/D04/D05; no invented thresholds. |
 | RL-UX-001 | PROPOSED | Frontend | Synthetic-data workflow proposal only; D09 and scoped approval before implementation. |
@@ -37,20 +37,20 @@ These proposed items are not claimed, running or approved to execute. The Lead a
 
 ## Remaining gates and next action
 
-**October 12 MVP remains AT RISK.** Tasks 1–2 merged. Task 3 Correction 02 passed scoped independent review but remains unmerged; Tasks 4+ unauthorized.
+**October 12 MVP remains AT RISK.** Tasks 1–3 are merged; Task 4 and later work are not authorized.
 
-Exact implementation `97db3615c65b9e31d0f94dca443baab760340c5f`, Backend publication head `139921de76f9f3d0a67af19217e0969464f88ffd`, received [QA PASS](https://github.com/galiettemita/Redaction_LLM_Evaluation_Dashboard/blob/b43682a241bae616b7735c6980553036ff693d5e/docs/project/handoffs/RL-MVP-003-qa-20261009T024200Z-97db361.md) and [Research PASS for Task-3 trust/truth semantics](https://github.com/galiettemita/Redaction_LLM_Evaluation_Dashboard/blob/12ff6e67770f841a4c4dfbf9928cc5e8e32a102b/docs/project/handoffs/RL-MVP-003-research-20261009T025500Z-dec022-correction02.md). QA independently verified literal synthetic PDF hashes, canonical IDs, forged/blank/missing identities, hidden-text suppression and edge whitespace. Research independently ran 20/20 synthetic provenance/truth probes. Neither reviewer could run the full exact-candidate repository suite due GitHub checkout DNS restrictions; Codex reports 60 focused and 180 full tests passed. No remaining Task-3 software blocker was identified in the reviewed scope.
+The owner explicitly approved merging independently reviewed Task 3. [PR #3](https://github.com/galiettemita/Redaction_LLM_Evaluation_Dashboard/pull/3) merged successfully at `733ae0245350439d795f86a7b68d3552cca6a3d2` (parents `3741a3d8` and Backend head `139921de`). Exact implementation `97db3615c65b9e31d0f94dca443baab760340c5f` received independent QA PASS and Research PASS for scoped Task-3 trust/truth semantics. Lead verified GitHub merge, both parents and all four implementation/test files plus Backend handoff on main. Codex reported 180 full tests passed; QA and Research performed independent targeted checks but did not rerun full pytest. Lead did not run application tests.
 
-**Next gate:** explicit owner authorization to integrate Task 3. The approved `two_boxes` fixture is the only registered pair; arbitrary uploaded reference truth stays NOT_SCOREABLE/null. Passing software reviews do not establish D03 scientific scoring validity, real-document alignment accuracy, institutional data authorization or production readiness. No merge, Task 4, paid calls or deployment without separate authority.
+**Next:** propose a bounded Task-4 packet for owner approval before Codex starts. Only synthetic `two_boxes` is registered; arbitrary uploaded references remain NOT_SCOREABLE/null. No scientific D03 scoring validity, real-document alignment accuracy, paid calls, private data, deployment or Task-4 authorization is implied by this merge.
 
 ## What is present / absent
 
 Present: source-aligned product digest, decision register, proposed architectural and record boundaries, research guardrails, operating guide, role prompts, handoff and PR templates.
-Present on main: typed contracts, synthetic PDF fixtures, vector-PDF redaction detector, safe canonicalizer, package metadata and Task 1+2 tests. Absent: reference aligner, persistence, API, workers, model adapters, evaluator, UI and deployment. No CI or cron is installed.
+Present on main: typed contracts, synthetic PDF fixtures, vector-PDF redaction detector, safe canonicalizer, text-first reference aligner, synthetic two_boxes trust registry, package metadata and Task 1–3 tests. Absent: persistence, API, workers, model adapters, evaluator, UI and deployment. No CI or cron is installed.
 
 ## Latest important change
 
-E0032: both independent reviewers passed Task-3 Correction 02 on `97db3615` within synthetic-only scope; owner merge authorization pending.
+E0033: owner-authorized RL-MVP-003 merged through PR #3 at `733ae024`. Task 4 remains unapproved.
 
 ## Maintenance rule
 

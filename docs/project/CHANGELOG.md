@@ -195,6 +195,12 @@ Verified exact implementation `97db3615c65b9e31d0f94dca443baab760340c5f` and Bac
 
 Fetched [QA PASS](https://github.com/galiettemita/Redaction_LLM_Evaluation_Dashboard/blob/b43682a241bae616b7735c6980553036ff693d5e/docs/project/handoffs/RL-MVP-003-qa-20261009T024200Z-97db361.md) at `b43682a241bae616b7735c6980553036ff693d5e` and [Research PASS for Task-3 semantics](https://github.com/galiettemita/Redaction_LLM_Evaluation_Dashboard/blob/12ff6e67770f841a4c4dfbf9928cc5e8e32a102b/docs/project/handoffs/RL-MVP-003-research-20261009T025500Z-dec022-correction02.md) at `12ff6e67770f841a4c4dfbf9928cc5e8e32a102b`, both reviewing exact implementation `97db3615c65b9e31d0f94dca443baab760340c5f`. QA independently checked forged canonical IDs, literal fixture pins, hidden-text and whitespace controls; Research ran 20/20 synthetic provenance/truth probes. Neither independently executed the exact full 180-test suite (checkout DNS blocked); Codex-reported 180 full tests passed. No scoped software blocker remains. **Disposition: REVIEW_PASSED_AWAITING_MERGE_APPROVAL**, not MERGED, not D03 scientific validation, not real-document accuracy. No Lead application tests, Task 4, paid calls or deployment.
 
+## 2026-10-09 | E0033 | Owner-authorized RL-MVP-003 integration
+
+Owner explicitly approved merge of the independently reviewed Task-3 branch. [PR #3](https://github.com/galiettemita/Redaction_LLM_Evaluation_Dashboard/pull/3) merged as `733ae0245350439d795f86a7b68d3552cca6a3d2`, parents `3741a3d80f118a3b4048aba42adb2fc8cbc67251` (main) and `139921de76f9f3d0a67af19217e0969464f88ffd` (Backend head). Reviewed implementation `97db3615c65b9e31d0f94dca443baab760340c5f` received independent QA PASS and Research Task-3 semantics PASS. Lead verified GitHub merge/ref/parents and source/test/handoff files; no application tests executed by Lead. Codex reports 180 full tests passing; reviewers independently ran focused probes, not full pytest.
+
+Task 3 is MERGED, not scientifically validated or deployed. DEC-022 permits reference confirmation only for pinned synthetic `two_boxes`; arbitrary uploads remain unknown/null. Task 4, paid calls, private data, D03 scoring validation and deployment remain unauthorized.
+
 ## Entry format
 
 Date / epoch / task or decision ID; approved change vs proposal; affected files/contracts; source/approval evidence; test/benchmark impact; migration/rollback; required receivers; unresolved issues. Never backfill a success claim without evidence.
