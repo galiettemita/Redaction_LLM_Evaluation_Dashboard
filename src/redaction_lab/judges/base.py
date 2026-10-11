@@ -6,7 +6,12 @@ from typing import Protocol
 
 from pydantic import model_validator
 
-from redaction_lab.contracts import FactEvidenceLabel, FrozenRecord, NonEmptyStr
+from redaction_lab.contracts import (
+    EvidenceValidationState,
+    FactEvidenceLabel,
+    FrozenRecord,
+    NonEmptyStr,
+)
 
 
 class SourceFact(FrozenRecord):
@@ -41,6 +46,9 @@ class SourceFactRecord(FrozenRecord):
     mapping_version: NonEmptyStr
     rubric_version: NonEmptyStr
     facts: tuple[SourceFact, ...]
+    validation_state: EvidenceValidationState = (
+        EvidenceValidationState.UNVALIDATED_SYNTHETIC
+    )
 
 
 class JudgeEvidence(FrozenRecord):
@@ -52,6 +60,9 @@ class JudgeEvidence(FrozenRecord):
     unsupported_assertions: tuple[NonEmptyStr, ...] = ()
     provisional: bool = True
     disagreement: bool = False
+    validation_state: EvidenceValidationState = (
+        EvidenceValidationState.UNVALIDATED_SYNTHETIC
+    )
 
     @model_validator(mode="after")
     def forbid_nonprovisional_task6_claims(self) -> JudgeEvidence:

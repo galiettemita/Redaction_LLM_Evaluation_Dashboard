@@ -83,6 +83,12 @@ class FactEvidenceLabel(StrEnum):
     NEEDS_REVIEW = "NEEDS_REVIEW"
 
 
+class EvidenceValidationState(StrEnum):
+    """Task-6 evidence is synthetic and explicitly not research validated."""
+
+    UNVALIDATED_SYNTHETIC = "UNVALIDATED_SYNTHETIC"
+
+
 class JobStatus(StrEnum):
     PENDING = "PENDING"
     RUNNING = "RUNNING"
@@ -388,6 +394,34 @@ class EvaluationRecord(FrozenRecord):
     unsupported_assertions: tuple[NonEmptyStr, ...] = ()
     attempt_request_hash: Sha256 | None = None
     attempt_response_hash: Sha256 | None = None
+    evaluation_series_key: NonEmptyStr | None = None
+    job_id: NonEmptyStr | None = None
+    source_id: NonEmptyStr | None = None
+    source_version: NonEmptyStr | None = None
+    source_sha256: Sha256 | None = None
+    run_version: NonEmptyStr | None = None
+    run_digest: Sha256 | None = None
+    manifest_id: NonEmptyStr | None = None
+    manifest_version: NonEmptyStr | None = None
+    manifest_digest: Sha256 | None = None
+    canonical_document_hash: Sha256 | None = None
+    provider_model_id: NonEmptyStr | None = None
+    prompt_id: NonEmptyStr | None = None
+    prompt_version: NonEmptyStr | None = None
+    settings_fingerprint: Sha256 | None = None
+    attempt_policy: NonEmptyStr | None = None
+    context_policy: NonEmptyStr | None = None
+    common_context_budget: Annotated[int, Field(gt=0)] | None = None
+    tool_permissions: tuple[NonEmptyStr, ...] = ()
+    prediction_protocol_id: NonEmptyStr | None = None
+    model_provenance_id: NonEmptyStr | None = None
+    reference_target_id: NonEmptyStr | None = None
+    reference_target_version: NonEmptyStr | None = None
+    mapping_method_version: NonEmptyStr | None = None
+    redacted_canonical_hash: Sha256 | None = None
+    reference_canonical_hash: Sha256 | None = None
+    source_fact_validation_state: EvidenceValidationState | None = None
+    judge_validation_state: EvidenceValidationState | None = None
 
     @model_validator(mode="after")
     def enforce_score_channel_and_prerequisites(self) -> EvaluationRecord:
@@ -461,6 +495,51 @@ class EvaluationRecord(FrozenRecord):
             ):
                 raise ValueError(
                     "Task 6 fact comparisons require typed, versioned evidence"
+                )
+
+        if self.evidence_schema_version == "qualitative-fact-evidence-v2":
+            required_v2 = {
+                "evaluation_series_key": self.evaluation_series_key,
+                "job_id": self.job_id,
+                "source_id": self.source_id,
+                "source_version": self.source_version,
+                "source_sha256": self.source_sha256,
+                "run_version": self.run_version,
+                "run_digest": self.run_digest,
+                "manifest_id": self.manifest_id,
+                "manifest_version": self.manifest_version,
+                "manifest_digest": self.manifest_digest,
+                "canonical_document_hash": self.canonical_document_hash,
+                "prompt_id": self.prompt_id,
+                "prompt_version": self.prompt_version,
+                "settings_fingerprint": self.settings_fingerprint,
+                "attempt_policy": self.attempt_policy,
+                "context_policy": self.context_policy,
+                "common_context_budget": self.common_context_budget,
+                "prediction_protocol_id": self.prediction_protocol_id,
+                "model_provenance_id": self.model_provenance_id,
+                "reference_target_id": self.reference_target_id,
+                "reference_target_version": self.reference_target_version,
+                "mapping_method_version": self.mapping_method_version,
+            }
+            missing_v2 = [
+                name for name, value in required_v2.items() if value is None
+            ]
+            if missing_v2:
+                raise ValueError(
+                    "Task 6 v2 evidence requires authoritative provenance: "
+                    + ", ".join(missing_v2)
+                )
+            if self.fact_comparisons and (
+                self.source_fact_validation_state
+                is not EvidenceValidationState.UNVALIDATED_SYNTHETIC
+                or self.judge_validation_state
+                is not EvidenceValidationState.UNVALIDATED_SYNTHETIC
+                or self.process_status is not EvaluationProcessStatus.NEEDS_REVIEW
+                or self.qualitative_status != "UNVALIDATED_MOCK_EVIDENCE"
+            ):
+                raise ValueError(
+                    "unvalidated Task 6 evidence must remain explicit NEEDS_REVIEW"
                 )
 
         if self.process_status is not EvaluationProcessStatus.COMPLETE:

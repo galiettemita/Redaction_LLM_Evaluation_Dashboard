@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
+from redaction_lab.adapters.base import build_prediction_manifest
 from redaction_lab.canonical import canonicalize_redacted
 from redaction_lab.contracts import (
     AttemptStatus,
@@ -14,6 +15,7 @@ from redaction_lab.contracts import (
     ModelAttempt,
     ReferenceScoreability,
     ReferenceStatus,
+    RunDefinition,
     ScoreStatus,
 )
 from redaction_lab.evaluator import (
@@ -32,7 +34,9 @@ from redaction_lab.judges.local_nli import (
     LocalNLIUnavailableError,
 )
 from redaction_lab.pdf_detector import DetectionStatus, detect_targets
+from redaction_lab.prediction_source import PredictionSource
 from redaction_lab.reference import align_reference
+from redaction_lab.store import ResolvedAttempt, StoredJob
 
 
 PROJECT_ID = "project-rl-mvp-003"
@@ -129,18 +133,72 @@ def _evaluate(
     targets,
     rubric_version: str = RUBRIC_VERSION,
 ):
+    run = RunDefinition(
+        run_id="run-synthetic-v1",
+        run_version="run-v1",
+        project_id=PROJECT_ID,
+        target_versions=tuple(target.target_version for target in targets),
+        model_ids=("synthetic-model-v1",),
+        experiment_condition="redacted-document-only",
+        canonical_document_version_id=canonical.canonical_document_version_id,
+        canonical_document_hash=canonical.canonical_hash,
+        common_context_budget=4096,
+        context_policy="common-full-document",
+        prompt_id="prompt-001",
+        prompt_version="prompt-v1",
+        settings={"temperature": 0},
+        attempt_policy="one-frozen-attempt",
+        tool_permissions=(),
+        budget_label="synthetic-no-spend",
+        created_by="trusted-test-harness",
+        created_at=NOW,
+    )
+    manifest_target_id = (
+        attempt.target_id
+        if attempt.target_id in {target.target_id for target in targets}
+        else targets[0].target_id
+    )
+    manifest = build_prediction_manifest(canonical, manifest_target_id, run)
+    source = PredictionSource(
+        source_id="source-evaluator-unit-test",
+        source_version="prediction-source-v1",
+        project_id=PROJECT_ID,
+        source_sha256=sha256(redacted_pdf).hexdigest(),
+        role="REDACTED",
+        redacted_document_version_id=canonical.redacted_document_version_id,
+        detector_version=targets[0].detector_version,
+        canonicalizer_version=canonical.canonicalizer_version,
+        canonical_document=canonical,
+        targets=targets,
+        provenance="trusted-unit-test-fixture",
+    )
+    resolved = ResolvedAttempt(
+        attempt=attempt,
+        job=StoredJob(
+            job_id="job-evaluator-unit-test",
+            state="COMPLETE",
+            attempt_policy=run.attempt_policy,
+            manifest=manifest,
+            attempt_id=attempt.attempt_id,
+            request_hash=attempt.request_hash,
+            model_config_id=attempt.model_config_id,
+            source_id=source.source_id,
+        ),
+        manifest=manifest,
+        run=run,
+        source=source,
+        run_digest="a" * 64,
+        manifest_digest="b" * 64,
+    )
     return evaluate_attempt(
-        attempt,
+        resolved,
         mapping,
         redacted_pdf=redacted_pdf,
         reference_pdf=reference_pdf,
-        redacted=canonical,
-        targets=targets,
         source_fact_record=fact_record,
         judge=judge,
         evaluator_version="qualitative-evaluator-v1",
         rubric_version=rubric_version,
-        condition_id="redacted-only-condition-v1",
         created_at=NOW,
     )
 
@@ -238,11 +296,13 @@ def test_trusted_pair_produces_provisional_qualitative_evidence_only(
         targets=targets,
     )
 
-    assert evaluation.process_status is EvaluationProcessStatus.COMPLETE
+    assert evaluation.process_status is EvaluationProcessStatus.NEEDS_REVIEW
     assert evaluation.score_status is ScoreStatus.NONE
     assert evaluation.verified_score is None
     assert evaluation.experimental_score is None
-    assert evaluation.qualitative_status == "PROVISIONAL_ALL_FACTS_SUPPORTED"
+    assert evaluation.qualitative_status == "UNVALIDATED_MOCK_EVIDENCE"
+    assert evaluation.source_fact_validation_state == "UNVALIDATED_SYNTHETIC"
+    assert evaluation.judge_validation_state == "UNVALIDATED_SYNTHETIC"
     assert evaluation.fact_comparisons[0].evidence_label == "SUPPORTED"
     assert evaluation.reference_trust == "APPROVED_SYNTHETIC_PAIR"
     assert evaluation.judge_id == "synthetic-mock-judge"
@@ -251,16 +311,15 @@ def test_trusted_pair_produces_provisional_qualitative_evidence_only(
 
 
 @pytest.mark.parametrize(
-    ("label", "expected_status"),
+    "label",
     [
-        (FactEvidenceLabel.MISSING, "PROVISIONAL_MIXED"),
-        (FactEvidenceLabel.CONTRADICTED, "PROVISIONAL_MIXED"),
-        (FactEvidenceLabel.NEEDS_REVIEW, "NEEDS_REVIEW"),
+        FactEvidenceLabel.MISSING,
+        FactEvidenceLabel.CONTRADICTED,
+        FactEvidenceLabel.NEEDS_REVIEW,
     ],
 )
 def test_adversarial_semantics_remain_explicit_provisional_evidence(
     label: FactEvidenceLabel,
-    expected_status: str,
     tmp_path: Path,
 ) -> None:
     redacted_pdf, reference_pdf, canonical, targets, mappings = _trusted_context(
@@ -302,7 +361,8 @@ def test_adversarial_semantics_remain_explicit_provisional_evidence(
         targets=targets,
     )
 
-    assert evaluation.qualitative_status == expected_status
+    assert evaluation.process_status is EvaluationProcessStatus.NEEDS_REVIEW
+    assert evaluation.qualitative_status == "UNVALIDATED_MOCK_EVIDENCE"
     assert evaluation.unsupported_assertions == ("an unreferenced cash bonus",)
     assert evaluation.fact_comparisons[0].evidence_label is label
     assert evaluation.verified_score is evaluation.experimental_score is None
