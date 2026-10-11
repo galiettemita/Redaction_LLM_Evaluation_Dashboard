@@ -19,7 +19,7 @@ from redaction_lab.contracts import (
     TokenUsage,
 )
 from redaction_lab.fixtures import make_synthetic_pair
-from redaction_lab.store import RunStore
+from redaction_lab.store import ResolvedAttempt, RunStore
 from redaction_lab.worker import run_pending_once
 
 
@@ -553,3 +553,85 @@ def test_completion_rejects_forged_adapter_provenance(tmp_path) -> None:
         asyncio.run(run_pending_once(store, ForgedAdapter()))
     assert store.job(job_id).state == "IN_DOUBT"
     assert store.attempts() == ()
+
+
+def test_resolve_attempt_returns_frozen_task4_authority_without_mutation(tmp_path) -> None:
+    path = tmp_path / "run.sqlite3"
+    store = RunStore(path)
+    job_id, source, run = _enqueue(store, tmp_path)
+    assert asyncio.run(run_pending_once(store, MockAdapter())) is True
+    attempt = store.attempts()[0]
+
+    before = path.read_bytes()
+    resolved = store.resolve_attempt(attempt.attempt_id, project_id=source.project_id)
+    after = path.read_bytes()
+
+    assert isinstance(resolved, ResolvedAttempt)
+    assert resolved.attempt == attempt
+    assert resolved.job.job_id == job_id
+    assert resolved.job.state == "COMPLETE"
+    assert resolved.manifest == store.job(job_id).manifest
+    assert resolved.run == run
+    assert resolved.source == source
+    assert len(resolved.run_digest) == 64
+    assert len(resolved.manifest_digest) == 64
+    assert before == after
+
+
+def test_resolve_attempt_rejects_unknown_project_and_tampered_attempt(tmp_path) -> None:
+    path = tmp_path / "run.sqlite3"
+    store = RunStore(path)
+    _enqueue(store, tmp_path)
+    assert asyncio.run(run_pending_once(store, MockAdapter())) is True
+    attempt = store.attempts()[0]
+
+    with pytest.raises(KeyError):
+        store.resolve_attempt("attempt-missing", project_id=attempt.project_id)
+    with pytest.raises(ValueError, match="project"):
+        store.resolve_attempt(attempt.attempt_id, project_id="project-other")
+
+    connection = sqlite3.connect(path)
+    connection.execute("DROP TRIGGER attempts_no_update")
+    payload = json.loads(
+        connection.execute(
+            "SELECT attempt_json FROM attempts WHERE attempt_id = ?",
+            (attempt.attempt_id,),
+        ).fetchone()[0]
+    )
+    payload["request_hash"] = "f" * 64
+    connection.execute(
+        "UPDATE attempts SET attempt_json = ? WHERE attempt_id = ?",
+        (json.dumps(payload), attempt.attempt_id),
+    )
+    connection.commit()
+    connection.close()
+
+    with pytest.raises(ValueError, match="provenance"):
+        store.resolve_attempt(attempt.attempt_id, project_id=attempt.project_id)
+
+
+def test_resolve_timeout_preserves_in_doubt_and_never_redispatches(tmp_path) -> None:
+    path = tmp_path / "run.sqlite3"
+    store = RunStore(path)
+    job_id, source, _ = _enqueue(store, tmp_path)
+    adapter = MockAdapter(AttemptStatus.TIMEOUT)
+    assert asyncio.run(run_pending_once(store, adapter)) is True
+    attempt = store.attempts()[0]
+
+    resolved = RunStore(path).resolve_attempt(
+        attempt.attempt_id, project_id=source.project_id
+    )
+
+    assert resolved.attempt.status is AttemptStatus.TIMEOUT
+    assert resolved.job.state == "IN_DOUBT"
+    assert asyncio.run(run_pending_once(RunStore(path), adapter)) is False
+    assert adapter.calls == 1
+
+
+def test_resolve_attempt_rejects_legacy_unbound_attempt(tmp_path) -> None:
+    path = tmp_path / "legacy.sqlite3"
+    test_legacy_pending_manifest_is_quarantined_after_migration(tmp_path)
+    store = RunStore(path)
+
+    with pytest.raises(ValueError, match="trusted prediction source"):
+        store.resolve_attempt("legacy-attempt", project_id="project-001")
