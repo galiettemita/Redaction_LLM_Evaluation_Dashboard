@@ -14,6 +14,7 @@ from redaction_lab.contracts import (
     EvaluationProcessStatus,
     RunDefinition,
     ScoreStatus,
+    SummaryRequest,
     TokenUsage,
 )
 from redaction_lab.evaluation_store import EvaluationStore
@@ -22,6 +23,7 @@ from redaction_lab.judges.base import JudgeEvidence, SourceFact
 from redaction_lab.pdf_detector import DetectionStatus, detect_targets
 from redaction_lab.reference import align_reference
 from redaction_lab.store import RunStore
+from redaction_lab.summary import assert_comparable_summaries
 from redaction_lab.worker import run_pending_once
 
 
@@ -66,13 +68,18 @@ class SupportedMockJudge:
         )
 
 
-def _run(source, *, run_id: str = "run-document-1") -> RunDefinition:
+def _run(
+    source,
+    *,
+    run_id: str = "run-document-1",
+    model_id: str = "synthetic-model-v1",
+) -> RunDefinition:
     return RunDefinition(
         run_id=run_id,
         run_version="run-v1",
         project_id=source.project_id,
         target_versions=source.target_versions,
-        model_ids=("synthetic-model-v1",),
+        model_ids=(model_id,),
         experiment_condition="redacted-document-only",
         canonical_document_version_id=(
             source.canonical_document.canonical_document_version_id
@@ -289,3 +296,307 @@ def test_evaluation_store_has_no_caller_record_save_path_and_rolls_back_failure(
     connection = sqlite3.connect(db_path)
     assert connection.execute("SELECT count(*) FROM evaluations").fetchone()[0] == 0
     connection.close()
+
+
+def test_summary_store_binds_exact_evaluations_and_explicit_exclusions(tmp_path) -> None:
+    inputs = _authoritative_inputs(tmp_path)
+    db_path, run_store, source, run, _, _, _, _, _, _ = inputs
+    store = EvaluationStore(db_path)
+    evaluation = _evaluate(store, inputs)
+    missing_job_id = run_store.enqueue(source.source_id, source.targets[1].target_id, run)
+    assert asyncio.run(run_pending_once(run_store, StoredAttemptAdapter())) is True
+    missing_attempt_id = run_store.job(missing_job_id).attempt_id
+    assert missing_attempt_id is not None
+    request = SummaryRequest(
+        project_id=PROJECT_ID,
+        summary_level="MODEL",
+        scope_id=evaluation.model_id,
+        scope_version=evaluation.model_config_id,
+        members=(
+            {
+                "attempt_id": evaluation.attempt_id,
+                "evaluation_id": evaluation.evaluation_id,
+            },
+            {"attempt_id": missing_attempt_id, "evaluation_id": None},
+        ),
+        aggregation_version="qualitative-counts-v2",
+    )
+
+    summary = store.build_summary(request)
+    reopened = EvaluationStore(db_path).get_summary(
+        summary.summary_id,
+        project_id=PROJECT_ID,
+        expected_compatibility_profile_id=summary.compatibility_profile_id,
+    )
+
+    assert reopened == summary
+    assert summary.included_evaluation_ids == (evaluation.evaluation_id,)
+    assert summary.requested_count == 2
+    assert summary.excluded_count == 1
+    assert summary.exclusions[0].attempt_id == missing_attempt_id
+    assert summary.contributing_run_ids == (run.run_id,)
+    assert summary.needs_review_count == 1
+    assert summary.eligible_count == 1
+    assert not hasattr(store, "save_summary")
+    with pytest.raises(ValueError, match="stale"):
+        store.get_summary(
+            summary.summary_id,
+            project_id=PROJECT_ID,
+            expected_compatibility_profile_id="different-profile",
+        )
+    with pytest.raises(KeyError):
+        store.build_summary(
+            SummaryRequest.model_validate(
+                {
+                    **request.model_dump(),
+                    "members": (
+                        {
+                            "attempt_id": evaluation.attempt_id,
+                            "evaluation_id": "evaluation-fictional",
+                        },
+                    ),
+                }
+            )
+        )
+
+
+def test_summary_and_membership_insert_is_atomic_and_immutable(tmp_path) -> None:
+    inputs = _authoritative_inputs(tmp_path)
+    db_path = inputs[0]
+    store = EvaluationStore(db_path)
+    evaluation = _evaluate(store, inputs)
+    request = SummaryRequest(
+        project_id=PROJECT_ID,
+        summary_level="MODEL",
+        scope_id=evaluation.model_id,
+        scope_version=evaluation.model_config_id,
+        members=(
+            {
+                "attempt_id": evaluation.attempt_id,
+                "evaluation_id": evaluation.evaluation_id,
+            },
+        ),
+        aggregation_version="qualitative-counts-v2",
+    )
+    connection = sqlite3.connect(db_path)
+    connection.execute(
+        """CREATE TRIGGER test_summary_member_failure BEFORE INSERT ON summary_members
+           BEGIN SELECT RAISE(ABORT, 'injected member failure'); END"""
+    )
+    connection.close()
+
+    with pytest.raises(sqlite3.IntegrityError, match="injected member failure"):
+        store.build_summary(request)
+    connection = sqlite3.connect(db_path)
+    assert connection.execute("SELECT count(*) FROM summaries").fetchone()[0] == 0
+    assert connection.execute("SELECT count(*) FROM summary_members").fetchone()[0] == 0
+    connection.execute("DROP TRIGGER test_summary_member_failure")
+    connection.close()
+
+    summary = store.build_summary(request)
+    connection = sqlite3.connect(db_path)
+    for sql in (
+        "UPDATE summaries SET payload_json = '{}'",
+        "DELETE FROM summaries",
+        "UPDATE summary_members SET disposition = 'EXCLUDED'",
+        "DELETE FROM summary_members",
+    ):
+        with pytest.raises(sqlite3.IntegrityError, match="immutable"):
+            connection.execute(sql)
+    connection.close()
+    assert store.get_summary(summary.summary_id, project_id=PROJECT_ID) == summary
+
+
+def test_model_summary_uses_distinct_task4_runs_across_documents(tmp_path) -> None:
+    first_inputs = _authoritative_inputs(tmp_path / "first")
+    db_path, run_store, _, first_run, _, _, _, _, _, _ = first_inputs
+    store = EvaluationStore(db_path)
+    first_evaluation = _evaluate(store, first_inputs)
+
+    redacted_path, reference_path = make_synthetic_pair(
+        "adjacent_boxes", tmp_path / "second"
+    )
+    redacted_pdf = redacted_path.read_bytes()
+    reference_pdf = reference_path.read_bytes()
+    second_source_id = run_store.ingest_redacted_pdf(
+        redacted_pdf, project_id=PROJECT_ID
+    )
+    second_source = run_store.source(second_source_id)
+    second_run = _run(second_source, run_id="run-document-2")
+    run_store.enqueue(
+        second_source_id, second_source.targets[0].target_id, second_run
+    )
+    assert asyncio.run(run_pending_once(run_store, StoredAttemptAdapter())) is True
+    second_attempt = next(
+        item for item in run_store.attempts() if item.run_id == second_run.run_id
+    )
+    detection = detect_targets(
+        redacted_pdf,
+        project_id=PROJECT_ID,
+        redacted_document_version_id="redacted-document-v1",
+    )
+    assert detection.status is DetectionStatus.SUPPORTED
+    canonical = canonicalize_redacted(
+        redacted_pdf,
+        detection,
+        project_id=PROJECT_ID,
+        redacted_document_version_id="redacted-document-v1",
+        canonical_document_version_id="redacted-canonical-v1",
+    )
+    mapping = align_reference(
+        canonical,
+        reference_pdf,
+        redacted_pdf=redacted_pdf,
+        targets=detection.targets,
+        reference_document_version_id=REFERENCE_VERSION_ID,
+        reference_canonical_version_id=REFERENCE_CANONICAL_ID,
+        mapping_version="mapping-v1",
+    )[0]
+    second_evaluation = store.evaluate_and_store(
+        project_id=PROJECT_ID,
+        attempt_id=second_attempt.attempt_id,
+        mapping=mapping,
+        redacted_pdf=redacted_pdf,
+        reference_pdf=reference_pdf,
+        source_fact_record_id=None,
+        judge=SupportedMockJudge(),
+        evaluator_version="qualitative-evaluator-v2",
+        rubric_version=RUBRIC_VERSION,
+    )
+    request = SummaryRequest(
+        project_id=PROJECT_ID,
+        summary_level="MODEL",
+        scope_id=first_evaluation.model_id,
+        scope_version=first_evaluation.model_config_id,
+        members=tuple(
+            {
+                "attempt_id": item.attempt_id,
+                "evaluation_id": item.evaluation_id,
+            }
+            for item in (first_evaluation, second_evaluation)
+        ),
+        aggregation_version="qualitative-counts-v2",
+    )
+
+    summary = store.build_summary(request)
+
+    assert summary.contributing_run_ids == tuple(
+        sorted((first_run.run_id, second_run.run_id))
+    )
+    assert len(summary.redacted_document_version_ids) == 2
+    assert summary.eligible_count == 1
+    assert summary.unknown_count == 1
+
+
+def test_cross_model_comparison_uses_separate_model_specific_task4_runs(tmp_path) -> None:
+    inputs = _authoritative_inputs(tmp_path)
+    (
+        db_path,
+        run_store,
+        source,
+        first_run,
+        _,
+        _,
+        mapping,
+        fact,
+        redacted_pdf,
+        reference_pdf,
+    ) = inputs
+    store = EvaluationStore(db_path)
+    first = _evaluate(store, inputs)
+    second_run = _run(
+        source, run_id="run-model-b", model_id="synthetic-model-b-v1"
+    )
+    run_store.enqueue(source.source_id, source.targets[0].target_id, second_run)
+    assert asyncio.run(run_pending_once(run_store, StoredAttemptAdapter())) is True
+    second_attempt = next(
+        item for item in run_store.attempts() if item.run_id == second_run.run_id
+    )
+    source_facts = store.record_source_facts(
+        mapping,
+        facts=(fact,),
+        rubric_version=RUBRIC_VERSION,
+        source_fact_record_version="source-facts-v1",
+    )
+    second = store.evaluate_and_store(
+        project_id=PROJECT_ID,
+        attempt_id=second_attempt.attempt_id,
+        mapping=mapping,
+        redacted_pdf=redacted_pdf,
+        reference_pdf=reference_pdf,
+        source_fact_record_id=source_facts.source_fact_record_id,
+        judge=SupportedMockJudge(),
+        evaluator_version="qualitative-evaluator-v2",
+        rubric_version=RUBRIC_VERSION,
+    )
+
+    def model_summary(evaluation):
+        return store.build_summary(
+            SummaryRequest(
+                project_id=PROJECT_ID,
+                summary_level="MODEL",
+                scope_id=evaluation.model_id,
+                scope_version=evaluation.model_config_id,
+                members=(
+                    {
+                        "attempt_id": evaluation.attempt_id,
+                        "evaluation_id": evaluation.evaluation_id,
+                    },
+                ),
+                aggregation_version="qualitative-counts-v2",
+            )
+        )
+
+    first_summary = model_summary(first)
+    second_summary = model_summary(second)
+
+    assert first_summary.contributing_run_ids == (first_run.run_id,)
+    assert second_summary.contributing_run_ids == (second_run.run_id,)
+    assert first_summary.model_provenance_ids != second_summary.model_provenance_ids
+    assert_comparable_summaries(first_summary, second_summary)
+
+
+@pytest.mark.parametrize(
+    ("trigger", "sql"),
+    [
+        ("source_fact_records_no_update", "UPDATE source_fact_records SET payload_json = '{}'") ,
+        ("evaluations_no_update", "UPDATE evaluations SET payload_json = '{}'") ,
+        ("summaries_no_update", "UPDATE summaries SET payload_json = '{}'") ,
+        (
+            "summary_members_no_update",
+            "UPDATE summary_members SET disposition = 'EXCLUDED'",
+        ),
+    ],
+)
+def test_reopen_rejects_tampered_authoritative_rows(
+    tmp_path, trigger: str, sql: str
+) -> None:
+    inputs = _authoritative_inputs(tmp_path)
+    db_path = inputs[0]
+    store = EvaluationStore(db_path)
+    evaluation = _evaluate(store, inputs)
+    summary = store.build_summary(
+        SummaryRequest(
+            project_id=PROJECT_ID,
+            summary_level="MODEL",
+            scope_id=evaluation.model_id,
+            scope_version=evaluation.model_config_id,
+            members=(
+                {
+                    "attempt_id": evaluation.attempt_id,
+                    "evaluation_id": evaluation.evaluation_id,
+                },
+            ),
+            aggregation_version="qualitative-counts-v2",
+        )
+    )
+    connection = sqlite3.connect(db_path)
+    connection.execute(f"DROP TRIGGER {trigger}")
+    connection.execute(sql)
+    connection.commit()
+    connection.close()
+
+    with pytest.raises((ValueError, KeyError)):
+        EvaluationStore(db_path).get_summary(
+            summary.summary_id, project_id=PROJECT_ID
+        )

@@ -13,12 +13,16 @@ from redaction_lab.contracts import (
     ReferenceScoreability,
     ReferenceStatus,
     SummaryLevel,
+    SummaryExclusion,
+    SummaryRequest,
     SummarySnapshot,
 )
 
 
 SUMMARY_SCHEMA_VERSION = "qualitative-summary-evidence-v1"
 SUMMARY_VERSION = "qualitative-summary-v1"
+AUTHORITATIVE_SUMMARY_SCHEMA_VERSION = "qualitative-summary-evidence-v2"
+AUTHORITATIVE_SUMMARY_VERSION = "qualitative-summary-v2"
 
 
 class SummaryCompatibilityError(ValueError):
@@ -110,6 +114,272 @@ def _version_ids(
             }
         )
     )
+
+
+def _eligible_provenance_key(evaluation: EvaluationRecord) -> str:
+    values = (
+        evaluation.project_id,
+        evaluation.redacted_document_version_id,
+        evaluation.target_id,
+        evaluation.target_version,
+        evaluation.reference_target_id,
+        evaluation.reference_target_version,
+        evaluation.mapping_id,
+        evaluation.mapping_version,
+        evaluation.mapping_method_version,
+        evaluation.reference_document_version_id,
+        evaluation.reference_canonical_version_id,
+        evaluation.redacted_canonical_hash,
+        evaluation.reference_canonical_hash,
+        evaluation.reference_trust,
+        evaluation.source_fact_record_id,
+        evaluation.source_fact_record_version,
+    )
+    if any(value is None for value in values[:-2]):
+        raise SummaryCompatibilityError("eligible reference provenance is incomplete")
+    return _digest("eligible-provenance", values)
+
+
+def _authoritative_profile(
+    evaluations: tuple[EvaluationRecord, ...], level: SummaryLevel
+) -> dict[str, object]:
+    if not evaluations:
+        raise SummaryCompatibilityError("at least one included evaluation is required")
+    if any(
+        item.evidence_schema_version != "qualitative-fact-evidence-v2"
+        for item in evaluations
+    ):
+        raise SummaryCompatibilityError("authoritative v2 evaluations are required")
+    if len({item.evaluation_id for item in evaluations}) != len(evaluations):
+        raise SummaryCompatibilityError("evaluation_id must be unique")
+    if len({_target_key(item) for item in evaluations}) != len(evaluations):
+        raise SummaryCompatibilityError("target identity must be unique")
+    common_fields = (
+        "project_id",
+        "model_id",
+        "provider_model_id",
+        "model_config_id",
+        "condition_id",
+        "prompt_id",
+        "prompt_version",
+        "settings_fingerprint",
+        "attempt_policy",
+        "context_policy",
+        "common_context_budget",
+        "tool_permissions",
+        "prediction_protocol_id",
+        "model_provenance_id",
+        "rubric_version",
+        "evaluator_version",
+        "judge_id",
+        "judge_version",
+        "mapping_version",
+        "mapping_method_version",
+    )
+    profile: dict[str, object] = {}
+    for field in common_fields:
+        values = {getattr(item, field) for item in evaluations}
+        if None in values or len(values) != 1:
+            raise SummaryCompatibilityError(f"incompatible {field}")
+        profile[field] = next(iter(values))
+    eligible_source_versions = {
+        item.source_fact_record_version
+        for item in evaluations
+        if _is_truth_eligible(item) and item.source_fact_record_version is not None
+    }
+    if len(eligible_source_versions) > 1:
+        raise SummaryCompatibilityError("incompatible source_fact_record_version")
+    if level is not SummaryLevel.MODEL and len({item.run_id for item in evaluations}) != 1:
+        raise SummaryCompatibilityError("incompatible run_id")
+    return profile
+
+
+def _summary_identity_payload(snapshot: SummarySnapshot) -> dict[str, object]:
+    return snapshot.model_dump(mode="json", exclude={"summary_id", "generated_at"})
+
+
+def verify_summary_identity(snapshot: SummarySnapshot) -> None:
+    if snapshot.summary_schema_version != AUTHORITATIVE_SUMMARY_SCHEMA_VERSION:
+        raise SummaryCompatibilityError("authoritative summary schema is required")
+    expected = _digest("summary", _summary_identity_payload(snapshot))
+    if snapshot.summary_id != expected:
+        raise SummaryCompatibilityError("summary deterministic identity mismatch")
+
+
+def build_authoritative_summary(
+    request: SummaryRequest,
+    evaluations: tuple[EvaluationRecord, ...],
+    exclusions: tuple[SummaryExclusion, ...],
+    *,
+    generated_at: datetime,
+) -> SummarySnapshot:
+    """Build a v2 snapshot from repository-authenticated exact membership."""
+
+    ordered = tuple(sorted(evaluations, key=lambda item: item.evaluation_id))
+    profile = _authoritative_profile(ordered, request.summary_level)
+    requested_attempt_ids = tuple(sorted(member.attempt_id for member in request.members))
+    included_attempt_ids = {item.attempt_id for item in ordered}
+    excluded_attempt_ids = {item.attempt_id for item in exclusions}
+    if included_attempt_ids & excluded_attempt_ids:
+        raise SummaryCompatibilityError("included and excluded attempts overlap")
+    if included_attempt_ids | excluded_attempt_ids != set(requested_attempt_ids):
+        raise SummaryCompatibilityError("requested attempts must exactly partition membership")
+    if any(item.project_id != request.project_id for item in ordered):
+        raise SummaryCompatibilityError("incompatible project_id")
+    if request.summary_level is SummaryLevel.TARGET:
+        if len(ordered) != 1 or any(
+            item.target_id != request.scope_id
+            or item.target_version != request.scope_version
+            for item in ordered
+        ):
+            raise SummaryCompatibilityError("target scope mismatch")
+    elif request.summary_level is SummaryLevel.DOCUMENT:
+        if any(
+            item.redacted_document_version_id != request.scope_id
+            for item in ordered
+        ):
+            raise SummaryCompatibilityError("document scope mismatch")
+    elif any(
+        item.model_id != request.scope_id
+        or item.model_config_id != request.scope_version
+        for item in ordered
+    ):
+        raise SummaryCompatibilityError("model scope mismatch")
+
+    included_ids = tuple(item.evaluation_id for item in ordered)
+    eligible = tuple(item for item in ordered if _is_truth_eligible(item))
+    unknown = tuple(item for item in ordered if not _is_truth_eligible(item))
+
+    def attempt_ids(status: AttemptStatus) -> tuple[str, ...]:
+        return tuple(item.evaluation_id for item in ordered if item.attempt_status is status)
+
+    completed_ids = attempt_ids(AttemptStatus.SUCCEEDED)
+    refused_ids = attempt_ids(AttemptStatus.REFUSED)
+    timeout_ids = attempt_ids(AttemptStatus.TIMEOUT)
+    malformed_ids = attempt_ids(AttemptStatus.MALFORMED)
+    error_ids = attempt_ids(AttemptStatus.ERROR)
+    review_ids = tuple(
+        item.evaluation_id
+        for item in ordered
+        if item.attempt_status is AttemptStatus.SUCCEEDED
+        and item.process_status is EvaluationProcessStatus.NEEDS_REVIEW
+    )
+    disagreement_ids = tuple(
+        item.evaluation_id
+        for item in ordered
+        if item.attempt_status is AttemptStatus.SUCCEEDED
+        and item.process_status is EvaluationProcessStatus.DISAGREEMENT
+    )
+    evaluation_error_ids = tuple(
+        item.evaluation_id
+        for item in ordered
+        if item.attempt_status is AttemptStatus.SUCCEEDED
+        and item.process_status is EvaluationProcessStatus.ERROR
+    )
+    eligible_ids = tuple(item.evaluation_id for item in eligible)
+    unknown_ids = tuple(item.evaluation_id for item in unknown)
+    eligible_target_keys = tuple(sorted(_target_key(item) for item in eligible))
+    eligible_provenance_keys = tuple(
+        sorted(_eligible_provenance_key(item) for item in eligible)
+    )
+    encoded = json.dumps(list(eligible_provenance_keys), separators=(",", ":")).encode()
+    common_set_id = f"eligible-set-{sha256(encoded).hexdigest()[:24]}"
+    contributing_run_ids = tuple(sorted({item.run_id for item in ordered}))
+    model_provenance_ids = tuple(
+        sorted({item.model_provenance_id for item in ordered if item.model_provenance_id})
+    )
+    compatibility_payload = {
+        key: value
+        for key, value in profile.items()
+        if key
+        not in {
+            "model_id",
+            "provider_model_id",
+            "model_config_id",
+            "model_provenance_id",
+        }
+    }
+    compatibility_profile_id = _digest("compatibility-profile", compatibility_payload)
+    snapshot = SummarySnapshot(
+        summary_id="pending-summary-identity",
+        summary_version=AUTHORITATIVE_SUMMARY_VERSION,
+        summary_schema_version=AUTHORITATIVE_SUMMARY_SCHEMA_VERSION,
+        project_id=request.project_id,
+        run_id=(contributing_run_ids[0] if len(contributing_run_ids) == 1 else None),
+        summary_level=request.summary_level,
+        scope_id=request.scope_id,
+        scope_version=request.scope_version,
+        requested_attempt_ids=requested_attempt_ids,
+        included_evaluation_ids=included_ids,
+        excluded_evaluation_ids=tuple(
+            sorted(item.evaluation_id for item in exclusions if item.evaluation_id)
+        ),
+        exclusions=tuple(sorted(exclusions, key=lambda item: item.attempt_id)),
+        eligible_evaluation_ids=eligible_ids,
+        common_eligible_set_id=common_set_id,
+        eligible_target_keys=eligible_target_keys,
+        eligible_provenance_keys=eligible_provenance_keys,
+        contributing_run_ids=contributing_run_ids,
+        redacted_document_version_ids=_version_ids(ordered, "redacted_document_version_id"),
+        reference_document_version_ids=_version_ids(ordered, "reference_document_version_id"),
+        reference_canonical_version_ids=_version_ids(ordered, "reference_canonical_version_id"),
+        reference_mapping_versions=_version_ids(ordered, "mapping_version"),
+        source_fact_record_versions=_version_ids(ordered, "source_fact_record_version"),
+        model_id=str(profile["model_id"]),
+        model_config_id=str(profile["model_config_id"]),
+        condition_id=str(profile["condition_id"]),
+        prompt_id=str(profile["prompt_id"]),
+        prompt_version=str(profile["prompt_version"]),
+        settings_fingerprint=str(profile["settings_fingerprint"]),
+        attempt_policy=str(profile["attempt_policy"]),
+        context_policy=str(profile["context_policy"]),
+        common_context_budget=int(profile["common_context_budget"]),
+        tool_permissions=tuple(profile["tool_permissions"]),
+        prediction_protocol_id=str(profile["prediction_protocol_id"]),
+        model_provenance_ids=model_provenance_ids,
+        model_identity_limitation=(
+            "Requested/reported model names and configuration IDs do not establish "
+            "model weights or a provider artifact digest."
+        ),
+        compatibility_profile_id=compatibility_profile_id,
+        rubric_version=str(profile["rubric_version"]),
+        evaluator_version=str(profile["evaluator_version"]),
+        judge_id=str(profile["judge_id"]),
+        judge_version=str(profile["judge_version"]),
+        aggregation_version=request.aggregation_version,
+        requested_count=len(request.members),
+        eligible_count=len(eligible_ids),
+        unknown_count=len(unknown_ids),
+        refused_count=len(refused_ids),
+        timeout_count=len(timeout_ids),
+        malformed_count=len(malformed_ids),
+        error_count=len(error_ids),
+        needs_review_count=len(review_ids),
+        disagreement_count=len(disagreement_ids),
+        completed_count=len(completed_ids),
+        evaluation_error_count=len(evaluation_error_ids),
+        excluded_count=len(exclusions),
+        completed_evaluation_ids=completed_ids,
+        unknown_evaluation_ids=unknown_ids,
+        refused_evaluation_ids=refused_ids,
+        timeout_evaluation_ids=timeout_ids,
+        malformed_evaluation_ids=malformed_ids,
+        error_evaluation_ids=error_ids,
+        needs_review_evaluation_ids=review_ids,
+        disagreement_evaluation_ids=disagreement_ids,
+        evaluation_error_evaluation_ids=evaluation_error_ids,
+        score_scale_id=None,
+        research_validation_id=None,
+        verified_score=None,
+        experimental_score=None,
+        generated_at=generated_at,
+        freshness="immutable-snapshot; compare compatibility_profile_id explicitly",
+    )
+    final = snapshot.model_copy(
+        update={"summary_id": _digest("summary", _summary_identity_payload(snapshot))}
+    )
+    verify_summary_identity(final)
+    return final
 
 
 def _summarize(
@@ -331,6 +601,25 @@ def assert_comparable_summaries(*summaries: SummarySnapshot) -> None:
     first = summaries[0]
     if any(summary.summary_level is not SummaryLevel.MODEL for summary in summaries):
         raise SummaryCompatibilityError("only model summaries are comparable")
+    if all(
+        summary.summary_schema_version == AUTHORITATIVE_SUMMARY_SCHEMA_VERSION
+        for summary in summaries
+    ):
+        for summary in summaries[1:]:
+            if (
+                summary.common_eligible_set_id != first.common_eligible_set_id
+                or summary.eligible_provenance_keys
+                != first.eligible_provenance_keys
+            ):
+                raise SummaryCompatibilityError("eligible reference set mismatch")
+            for field in (
+                "project_id",
+                "compatibility_profile_id",
+                "aggregation_version",
+            ):
+                if getattr(summary, field) != getattr(first, field):
+                    raise SummaryCompatibilityError(f"incompatible {field}")
+        return
     for summary in summaries[1:]:
         if (
             summary.common_eligible_set_id != first.common_eligible_set_id

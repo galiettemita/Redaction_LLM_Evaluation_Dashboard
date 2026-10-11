@@ -161,7 +161,22 @@ def _authoritative_mapping(
     if mapping.project_id != resolved.attempt.project_id:
         raise EvaluationBindingError("mapping project identity mismatch")
     if mapping.redacted_canonical_version_id is None:
-        raise EvaluationBindingError("mapping canonical identity is unavailable")
+        task_target = _task4_target(resolved)
+        recomputed = align_reference(
+            resolved.source.canonical_document,
+            reference_pdf,
+            redacted_pdf=redacted_pdf,
+            targets=resolved.source.targets,
+            reference_document_version_id=mapping.reference_document_version_id,
+            reference_canonical_version_id=mapping.reference_canonical_version_id,
+            mapping_version=mapping.mapping_version,
+        )
+        matches = tuple(
+            item for item in recomputed if item.target_id == task_target.target_id
+        )
+        if len(matches) != 1:
+            raise EvaluationBindingError("untrusted mapping target cannot be reproduced")
+        return matches[0], False, task_target, task_target
 
     detection = detect_targets(
         redacted_pdf,
