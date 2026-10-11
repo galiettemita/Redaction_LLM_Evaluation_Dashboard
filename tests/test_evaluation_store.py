@@ -317,7 +317,10 @@ def test_summary_store_binds_exact_evaluations_and_explicit_exclusions(tmp_path)
     db_path, run_store, source, run, _, _, _, _, _, _ = inputs
     store = EvaluationStore(db_path)
     evaluation = _evaluate(store, inputs)
-    missing_job_id = run_store.enqueue(source.source_id, source.targets[1].target_id, run)
+    excluded_run = _run(source, run_id="run-excluded-document")
+    missing_job_id = run_store.enqueue(
+        source.source_id, source.targets[1].target_id, excluded_run
+    )
     assert asyncio.run(run_pending_once(run_store, StoredAttemptAdapter())) is True
     missing_attempt_id = run_store.job(missing_job_id).attempt_id
     assert missing_attempt_id is not None
@@ -348,7 +351,9 @@ def test_summary_store_binds_exact_evaluations_and_explicit_exclusions(tmp_path)
     assert summary.requested_count == 2
     assert summary.excluded_count == 1
     assert summary.exclusions[0].attempt_id == missing_attempt_id
-    assert summary.contributing_run_ids == (run.run_id,)
+    assert summary.contributing_run_ids == tuple(
+        sorted((run.run_id, excluded_run.run_id))
+    )
     assert summary.needs_review_count == 1
     assert summary.eligible_count == 1
     assert not hasattr(store, "save_summary")
@@ -374,6 +379,40 @@ def test_summary_store_binds_exact_evaluations_and_explicit_exclusions(tmp_path)
         )
 
 
+def test_summary_rejects_incompatible_excluded_attempt(tmp_path) -> None:
+    inputs = _authoritative_inputs(tmp_path)
+    db_path, run_store, source, _, _, _, _, _, _, _ = inputs
+    store = EvaluationStore(db_path)
+    evaluation = _evaluate(store, inputs)
+    incompatible_run = _run(
+        source,
+        run_id="run-incompatible-exclusion",
+        model_id="synthetic-model-b-v1",
+    )
+    job_id = run_store.enqueue(
+        source.source_id, source.targets[1].target_id, incompatible_run
+    )
+    assert asyncio.run(run_pending_once(run_store, StoredAttemptAdapter())) is True
+    excluded_attempt_id = run_store.job(job_id).attempt_id
+    assert excluded_attempt_id is not None
+
+    with pytest.raises(ValueError, match="model scope"):
+        store.build_summary(
+            SummaryRequest(
+                project_id=PROJECT_ID,
+                summary_level="MODEL",
+                scope_id=evaluation.model_id,
+                scope_version=evaluation.model_config_id,
+                members=(
+                    {
+                        "attempt_id": evaluation.attempt_id,
+                        "evaluation_id": evaluation.evaluation_id,
+                    },
+                    {"attempt_id": excluded_attempt_id, "evaluation_id": None},
+                ),
+                aggregation_version="qualitative-counts-v2",
+            )
+        )
 def test_summary_disagreement_is_an_orthogonal_review_subset(tmp_path) -> None:
     inputs = _authoritative_inputs(tmp_path)
     db_path, _, _, _, _, attempt, mapping, fact, redacted_pdf, reference_pdf = inputs

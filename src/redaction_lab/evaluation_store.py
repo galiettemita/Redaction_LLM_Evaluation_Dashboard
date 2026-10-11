@@ -14,6 +14,7 @@ from redaction_lab.contracts import (
     ReferenceMapping,
     SummaryExclusion,
     SummaryExclusionReason,
+    SummaryLevel,
     SummaryRequest,
     SummaryRequestedMember,
     SummarySnapshot,
@@ -24,7 +25,7 @@ from redaction_lab.evaluator import (
     verify_evaluation_bindings,
 )
 from redaction_lab.judges.base import FactJudge, SourceFact, SourceFactRecord
-from redaction_lab.store import RunStore
+from redaction_lab.store import ResolvedAttempt, RunStore
 from redaction_lab.summary import build_authoritative_summary, verify_summary_identity
 
 
@@ -299,15 +300,82 @@ class EvaluationStore:
             )
         return record
 
+    @staticmethod
+    def _requested_attempt_profile(resolved: ResolvedAttempt) -> dict[str, object]:
+        settings_json = json.dumps(
+            resolved.run.settings.model_dump(mode="json"),
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+        ).encode("utf-8")
+        return {
+            "model_id": resolved.attempt.model_id,
+            "model_config_id": resolved.attempt.model_config_id,
+            "condition_id": resolved.run.experiment_condition,
+            "prompt_id": resolved.run.prompt_id,
+            "prompt_version": resolved.run.prompt_version,
+            "settings_fingerprint": sha256(settings_json).hexdigest(),
+            "attempt_policy": resolved.run.attempt_policy,
+            "context_policy": resolved.run.context_policy,
+            "common_context_budget": resolved.run.common_context_budget,
+            "tool_permissions": resolved.run.tool_permissions,
+        }
+
+    @classmethod
+    def _validate_requested_attempts(
+        cls, request: SummaryRequest, resolved_attempts: tuple[ResolvedAttempt, ...]
+    ) -> tuple[str, ...]:
+        target_keys = {
+            (
+                item.source.redacted_document_version_id,
+                item.attempt.target_id,
+                item.attempt.target_version,
+            )
+            for item in resolved_attempts
+        }
+        if len(target_keys) != len(resolved_attempts):
+            raise ValueError("requested attempt target identity must be unique")
+        if request.summary_level is SummaryLevel.TARGET:
+            if any(
+                item.attempt.target_id != request.scope_id
+                or item.attempt.target_version != request.scope_version
+                for item in resolved_attempts
+            ):
+                raise ValueError("target scope mismatch")
+        elif request.summary_level is SummaryLevel.DOCUMENT:
+            if request.scope_version != request.scope_id or any(
+                item.source.redacted_document_version_id != request.scope_id
+                for item in resolved_attempts
+            ):
+                raise ValueError("document scope mismatch")
+        elif any(
+            item.attempt.model_id != request.scope_id
+            or item.attempt.model_config_id != request.scope_version
+            for item in resolved_attempts
+        ):
+            raise ValueError("model scope mismatch")
+        profiles = tuple(cls._requested_attempt_profile(item) for item in resolved_attempts)
+        first = profiles[0]
+        for profile in profiles[1:]:
+            for field, value in first.items():
+                if profile[field] != value:
+                    raise ValueError(f"incompatible requested attempt {field}")
+        run_ids = tuple(sorted({item.run.run_id for item in resolved_attempts}))
+        if request.summary_level is not SummaryLevel.MODEL and len(run_ids) != 1:
+            raise ValueError("target and document summaries must be run-local")
+        return run_ids
+
     def build_summary(self, request: SummaryRequest) -> SummarySnapshot:
         """Atomically persist a summary and its exact authenticated membership."""
 
         evaluations: list[EvaluationRecord] = []
         exclusions: list[SummaryExclusion] = []
+        resolved_attempts: list[ResolvedAttempt] = []
         for member in request.members:
-            self.run_store.resolve_attempt(
+            resolved = self.run_store.resolve_attempt(
                 member.attempt_id, project_id=request.project_id
             )
+            resolved_attempts.append(resolved)
             if member.evaluation_id is None:
                 exclusions.append(
                     SummaryExclusion(
@@ -322,11 +390,15 @@ class EvaluationStore:
             if evaluation.attempt_id != member.attempt_id:
                 raise ValueError("summary evaluation does not match requested attempt")
             evaluations.append(evaluation)
+        contributing_run_ids = self._validate_requested_attempts(
+            request, tuple(resolved_attempts)
+        )
         snapshot = build_authoritative_summary(
             request,
             tuple(evaluations),
             tuple(exclusions),
             generated_at=datetime.now(UTC),
+            contributing_run_ids=contributing_run_ids,
         )
         connection = self._connect()
         try:
@@ -411,11 +483,14 @@ class EvaluationStore:
         if len(member_rows) != stored.requested_count:
             raise ValueError("stored summary membership count mismatch")
         members: list[SummaryRequestedMember] = []
+        resolved_attempts: list[ResolvedAttempt] = []
         for ordinal, member_row in enumerate(member_rows):
             if member_row["ordinal"] != ordinal:
                 raise ValueError("stored summary membership ordinal mismatch")
-            self.run_store.resolve_attempt(
-                member_row["subject_id"], project_id=project_id
+            resolved_attempts.append(
+                self.run_store.resolve_attempt(
+                    member_row["subject_id"], project_id=project_id
+                )
             )
             disposition = member_row["disposition"]
             evaluation_id = member_row["evaluation_id"]
@@ -448,6 +523,9 @@ class EvaluationStore:
             members=tuple(members),
             aggregation_version=stored.aggregation_version,
         )
+        contributing_run_ids = self._validate_requested_attempts(
+            request, tuple(resolved_attempts)
+        )
         rebuilt = build_authoritative_summary(
             request,
             tuple(
@@ -464,6 +542,7 @@ class EvaluationStore:
                 if member.evaluation_id is None
             ),
             generated_at=stored.generated_at,
+            contributing_run_ids=contributing_run_ids,
         )
         if rebuilt != stored:
             raise ValueError("stored summary evidence does not recompute")

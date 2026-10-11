@@ -218,6 +218,7 @@ def build_authoritative_summary(
     exclusions: tuple[SummaryExclusion, ...],
     *,
     generated_at: datetime,
+    contributing_run_ids: tuple[str, ...] | None = None,
 ) -> SummarySnapshot:
     """Build a v2 snapshot from repository-authenticated exact membership."""
 
@@ -240,7 +241,7 @@ def build_authoritative_summary(
         ):
             raise SummaryCompatibilityError("target scope mismatch")
     elif request.summary_level is SummaryLevel.DOCUMENT:
-        if any(
+        if request.scope_version != request.scope_id or any(
             item.redacted_document_version_id != request.scope_id
             for item in ordered
         ):
@@ -293,7 +294,11 @@ def build_authoritative_summary(
     )
     encoded = json.dumps(list(eligible_provenance_keys), separators=(",", ":")).encode()
     common_set_id = f"eligible-set-{sha256(encoded).hexdigest()[:24]}"
-    contributing_run_ids = tuple(sorted({item.run_id for item in ordered}))
+    contributing_run_ids = (
+        tuple(sorted(contributing_run_ids))
+        if contributing_run_ids is not None
+        else tuple(sorted({item.run_id for item in ordered}))
+    )
     model_provenance_ids = tuple(
         sorted({item.model_provenance_id for item in ordered if item.model_provenance_id})
     )

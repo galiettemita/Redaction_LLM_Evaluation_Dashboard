@@ -530,3 +530,25 @@ def test_authoritative_summary_requires_exact_attempt_partition() -> None:
     assert summary.excluded_count == 1
     assert summary.completed_count == 1
     assert summary.eligible_count == 1
+
+
+def test_authoritative_document_summary_rejects_fictional_scope_version() -> None:
+    evaluation = _authoritative_evaluation(
+        "eval-1", target_id="target-1", document_id="document-1", run_id="run-1"
+    )
+    request = SummaryRequest(
+        project_id=evaluation.project_id,
+        summary_level="DOCUMENT",
+        scope_id="document-1",
+        scope_version="fictional-document-version",
+        members=(
+            {
+                "attempt_id": evaluation.attempt_id,
+                "evaluation_id": evaluation.evaluation_id,
+            },
+        ),
+        aggregation_version="qualitative-counts-v2",
+    )
+
+    with pytest.raises(SummaryCompatibilityError, match="document scope"):
+        build_authoritative_summary(request, (evaluation,), (), generated_at=NOW)
