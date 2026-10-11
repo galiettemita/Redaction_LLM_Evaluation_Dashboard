@@ -78,7 +78,7 @@ class EvaluationStore:
                 CREATE TABLE IF NOT EXISTS summary_members (
                     summary_id TEXT NOT NULL REFERENCES summaries(summary_id),
                     ordinal INTEGER NOT NULL,
-                    subject_id TEXT NOT NULL,
+                    subject_id TEXT NOT NULL REFERENCES attempts(attempt_id),
                     evaluation_id TEXT REFERENCES evaluations(evaluation_id),
                     disposition TEXT NOT NULL,
                     exclusion_reason TEXT,

@@ -127,6 +127,7 @@ def _eligible_provenance_key(evaluation: EvaluationRecord) -> str:
         evaluation.mapping_id,
         evaluation.mapping_version,
         evaluation.mapping_method_version,
+        evaluation.mapping_redacted_canonical_version_id,
         evaluation.reference_document_version_id,
         evaluation.reference_canonical_version_id,
         evaluation.redacted_canonical_hash,
@@ -157,7 +158,6 @@ def _authoritative_profile(
     common_fields = (
         "project_id",
         "model_id",
-        "provider_model_id",
         "model_config_id",
         "condition_id",
         "prompt_id",
@@ -168,7 +168,6 @@ def _authoritative_profile(
         "common_context_budget",
         "tool_permissions",
         "prediction_protocol_id",
-        "model_provenance_id",
         "rubric_version",
         "evaluator_version",
         "judge_id",
@@ -182,6 +181,13 @@ def _authoritative_profile(
         if None in values or len(values) != 1:
             raise SummaryCompatibilityError(f"incompatible {field}")
         profile[field] = next(iter(values))
+    reported_model_ids = {
+        item.provider_model_id
+        for item in evaluations
+        if item.provider_model_id is not None
+    }
+    if len(reported_model_ids) > 1:
+        raise SummaryCompatibilityError("incompatible provider_model_id")
     eligible_source_versions = {
         item.source_fact_record_version
         for item in evaluations
@@ -268,7 +274,10 @@ def build_authoritative_summary(
         item.evaluation_id
         for item in ordered
         if item.attempt_status is AttemptStatus.SUCCEEDED
-        and item.process_status is EvaluationProcessStatus.DISAGREEMENT
+        and (
+            item.process_status is EvaluationProcessStatus.DISAGREEMENT
+            or any(comparison.disagreement for comparison in item.fact_comparisons)
+        )
     )
     evaluation_error_ids = tuple(
         item.evaluation_id
@@ -416,8 +425,11 @@ def _summarize(
     disagreement_ids = tuple(
         item.evaluation_id
         for item in ordered
-        if item.process_status is EvaluationProcessStatus.DISAGREEMENT
-        and item.attempt_status is AttemptStatus.SUCCEEDED
+        if item.attempt_status is AttemptStatus.SUCCEEDED
+        and (
+            item.process_status is EvaluationProcessStatus.DISAGREEMENT
+            or any(comparison.disagreement for comparison in item.fact_comparisons)
+        )
     )
     evaluation_error_ids = tuple(
         item.evaluation_id

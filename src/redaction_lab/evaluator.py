@@ -404,6 +404,7 @@ def evaluate_attempt(
                     evidence_label=judged.evidence_label,
                     rationale=judged.rationale,
                     provisional=True,
+                    disagreement=judged.disagreement,
                 )
                 for fact, judged in evidence
             )
@@ -507,6 +508,9 @@ def evaluate_attempt(
         mapping_status=authoritative.status,
         mapping_scoreability=authoritative.scoreability,
         mapping_method_version=authoritative.mapping_method_version,
+        mapping_redacted_canonical_version_id=(
+            authoritative.redacted_canonical_version_id
+        ),
         reference_document_version_id=authoritative.reference_document_version_id,
         reference_canonical_version_id=authoritative.reference_canonical_version_id,
         redacted_canonical_hash=authoritative.redacted_canonical_hash,

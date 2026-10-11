@@ -140,6 +140,7 @@ def _authoritative_evaluation(
             "reference_target_version": f"{target_id}-v1",
             "mapping_id": f"mapping-{document_id}-{target_id}",
             "mapping_method_version": "text-first-reference-v2",
+            "mapping_redacted_canonical_version_id": "redacted-canonical-v1",
             "redacted_canonical_hash": "2" * 64,
             "reference_canonical_hash": "3" * 64,
             "source_fact_record_id": f"facts-{document_id}-{target_id}",
@@ -387,6 +388,40 @@ def test_authoritative_model_summary_accepts_compatible_distinct_runs() -> None:
     assert summary.verified_score is summary.experimental_score is None
 
 
+def test_authoritative_summary_retains_technical_outcome_with_absent_reported_model() -> None:
+    success = _authoritative_evaluation(
+        "eval-success",
+        target_id="target-1",
+        document_id="document-1",
+        run_id="run-1",
+    )
+    timeout_base = _authoritative_evaluation(
+        "eval-timeout",
+        target_id="target-2",
+        document_id="document-2",
+        run_id="run-2",
+    )
+    timeout = EvaluationRecord.model_validate(
+        {
+            **timeout_base.model_dump(),
+            "attempt_status": "TIMEOUT",
+            "attempt_response_hash": None,
+            "provider_model_id": None,
+            "model_provenance_id": "model-provenance-model-a-absent-provider",
+            "process_status": "COMPLETE",
+            "qualitative_status": "TECHNICAL_TIMEOUT",
+        }
+    )
+
+    summary = build_authoritative_summary(
+        _request(success, timeout), (success, timeout), (), generated_at=NOW
+    )
+
+    assert summary.completed_count == 1
+    assert summary.timeout_count == 1
+    assert len(summary.model_provenance_ids) == 2
+
+
 @pytest.mark.parametrize(
     ("field", "value"),
     [
@@ -399,6 +434,7 @@ def test_authoritative_model_summary_accepts_compatible_distinct_runs() -> None:
         ("common_context_budget", 2048),
         ("tool_permissions", ("search",)),
         ("model_config_id", "config-b"),
+        ("provider_model_id", "unexpected-provider-model"),
         ("rubric_version", "rubric-v2"),
         ("judge_version", "judge-v2"),
         ("mapping_method_version", "mapping-method-v2"),

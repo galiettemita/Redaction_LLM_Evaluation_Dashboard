@@ -68,6 +68,16 @@ class SupportedMockJudge:
         )
 
 
+class DisagreementMockJudge(SupportedMockJudge):
+    def assess(self, reference, prediction) -> JudgeEvidence:
+        return JudgeEvidence(
+            evidence_label="NEEDS_REVIEW",
+            prediction_excerpt=prediction,
+            rationale="Synthetic mock judges disagree.",
+            disagreement=True,
+        )
+
+
 def _run(
     source,
     *,
@@ -198,6 +208,10 @@ def test_evaluation_store_binds_authentic_attempt_and_unvalidated_evidence(tmp_p
     assert evaluation.job_id == job_id
     assert evaluation.source_id == source.source_id
     assert evaluation.source_sha256 == source.source_sha256
+    assert evaluation.redacted_canonical_version_id == (
+        source.canonical_document.canonical_document_version_id
+    )
+    assert evaluation.mapping_redacted_canonical_version_id == "redacted-canonical-v1"
     assert evaluation.run_id == run.run_id
     assert evaluation.condition_id == run.experiment_condition
     assert evaluation.prompt_id == run.prompt_id
@@ -360,6 +374,49 @@ def test_summary_store_binds_exact_evaluations_and_explicit_exclusions(tmp_path)
         )
 
 
+def test_summary_disagreement_is_an_orthogonal_review_subset(tmp_path) -> None:
+    inputs = _authoritative_inputs(tmp_path)
+    db_path, _, _, _, _, attempt, mapping, fact, redacted_pdf, reference_pdf = inputs
+    store = EvaluationStore(db_path)
+    facts = store.record_source_facts(
+        mapping,
+        facts=(fact,),
+        rubric_version=RUBRIC_VERSION,
+        source_fact_record_version="source-facts-v1",
+    )
+    evaluation = store.evaluate_and_store(
+        project_id=PROJECT_ID,
+        attempt_id=attempt.attempt_id,
+        mapping=mapping,
+        redacted_pdf=redacted_pdf,
+        reference_pdf=reference_pdf,
+        source_fact_record_id=facts.source_fact_record_id,
+        judge=DisagreementMockJudge(),
+        evaluator_version="qualitative-evaluator-v2",
+        rubric_version=RUBRIC_VERSION,
+    )
+    summary = store.build_summary(
+        SummaryRequest(
+            project_id=PROJECT_ID,
+            summary_level="MODEL",
+            scope_id=evaluation.model_id,
+            scope_version=evaluation.model_config_id,
+            members=(
+                {
+                    "attempt_id": evaluation.attempt_id,
+                    "evaluation_id": evaluation.evaluation_id,
+                },
+            ),
+            aggregation_version="qualitative-counts-v2",
+        )
+    )
+
+    assert summary.completed_count == 1
+    assert summary.needs_review_count == 1
+    assert summary.disagreement_count == 1
+    assert summary.disagreement_evaluation_ids == (evaluation.evaluation_id,)
+
+
 def test_summary_and_membership_insert_is_atomic_and_immutable(tmp_path) -> None:
     inputs = _authoritative_inputs(tmp_path)
     db_path = inputs[0]
@@ -395,6 +452,29 @@ def test_summary_and_membership_insert_is_atomic_and_immutable(tmp_path) -> None
 
     summary = store.build_summary(request)
     connection = sqlite3.connect(db_path)
+    connection.execute("PRAGMA foreign_keys = ON")
+    foreign_keys = connection.execute(
+        "PRAGMA foreign_key_list(summary_members)"
+    ).fetchall()
+    assert any(
+        row[2] == "attempts" and row[3] == "subject_id" and row[4] == "attempt_id"
+        for row in foreign_keys
+    )
+    with pytest.raises(sqlite3.IntegrityError, match="FOREIGN KEY"):
+        connection.execute(
+            """INSERT INTO summary_members (
+                summary_id, ordinal, subject_id, evaluation_id,
+                disposition, exclusion_reason
+            ) VALUES (?, ?, ?, ?, ?, ?)""",
+            (
+                summary.summary_id,
+                99,
+                "attempt-fictional",
+                None,
+                "EXCLUDED",
+                "NO_EVALUATION",
+            ),
+        )
     for sql in (
         "UPDATE summaries SET payload_json = '{}'",
         "DELETE FROM summaries",

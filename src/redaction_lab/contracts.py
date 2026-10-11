@@ -135,6 +135,7 @@ class FactComparison(FrozenRecord):
     evidence_label: FactEvidenceLabel | None = None
     rationale: NonEmptyStr | None = None
     provisional: bool = True
+    disagreement: bool = False
 
     @model_validator(mode="after")
     def enforce_typed_evidence_consistency(self) -> FactComparison:
@@ -422,6 +423,7 @@ class EvaluationRecord(FrozenRecord):
     reference_target_id: NonEmptyStr | None = None
     reference_target_version: NonEmptyStr | None = None
     mapping_method_version: NonEmptyStr | None = None
+    mapping_redacted_canonical_version_id: NonEmptyStr | None = None
     redacted_canonical_hash: Sha256 | None = None
     reference_canonical_hash: Sha256 | None = None
     source_fact_validation_state: EvidenceValidationState | None = None
@@ -533,6 +535,13 @@ class EvaluationRecord(FrozenRecord):
                 raise ValueError(
                     "Task 6 v2 evidence requires authoritative provenance: "
                     + ", ".join(missing_v2)
+                )
+            if (
+                self.reference_trust == "APPROVED_SYNTHETIC_PAIR"
+                and self.mapping_redacted_canonical_version_id is None
+            ):
+                raise ValueError(
+                    "approved synthetic evidence requires mapping canonical provenance"
                 )
             if self.fact_comparisons and (
                 self.source_fact_validation_state

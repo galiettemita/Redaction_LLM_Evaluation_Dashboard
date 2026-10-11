@@ -310,6 +310,44 @@ def test_trusted_pair_produces_provisional_qualitative_evidence_only(
     assert judge.calls == [(facts[0], "Agent Cedar")]
 
 
+def test_mock_disagreement_is_preserved_but_stays_needs_review(tmp_path: Path) -> None:
+    redacted_pdf, reference_pdf, canonical, targets, mappings = _trusted_context(
+        tmp_path
+    )
+    mapping = mappings[0]
+    fact = SourceFact(
+        fact_id="courier-identity",
+        reference_proposition="The courier was Agent Cedar.",
+        reference_quote="Agent Cedar",
+        reference_quote_locator="chars:0-11",
+        critical_dimensions=("identity",),
+    )
+    evaluation = _evaluate(
+        attempt=_attempt(targets[0]),
+        mapping=mapping,
+        fact_record=_fact_record(mapping, (fact,)),
+        judge=StubJudge(
+            {
+                fact.fact_id: JudgeEvidence(
+                    evidence_label="NEEDS_REVIEW",
+                    rationale="Synthetic mock judges disagree.",
+                    disagreement=True,
+                )
+            }
+        ),
+        redacted_pdf=redacted_pdf,
+        reference_pdf=reference_pdf,
+        canonical=canonical,
+        targets=targets,
+    )
+
+    assert evaluation.process_status is EvaluationProcessStatus.NEEDS_REVIEW
+    assert evaluation.fact_comparisons[0].disagreement is True
+    assert evaluation.qualitative_status == "UNVALIDATED_MOCK_EVIDENCE"
+    assert evaluation.source_fact_validation_state == "UNVALIDATED_SYNTHETIC"
+    assert evaluation.judge_validation_state == "UNVALIDATED_SYNTHETIC"
+
+
 @pytest.mark.parametrize(
     "label",
     [
