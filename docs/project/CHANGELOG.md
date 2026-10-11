@@ -223,6 +223,10 @@ Owner expressly approved a narrowly scoped Task-5 Research rubric/adversarial be
 
 Product owner approved a bounded Task-6 synthetic/mock-only evaluator evidence and three-level summary implementation. Lead published the final packet to main before Codex execution, limiting scope to six named new source/test files, conditional contracts.py/test_contracts.py and one Backend handoff. Task-5 proposal is not research-human-validated, and no D03–D06 scoring/aggregation approval is granted. No models, costs, merge, Task 7 or deployment.
 
+## 2026-10-11 | E0039 | RL-MVP-006 Correction 01 approved
+
+Independent QA FAIL and Research CHANGES_REQUESTED on Task-6 implementation `34c08d2`. Owner approved a bounded expanded correction with EvaluationStore, Task-4 read-only attempt resolver, multi-run provenance, atomic summary membership and unvalidated qualitative NEEDS_REVIEW; final scoped packet published to main. No code implementation, merge, inference, Task 7, spend or scientific methodology authorization.
+
 ## Entry format
 
 Date / epoch / task or decision ID; approved change vs proposal; affected files/contracts; source/approval evidence; test/benchmark impact; migration/rollback; required receivers; unresolved issues. Never backfill a success claim without evidence.
