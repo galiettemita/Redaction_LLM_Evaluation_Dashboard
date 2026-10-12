@@ -796,6 +796,89 @@ def test_store_builds_exclusion_only_model_summary_across_compatible_runs(
     assert replay == summary
 
 
+def test_reopen_rejects_swapped_canonical_membership_ordinals(tmp_path) -> None:
+    inputs = _authoritative_inputs(tmp_path)
+    db_path, run_store, source, _, _, first_attempt, *_ = inputs
+    second_run = _run(source, run_id="run-membership-tamper")
+    second_job_id = run_store.enqueue(
+        source.source_id, source.targets[1].target_id, second_run
+    )
+    assert asyncio.run(run_pending_once(run_store, StoredAttemptAdapter())) is True
+    second_attempt_id = run_store.job(second_job_id).attempt_id
+    assert second_attempt_id is not None
+    store = EvaluationStore(db_path)
+    summary = store.build_summary(
+        SummaryRequest(
+            project_id=PROJECT_ID,
+            summary_level="MODEL",
+            scope_id=first_attempt.model_id,
+            scope_version=first_attempt.model_config_id,
+            members=(
+                {"attempt_id": second_attempt_id, "evaluation_id": None},
+                {"attempt_id": first_attempt.attempt_id, "evaluation_id": None},
+            ),
+            aggregation_version="qualitative-counts-v3",
+        )
+    )
+    assert store.get_summary(summary.summary_id, project_id=PROJECT_ID) == summary
+
+    connection = sqlite3.connect(db_path)
+    canonical_rows = connection.execute(
+        """SELECT ordinal, subject_id FROM summary_members
+           WHERE summary_id = ? ORDER BY ordinal""",
+        (summary.summary_id,),
+    ).fetchall()
+    assert canonical_rows == list(enumerate(summary.requested_attempt_ids))
+    connection.execute("DROP TRIGGER summary_members_no_update")
+    connection.execute(
+        """UPDATE summary_members SET ordinal = -1
+           WHERE summary_id = ? AND ordinal = 0""",
+        (summary.summary_id,),
+    )
+    connection.execute(
+        """UPDATE summary_members SET ordinal = 0
+           WHERE summary_id = ? AND ordinal = 1""",
+        (summary.summary_id,),
+    )
+    connection.execute(
+        """UPDATE summary_members SET ordinal = 1
+           WHERE summary_id = ? AND ordinal = -1""",
+        (summary.summary_id,),
+    )
+    connection.commit()
+    tampered_payload = connection.execute(
+        "SELECT payload_json FROM summaries WHERE summary_id = ?",
+        (summary.summary_id,),
+    ).fetchone()[0]
+    tampered_rows = connection.execute(
+        """SELECT ordinal, subject_id, evaluation_id, disposition, exclusion_reason
+           FROM summary_members WHERE summary_id = ? ORDER BY ordinal""",
+        (summary.summary_id,),
+    ).fetchall()
+    connection.close()
+    assert [row[0] for row in tampered_rows] == [0, 1]
+    assert [row[1] for row in tampered_rows] == list(
+        reversed(summary.requested_attempt_ids)
+    )
+
+    with pytest.raises(ValueError, match="canonical membership binding"):
+        EvaluationStore(db_path).get_summary(
+            summary.summary_id, project_id=PROJECT_ID
+        )
+
+    connection = sqlite3.connect(db_path)
+    assert connection.execute(
+        "SELECT payload_json FROM summaries WHERE summary_id = ?",
+        (summary.summary_id,),
+    ).fetchone()[0] == tampered_payload
+    assert connection.execute(
+        """SELECT ordinal, subject_id, evaluation_id, disposition, exclusion_reason
+           FROM summary_members WHERE summary_id = ? ORDER BY ordinal""",
+        (summary.summary_id,),
+    ).fetchall() == tampered_rows
+    connection.close()
+
+
 def test_exclusion_only_summary_insert_rolls_back_and_detects_member_tampering(
     tmp_path,
 ) -> None:

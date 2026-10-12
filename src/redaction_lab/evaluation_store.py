@@ -541,13 +541,23 @@ class EvaluationStore:
         stored = SummarySnapshot.model_validate_json(row["payload_json"])
         if stored.summary_id != row["summary_id"] or stored.project_id != project_id:
             raise ValueError("stored summary row integrity mismatch")
+        verify_summary_identity(stored)
         if len(member_rows) != stored.requested_count:
             raise ValueError("stored summary membership count mismatch")
+        actual_bindings = tuple(
+            (member_row["ordinal"], member_row["subject_id"])
+            for member_row in member_rows
+        )
+        expected_bindings = tuple(enumerate(stored.requested_attempt_ids))
+        if tuple(binding[0] for binding in actual_bindings) != tuple(
+            range(len(member_rows))
+        ):
+            raise ValueError("stored summary membership ordinal mismatch")
+        if actual_bindings != expected_bindings:
+            raise ValueError("stored summary canonical membership binding mismatch")
         members: list[SummaryRequestedMember] = []
         resolved_attempts: list[ResolvedAttempt] = []
-        for ordinal, member_row in enumerate(member_rows):
-            if member_row["ordinal"] != ordinal:
-                raise ValueError("stored summary membership ordinal mismatch")
+        for member_row in member_rows:
             resolved_attempts.append(
                 self.run_store.resolve_attempt(
                     member_row["subject_id"], project_id=project_id
@@ -617,7 +627,6 @@ class EvaluationStore:
         )
         if rebuilt != stored:
             raise ValueError("stored summary evidence does not recompute")
-        verify_summary_identity(stored)
         if (
             expected_compatibility_profile_id is not None
             and stored.compatibility_profile_id
