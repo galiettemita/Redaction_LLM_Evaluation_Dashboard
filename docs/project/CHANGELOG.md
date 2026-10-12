@@ -1,3 +1,7 @@
+
+## 2026-10-12 | E0050 | RL-MVP-007A Correction 03 authorization
+
+Owner approved two-file persistent interprocess migration-lock correction with inherited helper FD, deterministic concurrency tests, preservation of immutable evidence and fresh independent review. Published packet only; no implementation, merge, runtime, data, inference, spend or deployment.
 # Coordinated change log
 
 This is a concise index, not a transcript. The containing Git commit identifies each exact revision; no self-referential commit SHA is embedded. Lead maintains this with CURRENT_STATE and DECISIONS.
