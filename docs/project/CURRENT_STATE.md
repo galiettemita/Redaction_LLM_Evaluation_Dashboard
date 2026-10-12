@@ -1,12 +1,12 @@
 # Current state
 
-Updated: 2026-10-09 (America/New_York). Coordination epoch: **E0039**.
+Updated: 2026-10-11 (America/New_York). Coordination epoch: **E0040**.
 Integration branch: `main`. Canonical writer: **Lead/Architect**, within the owner's approved scope.
 Resolve the actual HEAD with GitHub; do not infer a current SHA from this file's timestamp.
 
 ## Read this first
 
-**Stage:** S1 / October 12 MVP implementation. **Execution boundary:** RL-MVP-001, RL-MVP-002 and RL-MVP-003 are merged. RL-MVP-004 has been owner-authorized and MERGED following Correction 01 independent QA and Research PASS; Task 5 is owner-approved for a research-only proposal on an isolated Research branch; Task 6 is owner-approved for bounded synthetic/mock-only implementation under [RL-MVP-006 packet](task_packets/RL-MVP-006-EVALUATOR-SUMMARIES.md); Task 7+ remains unapproved; Task 6 Correction 01 is approved under its scoped packet.
+**Stage:** S1 / October 12 MVP implementation. **Execution boundary:** RL-MVP-001, RL-MVP-002 and RL-MVP-003 are merged. RL-MVP-004 has been owner-authorized and MERGED following Correction 01 independent QA and Research PASS; Task 5 is owner-approved for a research-only proposal on an isolated Research branch; Task 6 is owner-approved for bounded synthetic/mock-only implementation under [RL-MVP-006 packet](task_packets/RL-MVP-006-EVALUATOR-SUMMARIES.md); Task 7+ remains unapproved; Task 6 Correction 02 is now approved under its scoped packet.
 **Product implementation:** RL-MVP-001 merged in PR #1 (`ba60aaa8`); RL-MVP-002 merged in PR #2 (`35281fb9`); RL-MVP-003 merged in PR #3 (`733ae024`).
 **Scoring validity:** not established. **Deployment:** none established here.
 **Active background agents / scheduler:** none installed by this setup.
@@ -32,7 +32,7 @@ On a critical new change, the Lead records affected task IDs here as `ON_HOLD`, 
 | RL-MVP-004 | MERGED; REAL_MODEL_BLOCKED | Backend/Codex + Lead integration | Correction 01 exact implementation `b9ce818`, Backend head `fb4c1f0`; independent QA and Research PASS for scoped infrastructure/protocol, owner-authorized PR #4 merged `8f4d2f18`. Real inference/D03/D05 not validated; Task 5 unapproved. |
 | RL-S1-001 | PROPOSED | Lead + Backend | Define document/target/reference records and initial input limits; D01/D02/D03 and component plan required. |
 | RL-MVP-005 | APPROVED_RESEARCH_PROPOSAL; NOT IMPLEMENTED | Research/Evaluation | [Research-only Task 5 packet](task_packets/RL-MVP-005-RESEARCH-PROPOSAL.md) explicitly approved by owner; two synthetic proposal artifacts and one unique Research handoff on an isolated branch. No evaluator, merge, scientific-method approval or Task 6. |
-| RL-MVP-006 | CORRECTION_01_APPROVED; UNMERGED | Backend/Codex | Original candidate `34c08d2` QA FAIL and Research CHANGES_REQUESTED; owner approved [Correction 01](task_packets/RL-MVP-006-CORRECTION-01.md) addressing provenance, multi-run summaries and unvalidated evidence; no merge/Task 7. |
+| RL-MVP-006 | CORRECTION_02_APPROVED; UNMERGED | Backend/Codex | Correction 01 `8f2fa74` Research scoped PASS, QA CHANGES_REQUESTED (outcome-dependent eligible-set identity; all-excluded summaries). Owner approved [Correction 02](task_packets/RL-MVP-006-CORRECTION-02.md) bounded six-file patch, TDD and exact-SHA QA/Research. No merge/Task 7. |
 | RL-S2-001 | PROPOSED | Research | Propose rubric, human benchmark and release criteria; D03/D04/D05; no invented thresholds. |
 | RL-UX-001 | PROPOSED | Frontend | Synthetic-data workflow proposal only; D09 and scoped approval before implementation. |
 
@@ -49,7 +49,7 @@ Present on main: Tasks 1–4 contracts, synthetic fixtures, PDF detector, canoni
 
 ## Latest important change
 
-E0039: Task 6 Correction 01 scope owner-approved and packet published; original candidate remains unmerged. Task 4 remains merged; Task 5 proposal still unvalidated; real inference blocked.
+E0040: Task 6 Correction 02 approved after QA findings; Research scoped PASS on Correction 01. No implementation/merge. Prior E0039: Task 6 Correction 01 scope owner-approved and packet published; original candidate remains unmerged. Task 4 remains merged; Task 5 proposal still unvalidated; real inference blocked.
 
 ## Maintenance rule
 
