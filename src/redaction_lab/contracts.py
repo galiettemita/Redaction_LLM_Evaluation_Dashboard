@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import StrEnum
+from hashlib import sha256
+import json
 from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, FiniteFloat, StringConstraints
@@ -72,6 +74,25 @@ class SummaryLevel(StrEnum):
     MODEL = "MODEL"
 
 
+class SummaryExclusionReason(StrEnum):
+    NO_EVALUATION = "NO_EVALUATION"
+
+
+class FactEvidenceLabel(StrEnum):
+    """Qualitative evidence only; labels have no numeric interpretation."""
+
+    SUPPORTED = "SUPPORTED"
+    MISSING = "MISSING"
+    CONTRADICTED = "CONTRADICTED"
+    NEEDS_REVIEW = "NEEDS_REVIEW"
+
+
+class EvidenceValidationState(StrEnum):
+    """Task-6 evidence is synthetic and explicitly not research validated."""
+
+    UNVALIDATED_SYNTHETIC = "UNVALIDATED_SYNTHETIC"
+
+
 class JobStatus(StrEnum):
     PENDING = "PENDING"
     RUNNING = "RUNNING"
@@ -108,6 +129,30 @@ class FactComparison(FrozenRecord):
     reference_quote: NonEmptyStr
     prediction_excerpt: NonEmptyStr | None = None
     comparison_label: NonEmptyStr
+    reference_proposition: NonEmptyStr | None = None
+    reference_quote_locator: NonEmptyStr | None = None
+    critical_dimensions: tuple[NonEmptyStr, ...] = ()
+    evidence_label: FactEvidenceLabel | None = None
+    rationale: NonEmptyStr | None = None
+    provisional: bool = True
+    disagreement: bool = False
+
+    @model_validator(mode="after")
+    def enforce_typed_evidence_consistency(self) -> FactComparison:
+        if self.evidence_label is not None:
+            if self.comparison_label != self.evidence_label.value:
+                raise ValueError("comparison label must match the typed evidence label")
+            if (
+                self.reference_proposition is None
+                or self.reference_quote_locator is None
+                or not self.critical_dimensions
+                or self.rationale is None
+                or not self.provisional
+            ):
+                raise ValueError(
+                    "typed evidence requires complete provisional provenance"
+                )
+        return self
 
 
 class DocumentVersion(FrozenRecord):
@@ -334,6 +379,55 @@ class EvaluationRecord(FrozenRecord):
     contradictions: tuple[NonEmptyStr, ...] = ()
     explanation: NonEmptyStr
     created_at: datetime
+    evidence_schema_version: NonEmptyStr | None = None
+    run_id: NonEmptyStr | None = None
+    target_id: NonEmptyStr | None = None
+    target_version: NonEmptyStr | None = None
+    redacted_document_version_id: NonEmptyStr | None = None
+    reference_document_version_id: NonEmptyStr | None = None
+    redacted_canonical_version_id: NonEmptyStr | None = None
+    reference_canonical_version_id: NonEmptyStr | None = None
+    model_id: NonEmptyStr | None = None
+    model_config_id: NonEmptyStr | None = None
+    condition_id: NonEmptyStr | None = None
+    reference_trust: NonEmptyStr | None = None
+    judge_id: NonEmptyStr | None = None
+    judge_version: NonEmptyStr | None = None
+    source_fact_record_id: NonEmptyStr | None = None
+    source_fact_record_version: NonEmptyStr | None = None
+    qualitative_status: NonEmptyStr | None = None
+    unsupported_assertions: tuple[NonEmptyStr, ...] = ()
+    attempt_request_hash: Sha256 | None = None
+    attempt_response_hash: Sha256 | None = None
+    evaluation_series_key: NonEmptyStr | None = None
+    job_id: NonEmptyStr | None = None
+    source_id: NonEmptyStr | None = None
+    source_version: NonEmptyStr | None = None
+    source_sha256: Sha256 | None = None
+    run_version: NonEmptyStr | None = None
+    run_digest: Sha256 | None = None
+    manifest_id: NonEmptyStr | None = None
+    manifest_version: NonEmptyStr | None = None
+    manifest_digest: Sha256 | None = None
+    canonical_document_hash: Sha256 | None = None
+    provider_model_id: NonEmptyStr | None = None
+    prompt_id: NonEmptyStr | None = None
+    prompt_version: NonEmptyStr | None = None
+    settings_fingerprint: Sha256 | None = None
+    attempt_policy: NonEmptyStr | None = None
+    context_policy: NonEmptyStr | None = None
+    common_context_budget: Annotated[int, Field(gt=0)] | None = None
+    tool_permissions: tuple[NonEmptyStr, ...] = ()
+    prediction_protocol_id: NonEmptyStr | None = None
+    model_provenance_id: NonEmptyStr | None = None
+    reference_target_id: NonEmptyStr | None = None
+    reference_target_version: NonEmptyStr | None = None
+    mapping_method_version: NonEmptyStr | None = None
+    mapping_redacted_canonical_version_id: NonEmptyStr | None = None
+    redacted_canonical_hash: Sha256 | None = None
+    reference_canonical_hash: Sha256 | None = None
+    source_fact_validation_state: EvidenceValidationState | None = None
+    judge_validation_state: EvidenceValidationState | None = None
 
     @model_validator(mode="after")
     def enforce_score_channel_and_prerequisites(self) -> EvaluationRecord:
@@ -347,6 +441,119 @@ class EvaluationRecord(FrozenRecord):
             value is not None for value in mapping_values
         ):
             raise ValueError("mapping identity and status snapshots must be complete")
+
+        if self.evidence_schema_version is not None:
+            required = {
+                "run_id": self.run_id,
+                "target_id": self.target_id,
+                "target_version": self.target_version,
+                "redacted_document_version_id": self.redacted_document_version_id,
+                "redacted_canonical_version_id": self.redacted_canonical_version_id,
+                "model_id": self.model_id,
+                "model_config_id": self.model_config_id,
+                "condition_id": self.condition_id,
+                "reference_trust": self.reference_trust,
+                "judge_id": self.judge_id,
+                "judge_version": self.judge_version,
+                "qualitative_status": self.qualitative_status,
+                "attempt_request_hash": self.attempt_request_hash,
+            }
+            missing = [name for name, value in required.items() if value is None]
+            if missing:
+                raise ValueError(
+                    "Task 6 evidence requires complete binding: " + ", ".join(missing)
+                )
+            if (
+                self.score_status is not ScoreStatus.NONE
+                or self.verified_score is not None
+                or self.experimental_score is not None
+                or self.score_scale_id is not None
+                or self.research_validation_id is not None
+            ):
+                raise ValueError("Task 6 evidence requires null numeric score channels")
+            if self.attempt_status is not AttemptStatus.SUCCEEDED and (
+                self.fact_comparisons or self.unsupported_assertions
+            ):
+                raise ValueError("non-success attempts cannot carry semantic evidence")
+            if self.reference_trust != "APPROVED_SYNTHETIC_PAIR" and (
+                self.fact_comparisons or self.unsupported_assertions
+            ):
+                raise ValueError("untrusted truth cannot carry semantic evidence")
+            if self.reference_trust == "APPROVED_SYNTHETIC_PAIR" and (
+                self.mapping_status is not ReferenceStatus.CONFIRMED
+                or self.mapping_scoreability is not ReferenceScoreability.SCOREABLE
+                or self.reference_document_version_id is None
+                or self.reference_canonical_version_id is None
+            ):
+                raise ValueError(
+                    "approved synthetic trust requires complete confirmed mapping provenance"
+                )
+            if self.fact_comparisons and (
+                self.source_fact_record_id is None
+                or self.source_fact_record_version is None
+                or any(
+                    comparison.evidence_label is None
+                    or comparison.reference_proposition is None
+                    or comparison.reference_quote_locator is None
+                    or comparison.rationale is None
+                    for comparison in self.fact_comparisons
+                )
+            ):
+                raise ValueError(
+                    "Task 6 fact comparisons require typed, versioned evidence"
+                )
+
+        if self.evidence_schema_version == "qualitative-fact-evidence-v2":
+            required_v2 = {
+                "evaluation_series_key": self.evaluation_series_key,
+                "job_id": self.job_id,
+                "source_id": self.source_id,
+                "source_version": self.source_version,
+                "source_sha256": self.source_sha256,
+                "run_version": self.run_version,
+                "run_digest": self.run_digest,
+                "manifest_id": self.manifest_id,
+                "manifest_version": self.manifest_version,
+                "manifest_digest": self.manifest_digest,
+                "canonical_document_hash": self.canonical_document_hash,
+                "prompt_id": self.prompt_id,
+                "prompt_version": self.prompt_version,
+                "settings_fingerprint": self.settings_fingerprint,
+                "attempt_policy": self.attempt_policy,
+                "context_policy": self.context_policy,
+                "common_context_budget": self.common_context_budget,
+                "prediction_protocol_id": self.prediction_protocol_id,
+                "model_provenance_id": self.model_provenance_id,
+                "reference_target_id": self.reference_target_id,
+                "reference_target_version": self.reference_target_version,
+                "mapping_method_version": self.mapping_method_version,
+            }
+            missing_v2 = [
+                name for name, value in required_v2.items() if value is None
+            ]
+            if missing_v2:
+                raise ValueError(
+                    "Task 6 v2 evidence requires authoritative provenance: "
+                    + ", ".join(missing_v2)
+                )
+            if (
+                self.reference_trust == "APPROVED_SYNTHETIC_PAIR"
+                and self.mapping_redacted_canonical_version_id is None
+            ):
+                raise ValueError(
+                    "approved synthetic evidence requires mapping canonical provenance"
+                )
+            if self.fact_comparisons and (
+                self.source_fact_validation_state
+                is not EvidenceValidationState.UNVALIDATED_SYNTHETIC
+                or self.judge_validation_state
+                is not EvidenceValidationState.UNVALIDATED_SYNTHETIC
+                or self.process_status is not EvaluationProcessStatus.NEEDS_REVIEW
+                or self.qualitative_status != "UNVALIDATED_MOCK_EVIDENCE"
+            ):
+                raise ValueError(
+                    "unvalidated Task 6 evidence must remain explicit NEEDS_REVIEW"
+                )
 
         if self.process_status is not EvaluationProcessStatus.COMPLETE:
             if self.score_status is not ScoreStatus.NONE:
@@ -385,6 +592,40 @@ class EvaluationRecord(FrozenRecord):
         return self
 
 
+class SummaryRequestedMember(FrozenRecord):
+    attempt_id: NonEmptyStr
+    evaluation_id: NonEmptyStr | None = None
+
+
+class SummaryExclusion(FrozenRecord):
+    attempt_id: NonEmptyStr
+    evaluation_id: NonEmptyStr | None = None
+    reason: SummaryExclusionReason
+
+
+class SummaryRequest(FrozenRecord):
+    project_id: NonEmptyStr
+    summary_level: SummaryLevel
+    scope_id: NonEmptyStr
+    scope_version: NonEmptyStr
+    members: tuple[SummaryRequestedMember, ...]
+    aggregation_version: NonEmptyStr
+
+    @model_validator(mode="after")
+    def enforce_unique_requested_attempts(self) -> SummaryRequest:
+        attempt_ids = tuple(member.attempt_id for member in self.members)
+        if not attempt_ids or len(set(attempt_ids)) != len(attempt_ids):
+            raise ValueError("summary request attempt IDs must be nonempty and unique")
+        evaluation_ids = tuple(
+            member.evaluation_id
+            for member in self.members
+            if member.evaluation_id is not None
+        )
+        if len(set(evaluation_ids)) != len(evaluation_ids):
+            raise ValueError("summary request evaluation IDs must be unique")
+        return self
+
+
 class SummarySnapshot(FrozenRecord):
     summary_id: NonEmptyStr
     summary_version: NonEmptyStr
@@ -397,7 +638,7 @@ class SummarySnapshot(FrozenRecord):
     common_eligible_set_id: NonEmptyStr
     model_id: NonEmptyStr
     condition_id: NonEmptyStr
-    rubric_version: NonEmptyStr
+    rubric_version: NonEmptyStr | None
     aggregation_version: NonEmptyStr
     requested_count: NonNegativeInt
     eligible_count: NonNegativeInt
@@ -408,12 +649,54 @@ class SummarySnapshot(FrozenRecord):
     error_count: NonNegativeInt
     needs_review_count: NonNegativeInt
     disagreement_count: NonNegativeInt
+    score_status: ScoreStatus | None = None
     score_scale_id: NonEmptyStr | None = None
     research_validation_id: NonEmptyStr | None = None
     verified_score: FiniteFloat | None = None
     experimental_score: FiniteFloat | None = None
     generated_at: datetime
     freshness: NonEmptyStr
+    summary_schema_version: NonEmptyStr | None = None
+    run_id: NonEmptyStr | None = None
+    model_config_id: NonEmptyStr | None = None
+    evaluator_version: NonEmptyStr | None = None
+    judge_id: NonEmptyStr | None = None
+    judge_version: NonEmptyStr | None = None
+    completed_evaluation_ids: tuple[NonEmptyStr, ...] = ()
+    unknown_evaluation_ids: tuple[NonEmptyStr, ...] = ()
+    refused_evaluation_ids: tuple[NonEmptyStr, ...] = ()
+    timeout_evaluation_ids: tuple[NonEmptyStr, ...] = ()
+    malformed_evaluation_ids: tuple[NonEmptyStr, ...] = ()
+    error_evaluation_ids: tuple[NonEmptyStr, ...] = ()
+    needs_review_evaluation_ids: tuple[NonEmptyStr, ...] = ()
+    disagreement_evaluation_ids: tuple[NonEmptyStr, ...] = ()
+    evaluation_error_evaluation_ids: tuple[NonEmptyStr, ...] = ()
+    excluded_evaluation_ids: tuple[NonEmptyStr, ...] = ()
+    eligible_target_keys: tuple[NonEmptyStr, ...] = ()
+    redacted_document_version_ids: tuple[NonEmptyStr, ...] = ()
+    reference_document_version_ids: tuple[NonEmptyStr, ...] = ()
+    reference_canonical_version_ids: tuple[NonEmptyStr, ...] = ()
+    reference_mapping_versions: tuple[NonEmptyStr, ...] = ()
+    source_fact_record_versions: tuple[NonEmptyStr, ...] = ()
+    completed_count: NonNegativeInt = 0
+    evaluation_error_count: NonNegativeInt = 0
+    excluded_count: NonNegativeInt = 0
+    requested_attempt_ids: tuple[NonEmptyStr, ...] = ()
+    exclusions: tuple[SummaryExclusion, ...] = ()
+    contributing_run_ids: tuple[NonEmptyStr, ...] = ()
+    prompt_id: NonEmptyStr | None = None
+    prompt_version: NonEmptyStr | None = None
+    settings_fingerprint: Sha256 | None = None
+    attempt_policy: NonEmptyStr | None = None
+    context_policy: NonEmptyStr | None = None
+    common_context_budget: Annotated[int, Field(gt=0)] | None = None
+    tool_permissions: tuple[NonEmptyStr, ...] = ()
+    prediction_protocol_id: NonEmptyStr | None = None
+    model_provenance_ids: tuple[NonEmptyStr, ...] = ()
+    model_identity_limitation: NonEmptyStr | None = None
+    eligible_provenance_keys: tuple[NonEmptyStr, ...] = ()
+    compatibility_profile_id: NonEmptyStr | None = None
+    evaluation_compatibility_profile_id: NonEmptyStr | None = None
 
     @model_validator(mode="after")
     def enforce_scope_denominator_and_scores(self) -> SummarySnapshot:
@@ -428,20 +711,204 @@ class SummarySnapshot(FrozenRecord):
         if self.eligible_count != len(self.eligible_evaluation_ids):
             raise ValueError("eligible_count must match exact eligible evaluation IDs")
 
-        partition_count = sum(
-            (
-                self.eligible_count,
-                self.unknown_count,
-                self.refused_count,
-                self.timeout_count,
-                self.malformed_count,
-                self.error_count,
-                self.needs_review_count,
-                self.disagreement_count,
+        if self.summary_schema_version is None:
+            partition_count = sum(
+                (
+                    self.eligible_count,
+                    self.unknown_count,
+                    self.refused_count,
+                    self.timeout_count,
+                    self.malformed_count,
+                    self.error_count,
+                    self.needs_review_count,
+                    self.disagreement_count,
+                )
             )
-        )
-        if self.requested_count != partition_count:
-            raise ValueError("requested_count must equal the explicit outcome counts")
+            if self.requested_count != partition_count:
+                raise ValueError("requested_count must equal the explicit outcome counts")
+        else:
+            is_v2 = self.summary_schema_version == "qualitative-summary-evidence-v2"
+            is_v3 = self.summary_schema_version == "qualitative-summary-evidence-v3"
+            required = {"model_config_id": self.model_config_id}
+            if not is_v3 or included:
+                required.update(
+                    {
+                        "rubric_version": self.rubric_version,
+                        "evaluator_version": self.evaluator_version,
+                        "judge_id": self.judge_id,
+                        "judge_version": self.judge_version,
+                    }
+                )
+            if is_v3 and included:
+                required["evaluation_compatibility_profile_id"] = (
+                    self.evaluation_compatibility_profile_id
+                )
+            if not is_v2 and not is_v3:
+                required["run_id"] = self.run_id
+            missing = [name for name, value in required.items() if value is None]
+            if missing:
+                detail = (
+                    "complete evaluation provenance"
+                    if is_v3 and included
+                    else "complete provenance"
+                )
+                raise ValueError(
+                    f"Task 6 summaries require {detail}: " + ", ".join(missing)
+                )
+            if is_v3 and not included:
+                method_values = (
+                    self.rubric_version,
+                    self.evaluator_version,
+                    self.judge_id,
+                    self.judge_version,
+                    self.evaluation_compatibility_profile_id,
+                )
+                if any(value is not None for value in method_values):
+                    raise ValueError(
+                        "exclusion-only summaries must not fabricate evaluation provenance"
+                    )
+                if any(
+                    (
+                        self.reference_document_version_ids,
+                        self.reference_canonical_version_ids,
+                        self.reference_mapping_versions,
+                        self.source_fact_record_versions,
+                        self.eligible_provenance_keys,
+                    )
+                ):
+                    raise ValueError(
+                        "exclusion-only summaries cannot carry evaluation evidence"
+                    )
+            categories = {
+                "completed": self.completed_evaluation_ids,
+                "refused": self.refused_evaluation_ids,
+                "timeout": self.timeout_evaluation_ids,
+                "malformed": self.malformed_evaluation_ids,
+                "error": self.error_evaluation_ids,
+            }
+            category_sets = {name: set(ids) for name, ids in categories.items()}
+            if any(
+                len(ids) != len(categories[name])
+                for name, ids in category_sets.items()
+            ):
+                raise ValueError("Task 6 summary outcome IDs must be unique")
+            outcome_ids = set().union(*category_sets.values())
+            if sum(len(ids) for ids in category_sets.values()) != len(outcome_ids):
+                raise ValueError("Task 6 attempt outcome categories must not overlap")
+            if outcome_ids != included:
+                raise ValueError("Task 6 attempt outcomes must partition included evaluations")
+            unknown = set(self.unknown_evaluation_ids)
+            if eligible & unknown or eligible | unknown != included:
+                raise ValueError("Task 6 truth categories must partition included evaluations")
+            review = set(self.needs_review_evaluation_ids)
+            disagreement = set(self.disagreement_evaluation_ids)
+            evaluation_errors = set(self.evaluation_error_evaluation_ids)
+            completed = category_sets["completed"]
+            if not review.issubset(completed) or not disagreement.issubset(completed):
+                raise ValueError("review states require completed predictions")
+            if not evaluation_errors.issubset(completed):
+                raise ValueError("evaluation errors require completed predictions")
+            excluded = set(self.excluded_evaluation_ids)
+            if included & excluded:
+                raise ValueError("excluded evaluations cannot also be included")
+            count_pairs = (
+                (self.completed_count, self.completed_evaluation_ids),
+                (self.unknown_count, self.unknown_evaluation_ids),
+                (self.refused_count, self.refused_evaluation_ids),
+                (self.timeout_count, self.timeout_evaluation_ids),
+                (self.malformed_count, self.malformed_evaluation_ids),
+                (self.error_count, self.error_evaluation_ids),
+                (self.needs_review_count, self.needs_review_evaluation_ids),
+                (self.disagreement_count, self.disagreement_evaluation_ids),
+                (self.evaluation_error_count, self.evaluation_error_evaluation_ids),
+            )
+            if any(count != len(ids) for count, ids in count_pairs):
+                raise ValueError("Task 6 summary counts must match exact ID sets")
+            authoritative_membership = is_v2 or is_v3
+            expected_excluded_count = (
+                len(self.exclusions)
+                if authoritative_membership
+                else len(self.excluded_evaluation_ids)
+            )
+            if self.excluded_count != expected_excluded_count:
+                raise ValueError("Task 6 excluded count must match exact exclusions")
+            excluded_subject_count = (
+                len(self.exclusions) if authoritative_membership else len(excluded)
+            )
+            if self.requested_count != len(included) + excluded_subject_count:
+                raise ValueError("requested_count must include included and excluded records")
+            if len(set(self.eligible_target_keys)) != len(self.eligible_target_keys):
+                raise ValueError("eligible target keys must be unique")
+            version_sets = (
+                self.redacted_document_version_ids,
+                self.reference_document_version_ids,
+                self.reference_canonical_version_ids,
+                self.reference_mapping_versions,
+                self.source_fact_record_versions,
+            )
+            if any(len(set(values)) != len(values) for values in version_sets):
+                raise ValueError("Task 6 summary version sets must be unique")
+            eligible_identity = (
+                self.eligible_provenance_keys
+                if authoritative_membership
+                else self.eligible_target_keys
+            )
+            encoded = json.dumps(
+                sorted(eligible_identity), separators=(",", ":")
+            ).encode("utf-8")
+            expected_set_id = f"eligible-set-{sha256(encoded).hexdigest()[:24]}"
+            if self.common_eligible_set_id != expected_set_id:
+                raise ValueError("common eligible set ID must derive from exact targets")
+            if (
+                self.verified_score is not None
+                or self.experimental_score is not None
+                or self.score_scale_id is not None
+                or self.research_validation_id is not None
+            ):
+                raise ValueError("Task 6 summaries require null numeric score channels")
+
+            if is_v3 and self.score_status is not ScoreStatus.NONE:
+                raise ValueError("Task 6 v3 summaries require score status NONE")
+
+            if authoritative_membership:
+                requested = set(self.requested_attempt_ids)
+                excluded_attempts = {item.attempt_id for item in self.exclusions}
+                if len(requested) != len(self.requested_attempt_ids):
+                    raise ValueError("requested attempt IDs must be unique")
+                if len(excluded_attempts) != len(self.exclusions):
+                    raise ValueError("summary exclusions must have unique attempts")
+                if excluded_attempts != {
+                    item.attempt_id
+                    for item in self.exclusions
+                    if item.evaluation_id is None
+                }:
+                    raise ValueError("NO_EVALUATION exclusions cannot name an evaluation")
+                if len(requested) != self.requested_count:
+                    raise ValueError("requested attempts must match requested_count")
+                if excluded_attempts - requested:
+                    raise ValueError("excluded attempts must be requested")
+                provenance_required = {
+                    "prompt_id": self.prompt_id,
+                    "prompt_version": self.prompt_version,
+                    "settings_fingerprint": self.settings_fingerprint,
+                    "attempt_policy": self.attempt_policy,
+                    "context_policy": self.context_policy,
+                    "common_context_budget": self.common_context_budget,
+                    "prediction_protocol_id": self.prediction_protocol_id,
+                    "compatibility_profile_id": self.compatibility_profile_id,
+                    "model_identity_limitation": self.model_identity_limitation,
+                }
+                if any(value is None for value in provenance_required.values()):
+                    raise ValueError("authoritative summaries require protocol provenance")
+                unique_sets = (
+                    self.contributing_run_ids,
+                    self.model_provenance_ids,
+                    self.eligible_provenance_keys,
+                )
+                if any(not values or len(set(values)) != len(values) for values in unique_sets[:2]):
+                    raise ValueError("authoritative summary provenance sets must be nonempty and unique")
+                if len(set(self.eligible_provenance_keys)) != len(self.eligible_provenance_keys):
+                    raise ValueError("eligible provenance keys must be unique")
 
         has_verified = self.verified_score is not None
         has_experimental = self.experimental_score is not None

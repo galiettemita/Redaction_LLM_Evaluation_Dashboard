@@ -564,3 +564,225 @@ def test_target_ids_are_versioned_and_project_scoped() -> None:
 
     assert target.target_version == "target-v3"
     assert target.project_id == "project-001"
+
+
+def test_task6_fact_evidence_requires_typed_label_and_provenance() -> None:
+    comparison = contracts.FactComparison(
+        fact_id="fact-001",
+        reference_quote="Agent Cedar",
+        reference_proposition="The courier was Agent Cedar.",
+        reference_quote_locator="chars:0-11",
+        critical_dimensions=("identity",),
+        prediction_excerpt="Agent Cedar",
+        comparison_label="SUPPORTED",
+        evidence_label="SUPPORTED",
+        rationale="Synthetic mock evidence only.",
+        provisional=True,
+    )
+
+    assert comparison.evidence_label is contracts.FactEvidenceLabel.SUPPORTED
+    with pytest.raises(ValidationError):
+        comparison.evidence_label = contracts.FactEvidenceLabel.MISSING
+    with pytest.raises(ValidationError, match="evidence label"):
+        contracts.FactComparison.model_validate(
+            {**comparison.model_dump(), "comparison_label": "CONTRADICTED"}
+        )
+
+
+def test_task6_evaluation_schema_requires_complete_binding_and_null_scores() -> None:
+    values = {
+        **_evaluation().model_dump(),
+        "evidence_schema_version": "qualitative-fact-evidence-v1",
+        "run_id": "run-v1",
+        "target_id": "target-001",
+        "target_version": "target-v1",
+        "redacted_document_version_id": "redacted-v1",
+        "redacted_canonical_version_id": "canonical-v1",
+        "model_id": "model-v1",
+        "model_config_id": "config-v1",
+        "condition_id": "condition-v1",
+        "reference_trust": "UNTRUSTED_OR_UNAVAILABLE",
+        "judge_id": "judge",
+        "judge_version": "judge-v1",
+        "qualitative_status": "ACCURACY_UNKNOWN",
+        "attempt_request_hash": HASH_A,
+    }
+    record = contracts.EvaluationRecord.model_validate(values)
+    assert record.verified_score is record.experimental_score is None
+
+    for field in (
+        "run_id",
+        "target_id",
+        "target_version",
+        "redacted_document_version_id",
+        "model_id",
+        "model_config_id",
+        "condition_id",
+        "reference_trust",
+        "judge_id",
+        "judge_version",
+        "qualitative_status",
+        "attempt_request_hash",
+    ):
+        with pytest.raises(ValidationError, match="Task 6 evidence"):
+            contracts.EvaluationRecord.model_validate({**values, field: None})
+
+    with pytest.raises(ValidationError, match="Task 6 evidence requires null"):
+        contracts.EvaluationRecord.model_validate(
+            {
+                **values,
+                "mapping_id": "mapping-1",
+                "mapping_version": "mapping-v1",
+                "mapping_status": "CONFIRMED",
+                "mapping_scoreability": "SCOREABLE",
+                "score_status": "EXPERIMENTAL",
+                "score_scale_id": "forbidden-scale",
+                "experimental_score": 1.0,
+            }
+        )
+
+    with pytest.raises(ValidationError, match="approved synthetic trust"):
+        contracts.EvaluationRecord.model_validate(
+            {
+                **values,
+                "reference_trust": "APPROVED_SYNTHETIC_PAIR",
+                "mapping_id": "mapping-1",
+                "mapping_version": "mapping-v1",
+                "mapping_status": "CONFLICTING",
+                "mapping_scoreability": "NOT_SCOREABLE",
+            }
+        )
+
+
+def _v3_exclusion_only_summary_values() -> dict[str, object]:
+    return {
+        "summary_id": "summary-v3-excluded",
+        "summary_version": "qualitative-summary-v3",
+        "summary_schema_version": "qualitative-summary-evidence-v3",
+        "project_id": "project-001",
+        "run_id": None,
+        "summary_level": "MODEL",
+        "scope_id": "synthetic-model",
+        "scope_version": "config-v1",
+        "included_evaluation_ids": (),
+        "eligible_evaluation_ids": (),
+        "common_eligible_set_id": "eligible-set-4f53cda18c2baa0c0354bb5f",
+        "model_id": "synthetic-model",
+        "model_config_id": "config-v1",
+        "condition_id": "redacted-document-only",
+        "rubric_version": None,
+        "evaluator_version": None,
+        "judge_id": None,
+        "judge_version": None,
+        "aggregation_version": "qualitative-counts-v3",
+        "requested_count": 2,
+        "eligible_count": 0,
+        "unknown_count": 0,
+        "refused_count": 0,
+        "timeout_count": 0,
+        "malformed_count": 0,
+        "error_count": 0,
+        "needs_review_count": 0,
+        "disagreement_count": 0,
+        "completed_count": 0,
+        "evaluation_error_count": 0,
+        "excluded_count": 2,
+        "requested_attempt_ids": ("attempt-001", "attempt-002"),
+        "exclusions": (
+            {"attempt_id": "attempt-001", "reason": "NO_EVALUATION"},
+            {"attempt_id": "attempt-002", "reason": "NO_EVALUATION"},
+        ),
+        "contributing_run_ids": ("run-001", "run-002"),
+        "prompt_id": "prompt-001",
+        "prompt_version": "prompt-v1",
+        "settings_fingerprint": HASH_A,
+        "attempt_policy": "one-frozen-attempt",
+        "context_policy": "common-full-document",
+        "common_context_budget": 4096,
+        "tool_permissions": (),
+        "prediction_protocol_id": "prediction-protocol-v1",
+        "model_provenance_ids": ("model-provenance-v1",),
+        "model_identity_limitation": "Requested names do not prove model weights.",
+        "eligible_provenance_keys": (),
+        "compatibility_profile_id": "prediction-compatibility-v1",
+        "evaluation_compatibility_profile_id": None,
+        "score_status": "NONE",
+        "score_scale_id": None,
+        "research_validation_id": None,
+        "verified_score": None,
+        "experimental_score": None,
+        "generated_at": NOW,
+        "freshness": "immutable-snapshot",
+    }
+
+
+def test_v3_exclusion_only_summary_requires_null_evaluation_method_provenance() -> None:
+    values = _v3_exclusion_only_summary_values()
+
+    summary = contracts.SummarySnapshot.model_validate(values)
+
+    assert summary.rubric_version is None
+    assert summary.evaluation_compatibility_profile_id is None
+    assert summary.score_status is contracts.ScoreStatus.NONE
+    for field in (
+        "rubric_version",
+        "evaluator_version",
+        "judge_id",
+        "judge_version",
+        "evaluation_compatibility_profile_id",
+    ):
+        with pytest.raises(ValidationError, match="must not fabricate"):
+            contracts.SummarySnapshot.model_validate(
+                {**values, field: f"invented-{field}"}
+            )
+
+
+def test_v3_included_summary_requires_complete_evaluation_method_provenance() -> None:
+    values = {
+        **_v3_exclusion_only_summary_values(),
+        "included_evaluation_ids": ("evaluation-001",),
+        "eligible_evaluation_ids": ("evaluation-001",),
+        "eligible_provenance_keys": ("eligible-reference-1",),
+        "common_eligible_set_id": "eligible-set-88d676787f662f81b72d59f8",
+        "requested_count": 1,
+        "requested_attempt_ids": ("attempt-001",),
+        "exclusions": (),
+        "excluded_count": 0,
+        "eligible_count": 1,
+        "completed_count": 1,
+        "completed_evaluation_ids": ("evaluation-001",),
+        "rubric_version": "rubric-v1",
+        "evaluator_version": "evaluator-v1",
+        "judge_id": "judge-v1",
+        "judge_version": "judge-version-v1",
+        "evaluation_compatibility_profile_id": "evaluation-compatibility-v1",
+    }
+    summary = contracts.SummarySnapshot.model_validate(values)
+    assert summary.evaluation_compatibility_profile_id == "evaluation-compatibility-v1"
+
+    for field in (
+        "rubric_version",
+        "evaluator_version",
+        "judge_id",
+        "judge_version",
+        "evaluation_compatibility_profile_id",
+    ):
+        with pytest.raises(ValidationError, match="complete evaluation provenance"):
+            contracts.SummarySnapshot.model_validate({**values, field: None})
+
+
+def test_v3_exclusion_only_summary_rejects_inexact_membership_and_scores() -> None:
+    values = _v3_exclusion_only_summary_values()
+
+    with pytest.raises(ValidationError, match="requested_count"):
+        contracts.SummarySnapshot.model_validate({**values, "requested_count": 1})
+    with pytest.raises(ValidationError, match="excluded count"):
+        contracts.SummarySnapshot.model_validate({**values, "excluded_count": 1})
+    with pytest.raises(ValidationError, match="null numeric"):
+        contracts.SummarySnapshot.model_validate(
+            {**values, "experimental_score": 0.0}
+        )
+    with pytest.raises(ValidationError, match="score status NONE"):
+        contracts.SummarySnapshot.model_validate(
+            {**values, "score_status": "EXPERIMENTAL"}
+        )

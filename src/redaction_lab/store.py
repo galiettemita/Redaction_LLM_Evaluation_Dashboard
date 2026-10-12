@@ -42,6 +42,19 @@ class StoredJob:
     source_id: str | None = None
 
 
+@dataclass(frozen=True)
+class ResolvedAttempt:
+    """Read-only, revalidated Task-4 prediction provenance."""
+
+    attempt: ModelAttempt
+    job: StoredJob
+    manifest: PredictionManifest
+    run: RunDefinition
+    source: PredictionSource
+    run_digest: str
+    manifest_digest: str
+
+
 class RunStore:
     """Transactional internal store with conservative no-retry semantics.
 
@@ -513,3 +526,102 @@ class RunStore:
                 "SELECT attempt_json FROM attempts ORDER BY created_at, attempt_id"
             ).fetchall()
         return tuple(ModelAttempt.model_validate_json(row["attempt_json"]) for row in rows)
+
+    @staticmethod
+    def _record_digest(record: object) -> str:
+        if not hasattr(record, "model_dump"):
+            raise TypeError("record must be a typed immutable contract")
+        payload = record.model_dump(mode="json")  # type: ignore[attr-defined]
+        encoded = json.dumps(
+            payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+        ).encode("utf-8")
+        return sha256(encoded).hexdigest()
+
+    def resolve_attempt(
+        self, attempt_id: str, *, project_id: str
+    ) -> ResolvedAttempt:
+        """Resolve one stored attempt without changing prediction state.
+
+        The project identifier scopes an already-authorized internal request; it is
+        not evidence that the caller is authorized for that project.
+        """
+
+        with self._connect() as connection:
+            row = connection.execute(
+                """SELECT attempts.attempt_json, jobs.*
+                   FROM attempts JOIN jobs ON jobs.job_id = attempts.job_id
+                   WHERE attempts.attempt_id = ?""",
+                (attempt_id,),
+            ).fetchone()
+            if row is None:
+                raise KeyError(attempt_id)
+            if row["project_id"] != project_id:
+                raise ValueError("attempt project identity mismatch")
+            manifest, run = self._validate_bound_job(connection, row)
+            source_row = connection.execute(
+                "SELECT * FROM canonical_sources WHERE source_id = ?",
+                (row["source_id"],),
+            ).fetchone()
+            if source_row is None:
+                raise ValueError("attempt trusted prediction source is missing")
+            source = self._source_from_row(source_row)
+            config = connection.execute(
+                """SELECT model_config_id FROM run_configs
+                   WHERE project_id = ? AND run_id = ? AND model_id = ?""",
+                (manifest.project_id, manifest.run_id, manifest.model_id),
+            ).fetchone()
+
+        attempt = ModelAttempt.model_validate_json(row["attempt_json"])
+        expected_attempt_id = f"attempt-{sha256(json.dumps(
+            (row['job_id'], row['request_hash'], row['model_config_id']),
+            separators=(',', ':'),
+        ).encode()).hexdigest()}"
+        expected = (
+            attempt_id,
+            expected_attempt_id,
+            row["attempt_id"],
+            manifest.project_id,
+            manifest.run_id,
+            manifest.target_id,
+            manifest.target_version,
+            manifest.model_id,
+            row["model_config_id"],
+            row["request_hash"],
+        )
+        actual = (
+            attempt.attempt_id,
+            attempt.attempt_id,
+            attempt.attempt_id,
+            attempt.project_id,
+            attempt.run_id,
+            attempt.target_id,
+            attempt.target_version,
+            attempt.model_id,
+            attempt.model_config_id,
+            attempt.request_hash,
+        )
+        if expected != actual:
+            raise ValueError("attempt provenance does not match durable intent")
+        if config is None or config["model_config_id"] != attempt.model_config_id:
+            raise ValueError("attempt model configuration provenance mismatch")
+        expected_state = (
+            "IN_DOUBT" if attempt.status is AttemptStatus.TIMEOUT else "COMPLETE"
+        )
+        if row["state"] != expected_state:
+            raise ValueError("attempt state does not match durable outcome")
+        if (
+            attempt.status in (AttemptStatus.SUCCEEDED, AttemptStatus.REFUSED)
+            and attempt.provider_model_id != attempt.model_id
+        ):
+            raise ValueError("attempt provider model provenance is not verified")
+
+        stored_job = self._stored_job(row)
+        return ResolvedAttempt(
+            attempt=attempt,
+            job=stored_job,
+            manifest=manifest,
+            run=run,
+            source=source,
+            run_digest=self._record_digest(run),
+            manifest_digest=self._record_digest(manifest),
+        )
