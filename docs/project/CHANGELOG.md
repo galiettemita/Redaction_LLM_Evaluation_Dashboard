@@ -223,6 +223,10 @@ Owner expressly approved a narrowly scoped Task-5 Research rubric/adversarial be
 
 Product owner approved a bounded Task-6 synthetic/mock-only evaluator evidence and three-level summary implementation. Lead published the final packet to main before Codex execution, limiting scope to six named new source/test files, conditional contracts.py/test_contracts.py and one Backend handoff. Task-5 proposal is not research-human-validated, and no D03–D06 scoring/aggregation approval is granted. No models, costs, merge, Task 7 or deployment.
 
+## 2026-10-12 | E0049 | RL-MVP-007A Correction 02 approved
+
+Published owner-approved two-file isolated SQLite migration-helper correction, preserving WAL/rollback and safe backup lifecycle. No implementation, merge, runtime install, private data, inference, spending or deployment authorized beyond scoped code changes.
+
 ## 2026-10-11 | E0048 | RL-MVP-007A correction migration scope expanded
 
 Owner authorized exactly two additional files for descriptor-confined SQLite migration backup, cleanup, and race testing, following Backend's correct scope-stop. Amended E0047 packet and coordination records; no code implementation, merge, runtime operation, downloads, data, inference, spend or deployment.
