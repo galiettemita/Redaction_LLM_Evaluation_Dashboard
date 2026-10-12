@@ -8,16 +8,15 @@ from pathlib import Path
 import pytest
 
 from redaction_lab.application.isolation import (
-    IsolatedPdfWorker,
+    ApplicationPdfWorker,
+    NonAuthoritativePdfWorkerProbe,
     RuntimeInspection,
     RuntimePolicy,
     RuntimeUnavailable,
     SubprocessPodmanRunner,
 )
 from redaction_lab.application.worker_protocol import WORKER_PROTOCOL_VERSION
-from redaction_lab.canonical import CANONICALIZER_VERSION
 from redaction_lab.contracts import DocumentRole
-from redaction_lab.pdf_detector import DETECTOR_VERSION
 
 
 class FakeRunner:
@@ -81,7 +80,7 @@ def test_runtime_absence_or_host_volume_share_fails_closed() -> None:
         _inspection(rootless=False),
     ):
         with pytest.raises(RuntimeUnavailable):
-            IsolatedPdfWorker(_policy(), FakeRunner(inspection)).process(
+            NonAuthoritativePdfWorkerProbe(_policy(), FakeRunner(inspection)).process(
                 pdf, project_id="project", role=DocumentRole.REFERENCE,
             )
 
@@ -93,13 +92,20 @@ def test_shipped_unverified_runtime_lock_cannot_create_policy() -> None:
         RuntimePolicy.from_lock(lock)
 
 
+def test_application_worker_accepts_no_caller_policy_or_runner() -> None:
+    with pytest.raises(TypeError):
+        ApplicationPdfWorker(_policy())  # type: ignore[call-arg]
+    with pytest.raises(TypeError):
+        ApplicationPdfWorker(runner=FakeRunner(_inspection()))  # type: ignore[call-arg]
+
+
 def test_verified_runtime_uses_hardened_container_command(monkeypatch) -> None:
     pdf = b"%PDF-reference"
     nonce = "a" * 32
     monkeypatch.setattr("redaction_lab.application.isolation.secrets.token_hex", lambda _: nonce)
     runner = FakeRunner(_inspection(), _response(pdf, nonce))
 
-    result = IsolatedPdfWorker(_policy(), runner).process(
+    result = NonAuthoritativePdfWorkerProbe(_policy(), runner).process(
         pdf, project_id="project", role=DocumentRole.REFERENCE,
     )
 
@@ -129,11 +135,11 @@ def test_nonce_hash_project_role_version_and_timeout_are_fail_closed(monkeypatch
         payload = json.loads(_response(pdf, nonce))
         payload[field] = value
         with pytest.raises(ValueError, match="binding|worker response"):
-            IsolatedPdfWorker(_policy(), FakeRunner(_inspection(), json.dumps(payload).encode())).process(
+            NonAuthoritativePdfWorkerProbe(_policy(), FakeRunner(_inspection(), json.dumps(payload).encode())).process(
                 pdf, project_id="project", role=DocumentRole.REFERENCE,
             )
     with pytest.raises(RuntimeUnavailable, match="timeout"):
-        IsolatedPdfWorker(_policy(), FakeRunner(_inspection(), timed_out=True)).process(
+        NonAuthoritativePdfWorkerProbe(_policy(), FakeRunner(_inspection(), timed_out=True)).process(
             pdf, project_id="project", role=DocumentRole.REFERENCE,
         )
 

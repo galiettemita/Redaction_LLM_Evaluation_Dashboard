@@ -111,6 +111,32 @@ def test_worker_material_reconstructs_identical_source_without_pdf_parsing(tmp_p
     assert rebuilt == expected
 
 
+def test_worker_material_has_no_authority_to_persist_itself(tmp_path: Path) -> None:
+    pdf_bytes = _redacted("two_boxes", tmp_path)
+    source = derive_prediction_source(pdf_bytes, project_id="project-a")
+    material = PredictionSourceMaterial(
+        source_sha256=source.source_sha256,
+        page_count=1,
+        detector_version=source.detector_version,
+        canonicalizer_version=source.canonicalizer_version,
+        canonical_text=source.canonical_document.canonical_text,
+        canonical_hash=source.canonical_document.canonical_hash,
+        targets=tuple(
+            PredictionTargetObservation(
+                page_index=target.page_index,
+                normalized_bbox=target.normalized_bbox,
+                rectangle_index=int(
+                    target.detection_evidence.source_object_ids[0].rsplit("-", 1)[1]
+                ),
+            )
+            for target in source.targets
+        ),
+    )
+
+    assert not hasattr(material, "persist")
+    assert not hasattr(material, "trusted")
+
+
 @pytest.mark.parametrize(
     "change",
     [

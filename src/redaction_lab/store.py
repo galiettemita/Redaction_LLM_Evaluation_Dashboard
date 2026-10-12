@@ -9,7 +9,6 @@ import json
 from os import PathLike
 from pathlib import Path
 import sqlite3
-from typing import Callable
 
 from redaction_lab.adapters.base import build_prediction_manifest
 from redaction_lab.contracts import (
@@ -63,14 +62,8 @@ class RunStore:
     This component does not expose or claim an arbitrary-upload authorization API.
     """
 
-    def __init__(
-        self,
-        path: str | PathLike[str],
-        *,
-        source_deriver: Callable[..., PredictionSource] | None = None,
-    ) -> None:
+    def __init__(self, path: str | PathLike[str]) -> None:
         self.path = Path(path)
-        self._source_deriver = source_deriver or derive_prediction_source
         self._initialize()
 
     def _connect(self) -> sqlite3.Connection:
@@ -256,7 +249,20 @@ class RunStore:
     def ingest_redacted_pdf(self, pdf_bytes: bytes, *, project_id: str) -> str:
         """Persist a byte-derived source for a pre-authenticated internal caller."""
 
-        source = self._source_deriver(pdf_bytes, project_id=project_id)
+        source = derive_prediction_source(pdf_bytes, project_id=project_id)
+        return self._persist_prediction_source(
+            source, pdf_bytes=pdf_bytes, project_id=project_id
+        )
+
+    def _persist_prediction_source(
+        self,
+        source: PredictionSource,
+        *,
+        pdf_bytes: bytes,
+        project_id: str,
+    ) -> str:
+        """Internal persistence primitive; not an authority-bearing public API."""
+
         if (
             source.project_id != project_id.strip()
             or source.source_sha256 != sha256(pdf_bytes).hexdigest()

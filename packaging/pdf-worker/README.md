@@ -9,6 +9,13 @@ Task 7A tests the protocol and command construction with mocks only. It does not
 install Podman, create a VM, pull or build an image, or claim that isolation has
 been verified on this computer.
 
+Those injectable mocks are explicitly non-authoritative probes: they cannot be
+supplied to the application document worker and cannot persist Task 4 sources or
+mark document jobs ready. Production composition reads only the install-owned
+`runtime.lock`, creates the concrete Podman runner internally, verifies it before
+claiming a job, and then keeps runtime invocation, response binding, deterministic
+source reconstruction and persistence in one application-owned path.
+
 The qualified runtime must use a dedicated rootless machine with `volumes = []`.
 Each disposable container receives one PDF through stdin, has no network,
 mounts, database, artifacts, credentials or reference side channel, and returns

@@ -3,25 +3,14 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Protocol
 
 from redaction_lab.application.application_store import ApplicationStore, ProcessingStatus
 from redaction_lab.application.artifact_store import ArtifactStore
-from redaction_lab.application.isolation import VerifiedWorkerResult
+from redaction_lab.application.isolation import ApplicationPdfWorker
 from redaction_lab.application.worker_protocol import WorkerStatus
 from redaction_lab.contracts import DocumentRole
 from redaction_lab.prediction_source import build_prediction_source_from_material
 from redaction_lab.store import RunStore
-
-
-class PdfWorker(Protocol):
-    def process(
-        self,
-        pdf_bytes: bytes,
-        *,
-        project_id: str,
-        role: DocumentRole,
-    ) -> VerifiedWorkerResult: ...
 
 
 class DocumentWorker:
@@ -29,13 +18,13 @@ class DocumentWorker:
         self,
         store: ApplicationStore,
         artifacts: ArtifactStore,
-        isolated_worker: PdfWorker,
     ) -> None:
         self.store = store
         self.artifacts = artifacts
-        self.isolated_worker = isolated_worker
 
     def run_once(self, *, owner: str) -> bool:
+        isolated_worker = ApplicationPdfWorker()
+        isolated_worker.ensure_available()
         job = self.store.claim_next(owner=owner, now=datetime.now(UTC))
         if job is None:
             return False
@@ -44,7 +33,7 @@ class DocumentWorker:
             pdf_bytes = self.artifacts.read(
                 version.artifact_key, expected_sha256=version.sha256
             )
-            verified = self.isolated_worker.process(
+            verified = isolated_worker.process(
                 pdf_bytes, project_id=job.project_id, role=job.role
             )
             response = verified.response
@@ -61,14 +50,12 @@ class DocumentWorker:
                 if job.role is DocumentRole.REDACTED:
                     material = response.to_source_material()
 
-                    def source_deriver(value: bytes, *, project_id: str):
-                        return build_prediction_source_from_material(
-                            value, project_id=project_id, material=material
-                        )
-
-                    source_id = RunStore(
-                        self.store.path, source_deriver=source_deriver
-                    ).ingest_redacted_pdf(pdf_bytes, project_id=job.project_id)
+                    source = build_prediction_source_from_material(
+                        pdf_bytes, project_id=job.project_id, material=material
+                    )
+                    source_id = RunStore(self.store.path)._persist_prediction_source(
+                        source, pdf_bytes=pdf_bytes, project_id=job.project_id
+                    )
                 self.store.complete_job(
                     job.job_id,
                     owner=owner,

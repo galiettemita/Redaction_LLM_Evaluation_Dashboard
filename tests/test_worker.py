@@ -161,7 +161,7 @@ def test_only_stored_pdf_source_can_enqueue_not_direct_or_forged_manifest(tmp_pa
     assert "REFERENCE SECRET" not in manifest.canonical_redacted_text
 
 
-def test_run_store_deriver_is_internal_and_input_binding_is_revalidated(tmp_path) -> None:
+def test_run_store_rejects_deriver_or_source_injection(tmp_path) -> None:
     redacted, _ = make_synthetic_pair("two_boxes", tmp_path / "fixture-deriver")
     pdf_bytes = redacted.read_bytes()
     authentic = derive_prediction_source(pdf_bytes, project_id="project-001")
@@ -170,10 +170,10 @@ def test_run_store_deriver_is_internal_and_input_binding_is_revalidated(tmp_path
         assert project_id == "project-001"
         return type(authentic)(**{**authentic.__dict__, "source_sha256": "f" * 64})
 
-    store = RunStore(tmp_path / "run-deriver.sqlite3", source_deriver=forged_deriver)
-    with pytest.raises(ValueError, match="input bytes"):
-        store.ingest_redacted_pdf(pdf_bytes, project_id="project-001")
+    with pytest.raises(TypeError):
+        RunStore(tmp_path / "run-deriver.sqlite3", source_deriver=forged_deriver)  # type: ignore[call-arg]
 
+    store = RunStore(tmp_path / "run.sqlite3")
     with pytest.raises(TypeError):
         store.ingest_redacted_pdf(pdf_bytes, project_id="project-001", source=authentic)  # type: ignore[call-arg]
 

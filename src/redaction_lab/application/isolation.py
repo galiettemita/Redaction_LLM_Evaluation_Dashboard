@@ -71,7 +71,9 @@ class RuntimeInspection:
 
 
 @dataclass(frozen=True)
-class VerifiedWorkerResult:
+class WorkerObservation:
+    """Bound protocol output, not proof of production runtime authority."""
+
     response: WorkerResponse
     image_digest: str
 
@@ -211,7 +213,7 @@ class SubprocessPodmanRunner:
         return returncode, bytes(stdout), bytes(stderr)
 
 
-class IsolatedPdfWorker:
+class _IsolatedPdfWorkerClient:
     def __init__(self, policy: RuntimePolicy, runner: RuntimeRunner | None = None) -> None:
         self.policy = policy
         self.runner = runner or SubprocessPodmanRunner()
@@ -262,7 +264,7 @@ class IsolatedPdfWorker:
         *,
         project_id: str,
         role: DocumentRole,
-    ) -> VerifiedWorkerResult:
+    ) -> WorkerObservation:
         inspection = self._verify_runtime()
         nonce = secrets.token_hex(16)
         request = WorkerRequest(
@@ -292,4 +294,30 @@ class IsolatedPdfWorker:
             or response.input_sha256 != request.input_sha256
         ):
             raise ValueError("isolated worker response binding mismatch")
-        return VerifiedWorkerResult(response=response, image_digest=inspection.image_digest)
+        return WorkerObservation(response=response, image_digest=inspection.image_digest)
+
+
+class NonAuthoritativePdfWorkerProbe(_IsolatedPdfWorkerClient):
+    """Injectable protocol/command probe with no persistence authority.
+
+    This seam exists only for deterministic tests. Application processing never
+    accepts an instance of this class or any caller-provided runner or policy.
+    """
+
+
+_INSTALL_RUNTIME_LOCK = (
+    Path(__file__).resolve().parents[3] / "packaging" / "pdf-worker" / "runtime.lock"
+)
+
+
+class ApplicationPdfWorker(_IsolatedPdfWorkerClient):
+    """Application-owned production worker composed from install-owned state."""
+
+    def __init__(self) -> None:
+        policy = RuntimePolicy.from_lock(_INSTALL_RUNTIME_LOCK)
+        super().__init__(policy, SubprocessPodmanRunner())
+
+    def ensure_available(self) -> None:
+        """Verify the concrete runtime before a durable job may be claimed."""
+
+        self._verify_runtime()
