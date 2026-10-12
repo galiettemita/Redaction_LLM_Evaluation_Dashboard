@@ -638,7 +638,7 @@ class SummarySnapshot(FrozenRecord):
     common_eligible_set_id: NonEmptyStr
     model_id: NonEmptyStr
     condition_id: NonEmptyStr
-    rubric_version: NonEmptyStr
+    rubric_version: NonEmptyStr | None
     aggregation_version: NonEmptyStr
     requested_count: NonNegativeInt
     eligible_count: NonNegativeInt
@@ -649,6 +649,7 @@ class SummarySnapshot(FrozenRecord):
     error_count: NonNegativeInt
     needs_review_count: NonNegativeInt
     disagreement_count: NonNegativeInt
+    score_status: ScoreStatus | None = None
     score_scale_id: NonEmptyStr | None = None
     research_validation_id: NonEmptyStr | None = None
     verified_score: FiniteFloat | None = None
@@ -695,6 +696,7 @@ class SummarySnapshot(FrozenRecord):
     model_identity_limitation: NonEmptyStr | None = None
     eligible_provenance_keys: tuple[NonEmptyStr, ...] = ()
     compatibility_profile_id: NonEmptyStr | None = None
+    evaluation_compatibility_profile_id: NonEmptyStr | None = None
 
     @model_validator(mode="after")
     def enforce_scope_denominator_and_scores(self) -> SummarySnapshot:
@@ -725,20 +727,58 @@ class SummarySnapshot(FrozenRecord):
             if self.requested_count != partition_count:
                 raise ValueError("requested_count must equal the explicit outcome counts")
         else:
-            required = {
-                "model_config_id": self.model_config_id,
-                "evaluator_version": self.evaluator_version,
-                "judge_id": self.judge_id,
-                "judge_version": self.judge_version,
-            }
-            if self.summary_schema_version != "qualitative-summary-evidence-v2":
+            is_v2 = self.summary_schema_version == "qualitative-summary-evidence-v2"
+            is_v3 = self.summary_schema_version == "qualitative-summary-evidence-v3"
+            required = {"model_config_id": self.model_config_id}
+            if not is_v3 or included:
+                required.update(
+                    {
+                        "rubric_version": self.rubric_version,
+                        "evaluator_version": self.evaluator_version,
+                        "judge_id": self.judge_id,
+                        "judge_version": self.judge_version,
+                    }
+                )
+            if is_v3 and included:
+                required["evaluation_compatibility_profile_id"] = (
+                    self.evaluation_compatibility_profile_id
+                )
+            if not is_v2 and not is_v3:
                 required["run_id"] = self.run_id
             missing = [name for name, value in required.items() if value is None]
             if missing:
-                raise ValueError(
-                    "Task 6 summaries require complete provenance: "
-                    + ", ".join(missing)
+                detail = (
+                    "complete evaluation provenance"
+                    if is_v3 and included
+                    else "complete provenance"
                 )
+                raise ValueError(
+                    f"Task 6 summaries require {detail}: " + ", ".join(missing)
+                )
+            if is_v3 and not included:
+                method_values = (
+                    self.rubric_version,
+                    self.evaluator_version,
+                    self.judge_id,
+                    self.judge_version,
+                    self.evaluation_compatibility_profile_id,
+                )
+                if any(value is not None for value in method_values):
+                    raise ValueError(
+                        "exclusion-only summaries must not fabricate evaluation provenance"
+                    )
+                if any(
+                    (
+                        self.reference_document_version_ids,
+                        self.reference_canonical_version_ids,
+                        self.reference_mapping_versions,
+                        self.source_fact_record_versions,
+                        self.eligible_provenance_keys,
+                    )
+                ):
+                    raise ValueError(
+                        "exclusion-only summaries cannot carry evaluation evidence"
+                    )
             categories = {
                 "completed": self.completed_evaluation_ids,
                 "refused": self.refused_evaluation_ids,
@@ -784,17 +824,16 @@ class SummarySnapshot(FrozenRecord):
             )
             if any(count != len(ids) for count, ids in count_pairs):
                 raise ValueError("Task 6 summary counts must match exact ID sets")
+            authoritative_membership = is_v2 or is_v3
             expected_excluded_count = (
                 len(self.exclusions)
-                if self.summary_schema_version == "qualitative-summary-evidence-v2"
+                if authoritative_membership
                 else len(self.excluded_evaluation_ids)
             )
             if self.excluded_count != expected_excluded_count:
                 raise ValueError("Task 6 excluded count must match exact exclusions")
             excluded_subject_count = (
-                len(self.exclusions)
-                if self.summary_schema_version == "qualitative-summary-evidence-v2"
-                else len(excluded)
+                len(self.exclusions) if authoritative_membership else len(excluded)
             )
             if self.requested_count != len(included) + excluded_subject_count:
                 raise ValueError("requested_count must include included and excluded records")
@@ -811,7 +850,7 @@ class SummarySnapshot(FrozenRecord):
                 raise ValueError("Task 6 summary version sets must be unique")
             eligible_identity = (
                 self.eligible_provenance_keys
-                if self.summary_schema_version == "qualitative-summary-evidence-v2"
+                if authoritative_membership
                 else self.eligible_target_keys
             )
             encoded = json.dumps(
@@ -828,7 +867,10 @@ class SummarySnapshot(FrozenRecord):
             ):
                 raise ValueError("Task 6 summaries require null numeric score channels")
 
-            if self.summary_schema_version == "qualitative-summary-evidence-v2":
+            if is_v3 and self.score_status is not ScoreStatus.NONE:
+                raise ValueError("Task 6 v3 summaries require score status NONE")
+
+            if authoritative_membership:
                 requested = set(self.requested_attempt_ids)
                 excluded_attempts = {item.attempt_id for item in self.exclusions}
                 if len(requested) != len(self.requested_attempt_ids):

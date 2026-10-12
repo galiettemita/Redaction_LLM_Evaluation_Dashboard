@@ -12,9 +12,11 @@ from redaction_lab.contracts import (
     SummaryRequest,
 )
 from redaction_lab.summary import (
+    RequestedAttemptSummaryProfile,
     SummaryCompatibilityError,
     assert_comparable_summaries,
     build_authoritative_summary,
+    rebuild_authoritative_summary_v2,
     summarize_document,
     summarize_model,
     summarize_target,
@@ -552,3 +554,209 @@ def test_authoritative_document_summary_rejects_fictional_scope_version() -> Non
 
     with pytest.raises(SummaryCompatibilityError, match="document scope"):
         build_authoritative_summary(request, (evaluation,), (), generated_at=NOW)
+
+
+@pytest.mark.parametrize("attempt_status", ["TIMEOUT", "REFUSED", "MALFORMED", "ERROR"])
+def test_v3_eligible_reference_identity_is_independent_of_technical_outcome(
+    attempt_status: str,
+) -> None:
+    success = _authoritative_evaluation(
+        "eval-success",
+        target_id="target-1",
+        document_id="document-1",
+        run_id="run-success",
+    )
+    technical_base = _authoritative_evaluation(
+        f"eval-{attempt_status.lower()}",
+        target_id="target-1",
+        document_id="document-1",
+        run_id=f"run-{attempt_status.lower()}",
+        model_id="model-b",
+        model_config_id="config-b",
+    )
+    technical = EvaluationRecord.model_validate(
+        {
+            **technical_base.model_dump(),
+            "attempt_status": attempt_status,
+            "attempt_response_hash": None,
+            "provider_model_id": None,
+            "source_fact_record_id": None,
+            "source_fact_record_version": None,
+            "process_status": "COMPLETE",
+            "qualitative_status": f"TECHNICAL_{attempt_status}",
+        }
+    )
+
+    success_summary = build_authoritative_summary(
+        _request(success), (success,), (), generated_at=NOW
+    )
+    technical_summary = build_authoritative_summary(
+        _request(technical), (technical,), (), generated_at=NOW
+    )
+
+    assert success_summary.summary_schema_version == "qualitative-summary-evidence-v3"
+    assert (
+        success_summary.eligible_provenance_keys
+        == technical_summary.eligible_provenance_keys
+    )
+    assert (
+        success_summary.common_eligible_set_id
+        == technical_summary.common_eligible_set_id
+    )
+    assert success_summary.completed_count == 1
+    assert getattr(technical_summary, f"{attempt_status.lower()}_count") == 1
+    assert technical_summary.completed_count == 0
+    assert_comparable_summaries(success_summary, technical_summary)
+
+
+def test_v3_evaluation_method_and_source_fact_compatibility_remain_separate() -> None:
+    first = _authoritative_evaluation(
+        "eval-a",
+        target_id="target-1",
+        document_id="document-1",
+        run_id="run-a",
+    )
+    second = _authoritative_evaluation(
+        "eval-b",
+        target_id="target-1",
+        document_id="document-1",
+        run_id="run-b",
+        model_id="model-b",
+        model_config_id="config-b",
+    )
+    first_summary = build_authoritative_summary(
+        _request(first), (first,), (), generated_at=NOW
+    )
+
+    changed_judge = second.model_copy(update={"judge_version": "judge-v2"})
+    changed_judge_summary = build_authoritative_summary(
+        _request(changed_judge), (changed_judge,), (), generated_at=NOW
+    )
+    assert (
+        first_summary.eligible_provenance_keys
+        == changed_judge_summary.eligible_provenance_keys
+    )
+    with pytest.raises(
+        SummaryCompatibilityError, match="evaluation_compatibility_profile_id"
+    ):
+        assert_comparable_summaries(first_summary, changed_judge_summary)
+
+    changed_facts = second.model_copy(
+        update={"source_fact_record_version": "source-facts-v2"}
+    )
+    changed_facts_summary = build_authoritative_summary(
+        _request(changed_facts), (changed_facts,), (), generated_at=NOW
+    )
+    assert (
+        first_summary.eligible_provenance_keys
+        == changed_facts_summary.eligible_provenance_keys
+    )
+    with pytest.raises(SummaryCompatibilityError, match="source_fact_record_version"):
+        assert_comparable_summaries(first_summary, changed_facts_summary)
+
+
+def _excluded_profile(
+    *, run_ids: tuple[str, ...] = ("run-1",)
+) -> RequestedAttemptSummaryProfile:
+    return RequestedAttemptSummaryProfile(
+        project_id="project-rl-mvp-003",
+        model_id="model-a",
+        model_config_id="config-a",
+        condition_id="condition-a",
+        prompt_id="prompt-001",
+        prompt_version="prompt-v1",
+        settings_fingerprint="c" * 64,
+        attempt_policy="one-frozen-attempt",
+        context_policy="common-full-document",
+        common_context_budget=4096,
+        tool_permissions=(),
+        prediction_protocol_id="prediction-protocol-v1",
+        model_provenance_ids=("model-provenance-model-a-config-a",),
+        contributing_run_ids=run_ids,
+    )
+
+
+def test_v3_exclusion_only_summary_has_exact_membership_and_null_methodology() -> None:
+    request = SummaryRequest(
+        project_id="project-rl-mvp-003",
+        summary_level="MODEL",
+        scope_id="model-a",
+        scope_version="config-a",
+        members=(
+            {"attempt_id": "attempt-2", "evaluation_id": None},
+            {"attempt_id": "attempt-1", "evaluation_id": None},
+        ),
+        aggregation_version="qualitative-counts-v3",
+    )
+    exclusions = tuple(
+        SummaryExclusion(attempt_id=attempt_id, reason="NO_EVALUATION")
+        for attempt_id in ("attempt-2", "attempt-1")
+    )
+
+    summary = build_authoritative_summary(
+        request,
+        (),
+        exclusions,
+        generated_at=NOW,
+        requested_profile=_excluded_profile(run_ids=("run-2", "run-1")),
+    )
+    replay = build_authoritative_summary(
+        request.model_copy(update={"members": tuple(reversed(request.members))}),
+        (),
+        tuple(reversed(exclusions)),
+        generated_at=NOW.replace(hour=22),
+        requested_profile=_excluded_profile(run_ids=("run-1", "run-2")),
+    )
+
+    assert summary.requested_attempt_ids == ("attempt-1", "attempt-2")
+    assert summary.requested_count == summary.excluded_count == 2
+    assert summary.included_evaluation_ids == summary.eligible_evaluation_ids == ()
+    assert summary.completed_count == summary.unknown_count == 0
+    assert summary.refused_count == summary.timeout_count == 0
+    assert summary.malformed_count == summary.error_count == 0
+    assert summary.rubric_version is summary.evaluator_version is None
+    assert summary.judge_id is summary.judge_version is None
+    assert summary.evaluation_compatibility_profile_id is None
+    assert summary.verified_score is summary.experimental_score is None
+    assert summary.score_status.value == "NONE"
+    assert summary.summary_id == replay.summary_id
+
+
+def test_v3_exclusion_only_summary_requires_authenticated_requested_profile() -> None:
+    request = SummaryRequest(
+        project_id="project-rl-mvp-003",
+        summary_level="MODEL",
+        scope_id="model-a",
+        scope_version="config-a",
+        members=({"attempt_id": "attempt-1", "evaluation_id": None},),
+        aggregation_version="qualitative-counts-v3",
+    )
+
+    with pytest.raises(SummaryCompatibilityError, match="requested attempt profile"):
+        build_authoritative_summary(
+            request,
+            (),
+            (SummaryExclusion(attempt_id="attempt-1", reason="NO_EVALUATION"),),
+            generated_at=NOW,
+        )
+
+
+def test_authoritative_comparison_rejects_mixed_v2_and_v3_semantics() -> None:
+    evaluation = _authoritative_evaluation(
+        "eval-1",
+        target_id="target-1",
+        document_id="document-1",
+        run_id="run-1",
+    )
+    request = _request(evaluation)
+    v2 = rebuild_authoritative_summary_v2(
+        request,
+        (evaluation,),
+        (),
+        generated_at=NOW,
+        contributing_run_ids=("run-1",),
+    )
+    v3 = build_authoritative_summary(request, (evaluation,), (), generated_at=NOW)
+
+    with pytest.raises(SummaryCompatibilityError, match="summary_schema_version"):
+        assert_comparable_summaries(v2, v3)

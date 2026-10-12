@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from datetime import UTC, datetime
 from hashlib import sha256
+import json
 import sqlite3
 
 import pytest
@@ -23,7 +24,10 @@ from redaction_lab.judges.base import JudgeEvidence, SourceFact
 from redaction_lab.pdf_detector import DetectionStatus, detect_targets
 from redaction_lab.reference import align_reference
 from redaction_lab.store import RunStore
-from redaction_lab.summary import assert_comparable_summaries
+from redaction_lab.summary import (
+    assert_comparable_summaries,
+    rebuild_authoritative_summary_v2,
+)
 from redaction_lab.worker import run_pending_once
 
 
@@ -719,3 +723,204 @@ def test_reopen_rejects_tampered_authoritative_rows(
         EvaluationStore(db_path).get_summary(
             summary.summary_id, project_id=PROJECT_ID
         )
+
+
+def test_store_builds_and_reopens_single_exclusion_only_summary(tmp_path) -> None:
+    inputs = _authoritative_inputs(tmp_path)
+    db_path, _, _, run, _, attempt, *_ = inputs
+    store = EvaluationStore(db_path)
+    request = SummaryRequest(
+        project_id=PROJECT_ID,
+        summary_level="MODEL",
+        scope_id=attempt.model_id,
+        scope_version=attempt.model_config_id,
+        members=({"attempt_id": attempt.attempt_id, "evaluation_id": None},),
+        aggregation_version="qualitative-counts-v3",
+    )
+
+    summary = store.build_summary(request)
+    replay = store.build_summary(request)
+    reopened = EvaluationStore(db_path).get_summary(
+        summary.summary_id, project_id=PROJECT_ID
+    )
+
+    assert summary == replay == reopened
+    assert summary.summary_schema_version == "qualitative-summary-evidence-v3"
+    assert summary.contributing_run_ids == (run.run_id,)
+    assert summary.requested_attempt_ids == (attempt.attempt_id,)
+    assert summary.requested_count == summary.excluded_count == 1
+    assert summary.included_evaluation_ids == summary.eligible_evaluation_ids == ()
+    assert summary.rubric_version is summary.evaluator_version is None
+    assert summary.judge_id is summary.judge_version is None
+    assert summary.evaluation_compatibility_profile_id is None
+    assert summary.verified_score is summary.experimental_score is None
+
+
+def test_store_builds_exclusion_only_model_summary_across_compatible_runs(
+    tmp_path,
+) -> None:
+    inputs = _authoritative_inputs(tmp_path)
+    db_path, run_store, source, first_run, _, first_attempt, *_ = inputs
+    second_run = _run(source, run_id="run-document-2")
+    second_job_id = run_store.enqueue(
+        source.source_id, source.targets[1].target_id, second_run
+    )
+    assert asyncio.run(run_pending_once(run_store, StoredAttemptAdapter())) is True
+    second_attempt_id = run_store.job(second_job_id).attempt_id
+    assert second_attempt_id is not None
+    request = SummaryRequest(
+        project_id=PROJECT_ID,
+        summary_level="MODEL",
+        scope_id=first_attempt.model_id,
+        scope_version=first_attempt.model_config_id,
+        members=(
+            {"attempt_id": second_attempt_id, "evaluation_id": None},
+            {"attempt_id": first_attempt.attempt_id, "evaluation_id": None},
+        ),
+        aggregation_version="qualitative-counts-v3",
+    )
+
+    summary = EvaluationStore(db_path).build_summary(request)
+    replay = EvaluationStore(db_path).build_summary(
+        request.model_copy(update={"members": tuple(reversed(request.members))})
+    )
+
+    assert summary.requested_attempt_ids == tuple(
+        sorted((first_attempt.attempt_id, second_attempt_id))
+    )
+    assert summary.contributing_run_ids == tuple(
+        sorted((first_run.run_id, second_run.run_id))
+    )
+    assert summary.requested_count == summary.excluded_count == 2
+    assert summary.completed_count == summary.timeout_count == 0
+    assert replay == summary
+
+
+def test_exclusion_only_summary_insert_rolls_back_and_detects_member_tampering(
+    tmp_path,
+) -> None:
+    inputs = _authoritative_inputs(tmp_path)
+    db_path, _, _, _, _, attempt, *_ = inputs
+    store = EvaluationStore(db_path)
+    request = SummaryRequest(
+        project_id=PROJECT_ID,
+        summary_level="MODEL",
+        scope_id=attempt.model_id,
+        scope_version=attempt.model_config_id,
+        members=({"attempt_id": attempt.attempt_id, "evaluation_id": None},),
+        aggregation_version="qualitative-counts-v3",
+    )
+    connection = sqlite3.connect(db_path)
+    connection.execute(
+        """CREATE TRIGGER test_excluded_member_failure BEFORE INSERT ON summary_members
+           BEGIN SELECT RAISE(ABORT, 'injected excluded member failure'); END"""
+    )
+    connection.close()
+
+    with pytest.raises(
+        sqlite3.IntegrityError, match="injected excluded member failure"
+    ):
+        store.build_summary(request)
+    connection = sqlite3.connect(db_path)
+    assert connection.execute("SELECT count(*) FROM summaries").fetchone()[0] == 0
+    assert connection.execute("SELECT count(*) FROM summary_members").fetchone()[0] == 0
+    connection.execute("DROP TRIGGER test_excluded_member_failure")
+    connection.close()
+
+    summary = store.build_summary(request)
+    connection = sqlite3.connect(db_path)
+    connection.execute("DROP TRIGGER summary_members_no_update")
+    connection.execute(
+        "UPDATE summary_members SET exclusion_reason = 'ALTERED' WHERE summary_id = ?",
+        (summary.summary_id,),
+    )
+    connection.commit()
+    connection.close()
+    with pytest.raises(ValueError, match="exclusion integrity"):
+        EvaluationStore(db_path).get_summary(
+            summary.summary_id, project_id=PROJECT_ID
+        )
+
+
+def test_store_reopens_immutable_v2_summary_without_reinterpreting_it(tmp_path) -> None:
+    inputs = _authoritative_inputs(tmp_path)
+    db_path = inputs[0]
+    store = EvaluationStore(db_path)
+    evaluation = _evaluate(store, inputs)
+    request = SummaryRequest(
+        project_id=PROJECT_ID,
+        summary_level="MODEL",
+        scope_id=evaluation.model_id,
+        scope_version=evaluation.model_config_id,
+        members=(
+            {
+                "attempt_id": evaluation.attempt_id,
+                "evaluation_id": evaluation.evaluation_id,
+            },
+        ),
+        aggregation_version="qualitative-counts-v2",
+    )
+    legacy = rebuild_authoritative_summary_v2(
+        request,
+        (evaluation,),
+        (),
+        generated_at=NOW,
+        contributing_run_ids=(evaluation.run_id,),
+    )
+    legacy_payload = legacy.model_dump(mode="json")
+    legacy_payload.pop("score_status")
+    legacy_payload.pop("evaluation_compatibility_profile_id")
+    identity_payload = {
+        key: value
+        for key, value in legacy_payload.items()
+        if key not in {"summary_id", "generated_at"}
+    }
+    legacy_payload["summary_id"] = "summary-" + sha256(
+        json.dumps(
+            identity_payload,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+        ).encode("utf-8")
+    ).hexdigest()
+    legacy = legacy.__class__.model_validate(legacy_payload)
+    connection = sqlite3.connect(db_path)
+    connection.execute("PRAGMA foreign_keys = ON")
+    connection.execute(
+        """INSERT INTO summaries (
+            summary_id, project_id, payload_json, created_at
+        ) VALUES (?, ?, ?, ?)""",
+        (
+            legacy.summary_id,
+            PROJECT_ID,
+            json.dumps(legacy_payload, separators=(",", ":")),
+            NOW.isoformat(),
+        ),
+    )
+    connection.execute(
+        """INSERT INTO summary_members (
+            summary_id, ordinal, subject_id, evaluation_id,
+            disposition, exclusion_reason
+        ) VALUES (?, 0, ?, ?, 'INCLUDED', NULL)""",
+        (legacy.summary_id, evaluation.attempt_id, evaluation.evaluation_id),
+    )
+    connection.commit()
+    before = connection.execute(
+        "SELECT payload_json FROM summaries WHERE summary_id = ?",
+        (legacy.summary_id,),
+    ).fetchone()[0]
+    connection.close()
+
+    reopened = EvaluationStore(db_path).get_summary(
+        legacy.summary_id, project_id=PROJECT_ID
+    )
+    connection = sqlite3.connect(db_path)
+    after = connection.execute(
+        "SELECT payload_json FROM summaries WHERE summary_id = ?",
+        (legacy.summary_id,),
+    ).fetchone()[0]
+    connection.close()
+
+    assert reopened == legacy
+    assert reopened.summary_schema_version == "qualitative-summary-evidence-v2"
+    assert before == after

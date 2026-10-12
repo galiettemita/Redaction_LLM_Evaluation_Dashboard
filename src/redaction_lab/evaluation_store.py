@@ -26,7 +26,14 @@ from redaction_lab.evaluator import (
 )
 from redaction_lab.judges.base import FactJudge, SourceFact, SourceFactRecord
 from redaction_lab.store import ResolvedAttempt, RunStore
-from redaction_lab.summary import build_authoritative_summary, verify_summary_identity
+from redaction_lab.summary import (
+    AUTHORITATIVE_SUMMARY_SCHEMA_VERSION,
+    CORRECTED_SUMMARY_SCHEMA_VERSION,
+    RequestedAttemptSummaryProfile,
+    build_authoritative_summary,
+    rebuild_authoritative_summary_v2,
+    verify_summary_identity,
+)
 
 
 class EvaluationStore:
@@ -321,10 +328,20 @@ class EvaluationStore:
             "tool_permissions": resolved.run.tool_permissions,
         }
 
+    @staticmethod
+    def _identity(prefix: str, payload: object) -> str:
+        encoded = json.dumps(
+            payload,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+        ).encode("utf-8")
+        return f"{prefix}-{sha256(encoded).hexdigest()}"
+
     @classmethod
     def _validate_requested_attempts(
         cls, request: SummaryRequest, resolved_attempts: tuple[ResolvedAttempt, ...]
-    ) -> tuple[str, ...]:
+    ) -> RequestedAttemptSummaryProfile:
         target_keys = {
             (
                 item.source.redacted_document_version_id,
@@ -363,7 +380,51 @@ class EvaluationStore:
         run_ids = tuple(sorted({item.run.run_id for item in resolved_attempts}))
         if request.summary_level is not SummaryLevel.MODEL and len(run_ids) != 1:
             raise ValueError("target and document summaries must be run-local")
-        return run_ids
+        prediction_protocol_id = cls._identity(
+            "prediction-protocol",
+            {
+                "experiment_condition": first["condition_id"],
+                "prompt_id": first["prompt_id"],
+                "prompt_version": first["prompt_version"],
+                "settings_fingerprint": first["settings_fingerprint"],
+                "attempt_policy": first["attempt_policy"],
+                "context_policy": first["context_policy"],
+                "common_context_budget": first["common_context_budget"],
+                "tool_permissions": first["tool_permissions"],
+            },
+        )
+        model_provenance_ids = tuple(
+            sorted(
+                {
+                    cls._identity(
+                        "model-provenance",
+                        {
+                            "model_id": item.attempt.model_id,
+                            "provider_model_id": item.attempt.provider_model_id,
+                            "model_config_id": item.attempt.model_config_id,
+                        },
+                    )
+                    for item in resolved_attempts
+                }
+            )
+        )
+        return RequestedAttemptSummaryProfile(
+            project_id=request.project_id,
+            model_id=str(first["model_id"]),
+            model_config_id=str(first["model_config_id"]),
+            condition_id=str(first["condition_id"]),
+            prompt_id=str(first["prompt_id"]),
+            prompt_version=str(first["prompt_version"]),
+            settings_fingerprint=str(first["settings_fingerprint"]),
+            attempt_policy=str(first["attempt_policy"]),
+            context_policy=str(first["context_policy"]),
+            common_context_budget=int(first["common_context_budget"]),
+            tool_permissions=tuple(first["tool_permissions"]),
+            prediction_protocol_id=prediction_protocol_id,
+            model_provenance_ids=model_provenance_ids,
+            contributing_run_ids=run_ids,
+            target_keys=tuple(sorted(target_keys)),
+        )
 
     def build_summary(self, request: SummaryRequest) -> SummarySnapshot:
         """Atomically persist a summary and its exact authenticated membership."""
@@ -390,7 +451,7 @@ class EvaluationStore:
             if evaluation.attempt_id != member.attempt_id:
                 raise ValueError("summary evaluation does not match requested attempt")
             evaluations.append(evaluation)
-        contributing_run_ids = self._validate_requested_attempts(
+        requested_profile = self._validate_requested_attempts(
             request, tuple(resolved_attempts)
         )
         snapshot = build_authoritative_summary(
@@ -398,7 +459,7 @@ class EvaluationStore:
             tuple(evaluations),
             tuple(exclusions),
             generated_at=datetime.now(UTC),
-            contributing_run_ids=contributing_run_ids,
+            requested_profile=requested_profile,
         )
         connection = self._connect()
         try:
@@ -523,10 +584,20 @@ class EvaluationStore:
             members=tuple(members),
             aggregation_version=stored.aggregation_version,
         )
-        contributing_run_ids = self._validate_requested_attempts(
+        requested_profile = self._validate_requested_attempts(
             request, tuple(resolved_attempts)
         )
-        rebuilt = build_authoritative_summary(
+        if stored.summary_schema_version == AUTHORITATIVE_SUMMARY_SCHEMA_VERSION:
+            rebuild = rebuild_authoritative_summary_v2
+            rebuild_kwargs = {
+                "contributing_run_ids": requested_profile.contributing_run_ids
+            }
+        elif stored.summary_schema_version == CORRECTED_SUMMARY_SCHEMA_VERSION:
+            rebuild = build_authoritative_summary
+            rebuild_kwargs = {"requested_profile": requested_profile}
+        else:
+            raise ValueError("stored summary schema is not repository-authoritative")
+        rebuilt = rebuild(
             request,
             tuple(
                 self.get_evaluation(member.evaluation_id, project_id=project_id)
@@ -542,7 +613,7 @@ class EvaluationStore:
                 if member.evaluation_id is None
             ),
             generated_at=stored.generated_at,
-            contributing_run_ids=contributing_run_ids,
+            **rebuild_kwargs,
         )
         if rebuilt != stored:
             raise ValueError("stored summary evidence does not recompute")
