@@ -1,6 +1,6 @@
 # RL-MVP-007A Correction 01 — filesystem confinement and authoritative worker composition
 
-**OWNER APPROVED for bounded code implementation; NOT MERGE APPROVED.** Coordination epoch E0047. Baseline main ec4e6f45ec903555858a13f507e9d73a572ca2de / E0046. Rejected implementation 87ae7c5d46e72d3f61dcc325e64fab562c9fa00a; Backend published head 90a69fba46ebbb780d4fb3bb85337d6c694ea3f2 on codex/rl-mvp-007a-portable-foundation. Independent QA/security CHANGES_REQUESTED at a6ca3d35c2cb95538c24f1ce4c7a2bbaf334e673; Research scoped PASS at dc2d975b9d427921ecdc62765d684aa83b1b9cc2. This is the controlling correction packet; read E0044–E0046 packets and current AGENTS/decisions.
+**OWNER APPROVED for bounded code implementation; NOT MERGE APPROVED.** Coordination epoch E0048 (scope amendment to E0047). Baseline main ec4e6f45ec903555858a13f507e9d73a572ca2de / E0046. Rejected implementation 87ae7c5d46e72d3f61dcc325e64fab562c9fa00a; Backend published head 90a69fba46ebbb780d4fb3bb85337d6c694ea3f2 on codex/rl-mvp-007a-portable-foundation. Independent QA/security CHANGES_REQUESTED at a6ca3d35c2cb95538c24f1ce4c7a2bbaf334e673; Research scoped PASS at dc2d975b9d427921ecdc62765d684aa83b1b9cc2. This is the controlling correction packet; read E0044–E0046 packets and current AGENTS/decisions.
 
 ## Exact approved paths
 
@@ -17,6 +17,8 @@ Modify only:
 - tests/application/test_document_worker.py
 - tests/test_worker.py
 - tests/test_prediction_source.py
+- src/redaction_lab/application/migration.py
+- tests/application/test_migrations.py
 
 Publish one unique docs/project/handoffs/RL-MVP-007A-backend-<UTC>-correction01-<SHA>.md on the existing Backend branch. No other paths, new dependencies, schema migration, Task 3/6 changes, version changes, runtime-lock activation or force push. Stop for amendment if required.
 
@@ -35,3 +37,7 @@ Write RED adversarial regressions first: symlinked home/intermediate/artifact/te
 ## Explicit prohibitions and stop conditions
 
 No Podman installation/execution, OCI image build/download, VM provisioning, private/restricted PDFs, external models/inference/provider APIs, spending, deployment, merge, Task 7B/C/P/D or scientific-method approval. No new permissions implied. Stop if supported macOS cannot guarantee no-follow descriptor-relative operations, if production authority requires a new file/entry point or DB migration, if legacy Task 4 ID contracts change, if backup/cleanup gaps require out-of-scope files, or any required regression fails. Owner approval is required to merge after independent review.
+
+## E0048 owner-approved two-file security amendment
+
+The owner explicitly expands Correction 01 by exactly `src/redaction_lab/application/migration.py` and `tests/application/test_migrations.py`. All other E0047 restrictions remain binding. The migration backup pathway must use securely opened directory descriptors, deny symlink traversal and directory-parent replacement races, avoid unsafe pathname-based SQLite opening/creation/deletion, and safely preserve/verify backups. Cover the entire lifecycle: initialization, backup creation, integrity checking, failure cleanup and reopen. Directory-relative backups must not alter existing Task 4/6 immutable evidence. Write adversarial RED-before-GREEN tests for symlinked backup root/ancestor, symlinked or replaced SQLite database pathname, swapped parent, cleanup after failed integrity check, backup replacement collision, and rollback integrity; add tests for non-disposable backup preservation and normal legacy database migration/reopen. If SQLite connection semantics cannot be made safe with the supported stdlib, stop for a scope amendment rather than relying on check-then-use validation. Re-run focused/full suites and exact fourteen-path scope audit. No other approvals are granted.
