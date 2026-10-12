@@ -1,6 +1,6 @@
 # Current state
 
-Updated: 2026-10-11 (America/New_York). Coordination epoch: **E0048**.
+Updated: 2026-10-11 (America/New_York). Coordination epoch: **E0049**.
 Integration branch: `main`. Canonical writer: **Lead/Architect**, within the owner's approved scope.
 Resolve the actual HEAD with GitHub; do not infer a current SHA from this file's timestamp.
 
@@ -66,3 +66,5 @@ E0046: Owner approved Task 7A code-only implementation. [Consolidated authorizat
 E0047: Owner authorized [RL-MVP-007A Correction 01](task_packets/RL-MVP-007A-CORRECTION-01.md) within twelve scoped files and unique Backend handoff: directory-FD full-lifecycle confinement and application-owned verified-worker authority. No merge, Podman/VM/image operations, private data, inference, spending or deployment. Fresh QA/security and Research reviews required.
 
 E0048: Owner approved [Correction 01 two-file amendment](task_packets/RL-MVP-007A-CORRECTION-01.md), adding application/migration.py and tests/application/test_migrations.py for symlink/race-safe backups and SQLite access. Now 14 authorized implementation paths plus one handoff; all runtime, merge, data, model, spending and deployment prohibitions remain.
+
+E0049: Owner approved [RL-MVP-007A Correction 02](task_packets/RL-MVP-007A-CORRECTION-02.md): two-file subprocess SQLite migration helper, no parent cwd mutation, crash-safe WAL/rollback and verified backups, concurrent-thread TDD. No merge, runtime/model/data operations or Task 7B/C/P/D.
