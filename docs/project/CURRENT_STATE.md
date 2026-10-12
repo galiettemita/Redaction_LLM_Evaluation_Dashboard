@@ -1,6 +1,6 @@
 # Current state
 
-Updated: 2026-10-11 (America/New_York). Coordination epoch: **E0045**.
+Updated: 2026-10-11 (America/New_York). Coordination epoch: **E0046**.
 Integration branch: `main`. Canonical writer: **Lead/Architect**, within the owner's approved scope.
 Resolve the actual HEAD with GitHub; do not infer a current SHA from this file's timestamp.
 
@@ -60,3 +60,5 @@ E0043: Owner selects local, portable, recipient-self-hosted Task 7 delivery: ano
 E0044: Owner approved RL-MVP-007A planning defaults and publication of [the scoped 007A packet](task_packets/RL-MVP-007A-PORTABLE-FOUNDATION.md): macOS arm64 first, loopback-only, 25 MiB/file, 100 pages, one document job, 60s parse budget, five-table schema direction, retained documents/evidence until authorized deletion, 24h temporary cleanup, 7d content-free logs, pre-migration backups. Packet published ONLY: no implementation, dependency install, inference, spending or deployment authorized.
 
 E0045: Owner-approved, publication-only [007A PDF isolation amendment](task_packets/RL-MVP-007A-PDF-ISOLATION-AMENDMENT.md) published. No Task 7A implementation, installs, downloads, VM, sensitive data, inference, spend or deployment authorized.
+
+E0046: Owner approved Task 7A code-only implementation. [Consolidated authorization packet](task_packets/RL-MVP-007A-IMPLEMENTATION.md) published; mock/synthetic work only, no runtime operations, private data, inference, deployment, spending or merge. Independent QA/security and Research reviews required.
