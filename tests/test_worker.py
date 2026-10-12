@@ -19,6 +19,7 @@ from redaction_lab.contracts import (
     TokenUsage,
 )
 from redaction_lab.fixtures import make_synthetic_pair
+from redaction_lab.prediction_source import derive_prediction_source
 from redaction_lab.store import ResolvedAttempt, RunStore
 from redaction_lab.worker import run_pending_once
 
@@ -158,6 +159,23 @@ def test_only_stored_pdf_source_can_enqueue_not_direct_or_forged_manifest(tmp_pa
     manifest = store.job(job_id).manifest
     assert manifest.canonical_document_hash == source.canonical_document.canonical_hash
     assert "REFERENCE SECRET" not in manifest.canonical_redacted_text
+
+
+def test_run_store_deriver_is_internal_and_input_binding_is_revalidated(tmp_path) -> None:
+    redacted, _ = make_synthetic_pair("two_boxes", tmp_path / "fixture-deriver")
+    pdf_bytes = redacted.read_bytes()
+    authentic = derive_prediction_source(pdf_bytes, project_id="project-001")
+
+    def forged_deriver(_: bytes, *, project_id: str):
+        assert project_id == "project-001"
+        return type(authentic)(**{**authentic.__dict__, "source_sha256": "f" * 64})
+
+    store = RunStore(tmp_path / "run-deriver.sqlite3", source_deriver=forged_deriver)
+    with pytest.raises(ValueError, match="input bytes"):
+        store.ingest_redacted_pdf(pdf_bytes, project_id="project-001")
+
+    with pytest.raises(TypeError):
+        store.ingest_redacted_pdf(pdf_bytes, project_id="project-001", source=authentic)  # type: ignore[call-arg]
 
 
 def test_source_and_run_project_target_and_order_mismatches_fail_closed(tmp_path) -> None:

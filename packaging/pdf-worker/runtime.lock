@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "protocol_version": "pdf-worker-v1",
+  "podman_executable": "/opt/redaction-lab/bin/podman",
+  "podman_version": "UNVERIFIED",
+  "machine_name": "redaction-lab-pdf-v1",
+  "machine_image_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "base_image_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "image_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "python_version": "3.12.14",
+  "timeout_seconds": 60,
+  "runtime_verified": false
+}

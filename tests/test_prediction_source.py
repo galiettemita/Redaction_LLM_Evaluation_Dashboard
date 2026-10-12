@@ -5,7 +5,12 @@ from pathlib import Path
 import pytest
 
 from redaction_lab.fixtures import make_synthetic_pair
-from redaction_lab.prediction_source import derive_prediction_source
+from redaction_lab.prediction_source import (
+    PredictionSourceMaterial,
+    PredictionTargetObservation,
+    build_prediction_source_from_material,
+    derive_prediction_source,
+)
 
 
 def _redacted(case: str, tmp_path: Path) -> bytes:
@@ -76,4 +81,121 @@ def test_caller_cannot_self_assert_a_trusted_flag(tmp_path: Path) -> None:
             _redacted("two_boxes", tmp_path),
             project_id="project-a",
             trusted=True,  # type: ignore[call-arg]
+        )
+
+
+def test_worker_material_reconstructs_identical_source_without_pdf_parsing(tmp_path: Path) -> None:
+    pdf_bytes = _redacted("two_boxes", tmp_path)
+    expected = derive_prediction_source(pdf_bytes, project_id="project-a")
+    material = PredictionSourceMaterial(
+        source_sha256=expected.source_sha256,
+        page_count=1,
+        detector_version=expected.detector_version,
+        canonicalizer_version=expected.canonicalizer_version,
+        canonical_text=expected.canonical_document.canonical_text,
+        canonical_hash=expected.canonical_document.canonical_hash,
+        targets=tuple(
+            PredictionTargetObservation(
+                page_index=target.page_index,
+                normalized_bbox=target.normalized_bbox,
+                rectangle_index=int(target.detection_evidence.source_object_ids[0].rsplit("-", 1)[1]),
+            )
+            for target in expected.targets
+        ),
+    )
+
+    rebuilt = build_prediction_source_from_material(
+        pdf_bytes, project_id="project-a", material=material
+    )
+
+    assert rebuilt == expected
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"source_sha256": "f" * 64},
+        {"page_count": 0},
+        {"detector_version": "forged"},
+        {"canonicalizer_version": "forged"},
+        {"canonical_hash": "f" * 64},
+        {"targets": ()},
+    ],
+)
+def test_worker_material_spoofing_fails_closed(tmp_path: Path, change: dict[str, object]) -> None:
+    pdf_bytes = _redacted("two_boxes", tmp_path)
+    source = derive_prediction_source(pdf_bytes, project_id="project-a")
+    values = {
+        "source_sha256": source.source_sha256,
+        "page_count": 1,
+        "detector_version": source.detector_version,
+        "canonicalizer_version": source.canonicalizer_version,
+        "canonical_text": source.canonical_document.canonical_text,
+        "canonical_hash": source.canonical_document.canonical_hash,
+        "targets": tuple(
+            PredictionTargetObservation(
+                page_index=t.page_index, normalized_bbox=t.normalized_bbox,
+                rectangle_index=int(t.detection_evidence.source_object_ids[0].rsplit("-", 1)[1]),
+            ) for t in source.targets
+        ),
+    }
+    values.update(change)
+
+    with pytest.raises(ValueError):
+        build_prediction_source_from_material(
+            pdf_bytes, project_id="project-a", material=PredictionSourceMaterial(**values)
+        )
+
+
+def test_worker_material_bridge_never_invokes_host_pdf_parsers(tmp_path: Path, monkeypatch) -> None:
+    pdf_bytes = _redacted("two_boxes", tmp_path)
+    source = derive_prediction_source(pdf_bytes, project_id="project-a")
+    material = PredictionSourceMaterial(
+        source_sha256=source.source_sha256,
+        page_count=1,
+        detector_version=source.detector_version,
+        canonicalizer_version=source.canonicalizer_version,
+        canonical_text=source.canonical_document.canonical_text,
+        canonical_hash=source.canonical_document.canonical_hash,
+        targets=tuple(
+            PredictionTargetObservation(
+                page_index=t.page_index, normalized_bbox=t.normalized_bbox,
+                rectangle_index=int(t.detection_evidence.source_object_ids[0].rsplit("-", 1)[1]),
+            ) for t in source.targets
+        ),
+    )
+    monkeypatch.setattr("redaction_lab.prediction_source.detect_targets", lambda *a, **k: (_ for _ in ()).throw(AssertionError("host parse")))
+    monkeypatch.setattr("redaction_lab.prediction_source.canonicalize_redacted", lambda *a, **k: (_ for _ in ()).throw(AssertionError("host parse")))
+
+    rebuilt = build_prediction_source_from_material(
+        pdf_bytes, project_id="project-a", material=material
+    )
+
+    assert rebuilt == source
+
+
+def test_worker_material_rejects_reused_detector_evidence_identifier(tmp_path: Path) -> None:
+    pdf_bytes = _redacted("two_boxes", tmp_path)
+    source = derive_prediction_source(pdf_bytes, project_id="project-a")
+    observations = tuple(
+        PredictionTargetObservation(
+            page_index=target.page_index,
+            normalized_bbox=target.normalized_bbox,
+            rectangle_index=0,
+        )
+        for target in source.targets
+    )
+    material = PredictionSourceMaterial(
+        source_sha256=source.source_sha256,
+        page_count=1,
+        detector_version=source.detector_version,
+        canonicalizer_version=source.canonicalizer_version,
+        canonical_text=source.canonical_document.canonical_text,
+        canonical_hash=source.canonical_document.canonical_hash,
+        targets=observations,
+    )
+
+    with pytest.raises(ValueError, match="evidence"):
+        build_prediction_source_from_material(
+            pdf_bytes, project_id="project-a", material=material
         )

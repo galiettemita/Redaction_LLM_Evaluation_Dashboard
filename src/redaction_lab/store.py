@@ -9,6 +9,7 @@ import json
 from os import PathLike
 from pathlib import Path
 import sqlite3
+from typing import Callable
 
 from redaction_lab.adapters.base import build_prediction_manifest
 from redaction_lab.contracts import (
@@ -62,8 +63,14 @@ class RunStore:
     This component does not expose or claim an arbitrary-upload authorization API.
     """
 
-    def __init__(self, path: str | PathLike[str]) -> None:
+    def __init__(
+        self,
+        path: str | PathLike[str],
+        *,
+        source_deriver: Callable[..., PredictionSource] | None = None,
+    ) -> None:
         self.path = Path(path)
+        self._source_deriver = source_deriver or derive_prediction_source
         self._initialize()
 
     def _connect(self) -> sqlite3.Connection:
@@ -249,7 +256,13 @@ class RunStore:
     def ingest_redacted_pdf(self, pdf_bytes: bytes, *, project_id: str) -> str:
         """Persist a byte-derived source for a pre-authenticated internal caller."""
 
-        source = derive_prediction_source(pdf_bytes, project_id=project_id)
+        source = self._source_deriver(pdf_bytes, project_id=project_id)
+        if (
+            source.project_id != project_id.strip()
+            or source.source_sha256 != sha256(pdf_bytes).hexdigest()
+        ):
+            raise ValueError("prediction source does not match input bytes or project")
+        validate_prediction_source(source)
         canonical_json = source.canonical_document.model_dump_json()
         targets_json = json.dumps(
             [target.model_dump(mode="json") for target in source.targets],
