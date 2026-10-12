@@ -1,6 +1,6 @@
 # Current state
 
-Updated: 2026-10-11 (America/New_York). Coordination epoch: **E0043**.
+Updated: 2026-10-11 (America/New_York). Coordination epoch: **E0044**.
 Integration branch: `main`. Canonical writer: **Lead/Architect**, within the owner's approved scope.
 Resolve the actual HEAD with GitHub; do not infer a current SHA from this file's timestamp.
 
@@ -56,3 +56,5 @@ E0042: Task 6 merged via owner-approved PR #5 after independent QA/Research scop
 Keep this page small (target: roughly 600 words). It is a derived snapshot, not the only evidence. Link task records/commits instead of pasting transcripts. The Lead updates it alongside accepted decisions and handoff index changes. If it conflicts with merged code or approved decisions, flag the discrepancy and reconcile; never hide it.
 
 E0043: Owner selects local, portable, recipient-self-hosted Task 7 delivery: another researcher must independently install and launch the complete application on a compatible computer without access to the owner's MacBook. Required cross-device installation/startup, pinned deps, local persistence and model availability/hardware disclosures; no implementation or deployment authorized.
+
+E0044: Owner approved RL-MVP-007A planning defaults and publication of [the scoped 007A packet](task_packets/RL-MVP-007A-PORTABLE-FOUNDATION.md): macOS arm64 first, loopback-only, 25 MiB/file, 100 pages, one document job, 60s parse budget, five-table schema direction, retained documents/evidence until authorized deletion, 24h temporary cleanup, 7d content-free logs, pre-migration backups. Packet published ONLY: no implementation, dependency install, inference, spending or deployment authorized.
