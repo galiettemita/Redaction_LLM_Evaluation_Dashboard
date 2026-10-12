@@ -1,6 +1,6 @@
 # Decision register
 
-Baseline: [MASTER_SPEC.md](MASTER_SPEC.md), imported 2026-10-06. Epoch E0044.
+Baseline: [MASTER_SPEC.md](MASTER_SPEC.md), imported 2026-10-06. Epoch E0045.
 Product decision IDs `DEC-...` are distinct from the source PDF's open-decision IDs `D01`-`D10`.
 
 ## Authority
@@ -59,6 +59,10 @@ On 2026-10-09, the owner explicitly approved RL-MVP-005 strictly for a research 
 ## E0038 Task 6 implementation authorization (not scientific-method approval)
 
 On 2026-10-09 the owner explicitly approved bounded RL-MVP-006 synthetic/mock-only evaluator evidence and target/document/model summary code: six proposed source/test files, necessary scoped changes in contracts.py and test_contracts.py, and one unique Backend handoff. The owner requires the final [Task 6 packet](task_packets/RL-MVP-006-EVALUATOR-SUMMARIES.md) on main before Codex work and fresh independent QA and Research review. No D03/D04/D05/D06 scientific approval, numeric score formula/weights/thresholds, live model inference, installation/download, new unapproved dependencies, merge, Task 7, spending or deployment. This is task execution authorization, not a DEC-numbered methodological amendment.
+
+## E0045 Task 7A PDF isolation planning amendment
+
+Owner approved documentation publication only of [the 007A security amendment](task_packets/RL-MVP-007A-PDF-ISOLATION-AMENDMENT.md). Accept arbitrary PDFs for validation, propose Podman VM without host shares/network, and require preservation of Task 4 byte-derived source authority without reparsing on host. Extra interface files are proposed but not implementation-authorized. Institutional data permission and all Task 7 code/install/model/deploy gates remain open.
 
 ## E0044 Task 7A planning defaults and packet publication (not implementation)
 

@@ -223,6 +223,10 @@ Owner expressly approved a narrowly scoped Task-5 Research rubric/adversarial be
 
 Product owner approved a bounded Task-6 synthetic/mock-only evaluator evidence and three-level summary implementation. Lead published the final packet to main before Codex execution, limiting scope to six named new source/test files, conditional contracts.py/test_contracts.py and one Backend handoff. Task-5 proposal is not research-human-validated, and no D03–D06 scoring/aggregation approval is granted. No models, costs, merge, Task 7 or deployment.
 
+## 2026-10-11 | E0045 | RL-MVP-007A security planning amendment
+
+Published owner-approved arbitrary-PDF security planning amendment and Task-4 isolated source-verification stop gate. Implementation, dependencies, VM, inference, spend and deployment not authorized.
+
 ## 2026-10-11 | E0044 | RL-MVP-007A packet published, implementation pending
 
 Published narrow 007A planning packet following owner acceptance of Mac arm64 local-first, upload/security/retention defaults, portable path and five-table schema direction. No Task 7A implementation, dependencies, migration, inference, spending or deployment authorized.
