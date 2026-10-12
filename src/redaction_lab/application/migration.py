@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
+import errno
+import fcntl
 from hashlib import sha256
 import json
 import os
@@ -17,7 +20,7 @@ import subprocess
 import sys
 import threading
 import time
-from typing import Any, Sequence
+from typing import Any, Iterator, Sequence
 
 from redaction_lab.application.paths import open_verified_directory, preflight_directories
 
@@ -52,6 +55,8 @@ _MAX_STDOUT_BYTES = 64 * 1024
 _MAX_STDERR_BYTES = 8 * 1024
 _BACKUP_STAMP_PATTERN = re.compile(r"^[0-9]{8}T[0-9]{12}Z$")
 _MIGRATION_LOCK = threading.RLock()
+_MIGRATION_LOCK_TIMEOUT_SECONDS = 125.0
+_LOCK_FLAGS = os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
 
 
 def _table_names(connection: sqlite3.Connection) -> set[str]:
@@ -77,13 +82,128 @@ def _valid_leaf_name(name: str) -> bool:
     )
 
 
+def _migration_lock_name(database_name: str) -> str:
+    if not _valid_leaf_name(database_name):
+        raise MigrationError("invalid database leaf name")
+    digest = sha256(database_name.encode("utf-8")).hexdigest()
+    return f".redaction-lab-migration-{digest}.lock"
+
+
+def _validate_migration_lock(
+    database_directory_fd: int,
+    lock_fd: int,
+    database_name: str,
+) -> os.stat_result:
+    try:
+        directory = os.fstat(database_directory_fd)
+        lock = os.fstat(lock_fd)
+        name = _migration_lock_name(database_name)
+        current = os.stat(name, dir_fd=database_directory_fd, follow_symlinks=False)
+    except OSError as error:
+        raise MigrationError("unsafe or replaced migration lock file") from error
+    if (
+        not stat.S_ISDIR(directory.st_mode)
+        or not stat.S_ISREG(lock.st_mode)
+        or lock.st_uid != os.getuid()
+        or lock.st_dev != directory.st_dev
+        or lock.st_nlink != 1
+        or stat.S_IMODE(lock.st_mode) != 0o600
+        or (current.st_dev, current.st_ino) != (lock.st_dev, lock.st_ino)
+    ):
+        raise MigrationError("unsafe or replaced migration lock file")
+    return lock
+
+
+def _open_migration_lock(database_directory_fd: int, database_name: str) -> int:
+    name = _migration_lock_name(database_name)
+    created = False
+    try:
+        descriptor = os.open(
+            name,
+            _LOCK_FLAGS | os.O_EXCL,
+            0o600,
+            dir_fd=database_directory_fd,
+        )
+        created = True
+    except FileExistsError:
+        try:
+            descriptor = os.open(
+                name,
+                os.O_RDWR | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0),
+                dir_fd=database_directory_fd,
+            )
+        except OSError as error:
+            raise MigrationError("unsafe migration lock file") from error
+    except OSError as error:
+        raise MigrationError("cannot safely create migration lock file") from error
+    try:
+        if created:
+            os.fchmod(descriptor, 0o600)
+            os.fsync(descriptor)
+            os.fsync(database_directory_fd)
+        _validate_migration_lock(database_directory_fd, descriptor, database_name)
+        return descriptor
+    except Exception:
+        os.close(descriptor)
+        raise
+
+
+@contextmanager
+def _exclusive_migration_lock(
+    database_directory_fd: int,
+    database_name: str,
+    *,
+    timeout_seconds: float | None = None,
+) -> Iterator[int]:
+    timeout = (
+        _MIGRATION_LOCK_TIMEOUT_SECONDS
+        if timeout_seconds is None
+        else timeout_seconds
+    )
+    if timeout < 0:
+        raise MigrationError("migration lock timeout must not be negative")
+    descriptor = _open_migration_lock(database_directory_fd, database_name)
+    deadline = time.monotonic() + timeout
+    acquired = False
+    try:
+        while True:
+            try:
+                fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                acquired = True
+                break
+            except OSError as error:
+                if error.errno not in {errno.EACCES, errno.EAGAIN}:
+                    raise MigrationError("migration lock acquisition failed") from error
+                if time.monotonic() >= deadline:
+                    raise MigrationError(
+                        "another Redaction Lab process is migrating this database; "
+                        "retry after that process exits"
+                    ) from error
+                time.sleep(min(0.01, max(0.0, deadline - time.monotonic())))
+        _validate_migration_lock(database_directory_fd, descriptor, database_name)
+        yield descriptor
+    finally:
+        try:
+            if acquired:
+                _validate_migration_lock(
+                    database_directory_fd, descriptor, database_name
+                )
+        finally:
+            try:
+                if acquired:
+                    fcntl.flock(descriptor, fcntl.LOCK_UN)
+            finally:
+                os.close(descriptor)
+
+
 def _require_inherited_descriptors(
     database_directory_fd: int,
     database_fd: int,
     backup_fd: int,
+    lock_fd: int,
     database_name: str,
 ) -> tuple[os.stat_result, os.stat_result, os.stat_result]:
-    if len({database_directory_fd, database_fd, backup_fd}) != 3:
+    if len({database_directory_fd, database_fd, backup_fd, lock_fd}) != 4:
         raise MigrationError("helper descriptors must be distinct")
     if not _valid_leaf_name(database_name):
         raise MigrationError("invalid database leaf name")
@@ -108,6 +228,7 @@ def _require_inherited_descriptors(
     )
     if (current.st_dev, current.st_ino) != (database.st_dev, database.st_ino):
         raise MigrationError("database pathname was replaced before helper open")
+    _validate_migration_lock(database_directory_fd, lock_fd, database_name)
     return database_directory, database, backup_directory
 
 
@@ -294,6 +415,7 @@ def _run_helper(
     database_directory_fd: int,
     database_fd: int,
     backup_fd: int,
+    lock_fd: int,
     database_name: str,
     existed: bool,
 ) -> dict[str, Any]:
@@ -303,8 +425,10 @@ def _run_helper(
         database_directory_fd,
         database_fd,
         backup_fd,
+        lock_fd,
         database_name,
     )
+    os.set_inheritable(lock_fd, False)
     _cleanup_incomplete_backups(backup_fd, database_name)
     os.fchdir(database_directory_fd)
     connection: sqlite3.Connection | None = None
@@ -370,6 +494,7 @@ def _invoke_helper(
     database_directory_fd: int,
     database_fd: int,
     backup_fd: int,
+    lock_fd: int,
     database_name: str,
     existed: bool,
 ) -> dict[str, Any]:
@@ -388,6 +513,7 @@ def _invoke_helper(
         str(database_directory_fd),
         str(database_fd),
         str(backup_fd),
+        str(lock_fd),
         database_name,
         "1" if existed else "0",
     ]
@@ -396,7 +522,7 @@ def _invoke_helper(
         shell=False,
         cwd=None,
         close_fds=True,
-        pass_fds=(database_directory_fd, database_fd, backup_fd),
+        pass_fds=(database_directory_fd, database_fd, backup_fd, lock_fd),
         stdin=subprocess.DEVNULL,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -504,30 +630,36 @@ def _migrate_database(path: Path, *, backup_directory: Path) -> MigrationResult:
     database_fd = -1
     backup_fd = -1
     try:
-        _validate_database_leaf(database_directory_fd, path.name)
-        backup_fd = open_verified_directory(backup_directory, create=True)
-        database_fd, existed = _open_database_leaf(database_directory_fd, path.name)
-        before = os.fstat(database_fd)
-        payload = _invoke_helper(
-            database_directory_fd,
-            database_fd,
-            backup_fd,
-            path.name,
-            existed,
-        )
-        current = os.stat(path.name, dir_fd=database_directory_fd, follow_symlinks=False)
-        if (current.st_dev, current.st_ino) != (before.st_dev, before.st_ino):
-            raise MigrationError("database pathname was replaced during migration")
-        applied, backup_name = _validate_helper_result(
-            payload,
-            database_fd=database_fd,
-            backup_fd=backup_fd,
-            database_name=path.name,
-        )
-        return MigrationResult(
-            applied,
-            backup_directory / backup_name if backup_name is not None else None,
-        )
+        with _exclusive_migration_lock(database_directory_fd, path.name) as lock_fd:
+            _validate_database_leaf(database_directory_fd, path.name)
+            backup_fd = open_verified_directory(backup_directory, create=True)
+            database_fd, existed = _open_database_leaf(database_directory_fd, path.name)
+            before = os.fstat(database_fd)
+            payload = _invoke_helper(
+                database_directory_fd,
+                database_fd,
+                backup_fd,
+                lock_fd,
+                path.name,
+                existed,
+            )
+            current = os.stat(
+                path.name,
+                dir_fd=database_directory_fd,
+                follow_symlinks=False,
+            )
+            if (current.st_dev, current.st_ino) != (before.st_dev, before.st_ino):
+                raise MigrationError("database pathname was replaced during migration")
+            applied, backup_name = _validate_helper_result(
+                payload,
+                database_fd=database_fd,
+                backup_fd=backup_fd,
+                database_name=path.name,
+            )
+            return MigrationResult(
+                applied,
+                backup_directory / backup_name if backup_name is not None else None,
+            )
     finally:
         if database_fd >= 0:
             os.close(database_fd)
@@ -544,20 +676,21 @@ def migrate_database(path: Path, *, backup_directory: Path) -> MigrationResult:
 
 
 def _helper_main(arguments: Sequence[str]) -> int:
-    if len(arguments) != 6 or arguments[0] != _HELPER_ARGUMENT:
+    if len(arguments) != 7 or arguments[0] != _HELPER_ARGUMENT:
         return 2
     try:
-        database_directory_fd, database_fd, backup_fd = (
-            int(value) for value in arguments[1:4]
+        database_directory_fd, database_fd, backup_fd, lock_fd = (
+            int(value) for value in arguments[1:5]
         )
-        if arguments[5] not in {"0", "1"}:
+        if arguments[6] not in {"0", "1"}:
             raise MigrationError("invalid existing-database marker")
         payload = _run_helper(
             database_directory_fd,
             database_fd,
             backup_fd,
-            arguments[4],
-            arguments[5] == "1",
+            lock_fd,
+            arguments[5],
+            arguments[6] == "1",
         )
         encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode(
             "utf-8"
