@@ -1,6 +1,6 @@
 # Decision register
 
-Baseline: [MASTER_SPEC.md](MASTER_SPEC.md), imported 2026-10-06. Epoch E0042.
+Baseline: [MASTER_SPEC.md](MASTER_SPEC.md), imported 2026-10-06. Epoch E0043.
 Product decision IDs `DEC-...` are distinct from the source PDF's open-decision IDs `D01`-`D10`.
 
 ## Authority
@@ -59,6 +59,10 @@ On 2026-10-09, the owner explicitly approved RL-MVP-005 strictly for a research 
 ## E0038 Task 6 implementation authorization (not scientific-method approval)
 
 On 2026-10-09 the owner explicitly approved bounded RL-MVP-006 synthetic/mock-only evaluator evidence and target/document/model summary code: six proposed source/test files, necessary scoped changes in contracts.py and test_contracts.py, and one unique Backend handoff. The owner requires the final [Task 6 packet](task_packets/RL-MVP-006-EVALUATOR-SUMMARIES.md) on main before Codex work and fresh independent QA and Research review. No D03/D04/D05/D06 scientific approval, numeric score formula/weights/thresholds, live model inference, installation/download, new unapproved dependencies, merge, Task 7, spending or deployment. This is task execution authorization, not a DEC-numbered methodological amendment.
+
+## E0043 Task 7 portable local delivery planning decision (not implementation authorization)
+
+Owner selected a **portable, local, recipient-self-hosted web application** for Task 7: a recipient must be able to receive a release/project package, set up and run both frontend and Python backend on their own compatible computer, and access the application from their own browser without relying on the owner's MacBook, machine-specific absolute paths, credentials, filesystem or running server. Require documented supported operating systems and architectures, pinned reproducible dependencies, portable migration/bootstrap and local data isolation, safe setup/start scripts or launcher, all-offline-after-prerequisite-install behavior when feasible, and independent clean-second-device acceptance tests. Model artifacts/runtimes and licenses are independently approved requirements: don't promise real inference on hardware without a compatible authorized model. No public hosting, spending, model download/inference, private data, Task 7 code, deployment, or D03–D06 approval authorized by this decision. Design the smallest viable packaging approach; do not assume Docker, installer technology or support for every OS without an explicit feasibility decision.
 
 ## E0042 Task 6 owner-approved integration (not scientific approval)
 

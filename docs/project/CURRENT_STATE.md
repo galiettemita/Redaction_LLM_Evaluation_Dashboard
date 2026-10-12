@@ -1,12 +1,12 @@
 # Current state
 
-Updated: 2026-10-11 (America/New_York). Coordination epoch: **E0042**.
+Updated: 2026-10-11 (America/New_York). Coordination epoch: **E0043**.
 Integration branch: `main`. Canonical writer: **Lead/Architect**, within the owner's approved scope.
 Resolve the actual HEAD with GitHub; do not infer a current SHA from this file's timestamp.
 
 ## Read this first
 
-**Stage:** S1 / October 12 MVP implementation. **Execution boundary:** RL-MVP-001, RL-MVP-002 and RL-MVP-003 are merged. RL-MVP-004 has been owner-authorized and MERGED following Correction 01 independent QA and Research PASS; Task 5 is owner-approved for a research-only proposal on an isolated Research branch; Task 6 is owner-approved for bounded synthetic/mock-only implementation under [RL-MVP-006 packet](task_packets/RL-MVP-006-EVALUATOR-SUMMARIES.md); Task 7+ remains unapproved; Task 6 integrated after owner approval and independent QA/Research scoped PASS; Task 7+ remains unapproved.
+**Stage:** S1 / October 12 MVP implementation. **Execution boundary:** RL-MVP-001, RL-MVP-002 and RL-MVP-003 are merged. RL-MVP-004 has been owner-authorized and MERGED following Correction 01 independent QA and Research PASS; Task 5 is owner-approved for a research-only proposal on an isolated Research branch; Task 6 is owner-approved for bounded synthetic/mock-only implementation under [RL-MVP-006 packet](task_packets/RL-MVP-006-EVALUATOR-SUMMARIES.md); Task 7 implementation remains unapproved; owner selected portable local self-hosting for Task 7 planning, requiring independently runnable installation on another recipient computer; Task 6 integrated after owner approval and independent QA/Research scoped PASS; Task 7+ remains unapproved.
 **Product implementation:** RL-MVP-001 merged in PR #1 (`ba60aaa8`); RL-MVP-002 merged in PR #2 (`35281fb9`); RL-MVP-003 merged in PR #3 (`733ae024`).
 **Scoring validity:** not established. **Deployment:** none established here.
 **Active background agents / scheduler:** none installed by this setup.
@@ -54,3 +54,5 @@ E0042: Task 6 merged via owner-approved PR #5 after independent QA/Research scop
 ## Maintenance rule
 
 Keep this page small (target: roughly 600 words). It is a derived snapshot, not the only evidence. Link task records/commits instead of pasting transcripts. The Lead updates it alongside accepted decisions and handoff index changes. If it conflicts with merged code or approved decisions, flag the discrepancy and reconcile; never hide it.
+
+E0043: Owner selects local, portable, recipient-self-hosted Task 7 delivery: another researcher must independently install and launch the complete application on a compatible computer without access to the owner's MacBook. Required cross-device installation/startup, pinned deps, local persistence and model availability/hardware disclosures; no implementation or deployment authorized.
