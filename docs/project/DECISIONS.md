@@ -1,6 +1,6 @@
 # Decision register
 
-Baseline: [MASTER_SPEC.md](MASTER_SPEC.md), imported 2026-10-06. Epoch E0051.
+Baseline: [MASTER_SPEC.md](MASTER_SPEC.md), imported 2026-10-06. Epoch E0052.
 Product decision IDs `DEC-...` are distinct from the source PDF's open-decision IDs `D01`-`D10`.
 
 ## Authority
