@@ -1,6 +1,6 @@
 # Current state
 
-Updated: 2026-10-11 (America/New_York). Coordination epoch: **E0057**.
+Updated: 2026-10-11 (America/New_York). Coordination epoch: **E0058**.
 Integration branch: `main`. Canonical writer: **Lead/Architect**, within the owner's approved scope.
 Resolve the actual HEAD with GitHub; do not infer a current SHA from this file's timestamp.
 
@@ -84,3 +84,5 @@ E0055: Owner approved scoped [RL-MVP-007CP website build/static-host packet](tas
 E0056: Owner approved exact Vite pin substitution `7.1.12` -> `7.3.5` only within [7CP approved packet](task_packets/RL-MVP-007CP-WEBSITE-BUILD.md). All other pins, file scopes and zero-cost isolated install gates unchanged; repeat full transitive preflight. Static-host branch unmerged, formal reviews still required. No merge, deployment, private data, Podman/VM, inference or final 7D acceptance.
 
 E0057: Owner approved only npm `esbuild@0.27.2` override with `vite@7.3.5` unchanged in [7CP packet](task_packets/RL-MVP-007CP-WEBSITE-BUILD.md). Regenerate and audit full transitive lock before isolated zero-cost install; no other scopes, merge or runtime/data/inference/deployment permissions changed.
+
+E0058: Owner authorized integration of independently reviewed 7CP Frontend build HEAD `334920de5e885510eaa9cceadd0f33cfd0b8b2eb` and Packaging static host HEAD `d0fce23fd96d3781e5559e1bf50616006eaae8a0`; both scoped QA/Research PASS. Assets still deliberately unbound (`frontend.assets: null`); combined browser acceptance NOT established. [Assembly packet](task_packets/RL-MVP-007CP-ASSEMBLY.md) authorizes only isolated-branch manifest binding plus exact packaging tests, followed by fresh reviews and separate merge approval. No deployment, runtime/model operations, private data or final 7D acceptance.

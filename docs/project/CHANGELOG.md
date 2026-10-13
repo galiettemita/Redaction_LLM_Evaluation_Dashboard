@@ -1,4 +1,8 @@
 
+## 2026-10-13 | E0058 | reviewed 7CP component integration / assembly packet
+
+Owner-authorized non-force integration of reviewed frontend bundle and security-hardened static host. Separately approved manifest-only assembly and existing packaging integration tests on isolated branch, no merge of assembly or final website acceptance.
+
 ## 2026-10-13 | E0057 | esbuild transitive override approved
 
 Owner approved esbuild 0.27.2 override under unchanged Vite 7.3.5; full lockfile re-audit mandatory before isolated installation. This is coordination publication only, not implementation or merge.
