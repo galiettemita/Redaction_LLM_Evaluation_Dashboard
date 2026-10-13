@@ -30,6 +30,11 @@ function client(transport) {
 test('accepts the local v0.1 health shape without upgrading runtime readiness', async () => {
   assert.deepEqual(await client(async () => response(health)).health(), health);
 });
+test('rejects non-string health state instead of coercing JSON arrays into readiness', async () => {
+  for (const state of [['READY'], ['DEGRADED'], null, 1, true, { state: 'READY' }]) {
+    await assert.rejects(() => client(async () => response({ ...health, state })).health(), /contract/i);
+  }
+});
 test('uploads only exact multipart fields to a relative same-origin route', async () => {
   const calls = [];
   const accepted = await client(async (path, options) => {
@@ -146,6 +151,11 @@ test('rejects numeric scores, fabricated targets and promoted reference truth', 
     { summaries: { target: null, document: { score: 100 }, model: null } }]) {
     const local = client(async () => response({ ...result, ...change }));
     await assert.rejects(() => local.results('version-1'), /contract/i);
+  }
+});
+test('rejects non-string result status instead of coercing JSON arrays into completion', async () => {
+  for (const status of [['AVAILABLE'], ['PENDING'], null, 1, true, { status: 'AVAILABLE' }]) {
+    await assert.rejects(() => client(async () => response({ ...result, status })).results('version-1'), /contract/i);
   }
 });
 test('rejects malformed document metadata and unsupported processing states', async () => {

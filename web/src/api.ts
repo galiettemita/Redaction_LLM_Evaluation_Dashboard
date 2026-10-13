@@ -84,7 +84,7 @@ export function createApi(origin: string, transport: typeof fetch = globalThis.f
   }
   async function health(signal?: AbortSignal): Promise<Health> {
     const value = await request('/api/v1/health', 'GET', undefined, signal);
-    return checked(value, object(value) && value.api_version === '0.1' && ['READY', 'DEGRADED'].includes(String(value.state)) &&
+    return checked(value, object(value) && value.api_version === '0.1' && typeof value.state === 'string' && ['READY', 'DEGRADED'].includes(value.state) &&
       value.runtime_qualified === false && value.mode === 'local');
   }
   async function upload(projectId: string, redacted: File | null, reference: File | null): Promise<AcceptedUpload> {
@@ -121,7 +121,7 @@ export function createApi(origin: string, transport: typeof fetch = globalThis.f
   }
   async function results(versionId: string, signal?: AbortSignal): Promise<Results> {
     const value = await request(`/api/v1/results/${requireId(versionId)}`, 'GET', undefined, signal);
-    return checked(value, object(value) && value.version_id === versionId && resultStates.includes(String(value.status)) &&
+    return checked(value, object(value) && value.version_id === versionId && typeof value.status === 'string' && resultStates.includes(value.status) &&
       Array.isArray(value.targets) && value.targets.length === 0 && object(value.summaries) &&
       value.summaries.target === null && value.summaries.document === null && value.summaries.model === null &&
       value.score_status === 'NONE' && value.verified_score === null && value.experimental_score === null && value.truth_status === 'UNKNOWN');
