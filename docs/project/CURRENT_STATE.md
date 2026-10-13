@@ -1,6 +1,6 @@
 # Current state
 
-Updated: 2026-10-11 (America/New_York). Coordination epoch: **E0052**.
+Updated: 2026-10-11 (America/New_York). Coordination epoch: **E0053**.
 Integration branch: `main`. Canonical writer: **Lead/Architect**, within the owner's approved scope.
 Resolve the actual HEAD with GitHub; do not infer a current SHA from this file's timestamp.
 
@@ -74,3 +74,5 @@ E0050: Owner approved [RL-MVP-007A Correction 03](task_packets/RL-MVP-007A-CORRE
 E0051: Owner-authorized RL-MVP-007A portable foundation integrated from Backend published HEAD `64784f752b7a4107e927b07cd8d31453e5e8e2e6` after Correction 03 QA PASS at `0e8ace7b2750c558ac5adca44461780fc8c06021` and Research scoped PASS at `196a545484ce11223567aea9a2ee9df5a80f4a64` on exact implementation `03d95ec8e6f280693550563f08ebaa65e844afb3`. This is code-only foundation; runtime lock remains unverified and operational PDF processing fails closed. No runtime install/qualification, real inference, deployment, private data, cost or Task 7B/C/P/D authorization.
 
 E0052: Owner authorized fast-lane parallel code implementation of [7B API](task_packets/RL-MVP-007B-API.md), [7C frontend](task_packets/RL-MVP-007C-FRONTEND.md), [7P packaging](task_packets/RL-MVP-007P-PACKAGING.md) and [7D synthetic preparation](task_packets/RL-MVP-007D-PREP.md), under frozen [API contract v0.1](API_CONTRACT_V0_1.md). Separate branches/reviews/merge approvals mandatory. No new dependencies or installs, runtime/VM, inference, private data, spend, deployment or final recipient acceptance.
+
+E0053: Owner-authorized guarded integration of RL-MVP-007B API Backend published HEAD `481211796cb499d76bd788d5efe4c1854e867526`, exact implementation `b2a5a16bf16a8f339d9d70b6d2a44471578fa63d`, after independent QA/security PASS at `325a4fee4e7e132e3b449f64796e23cd4444ad38` and Research scoped PASS at `4d04629115226dedec45df6e9b90dd64a104f26f`. Code-only WSGI API is merged, not an independently launched HTTP service or qualified PDF runtime. Task 7C/7P/7D scope unchanged; no dependencies, deployment, Podman/VM, private data, inference or spending approved.
