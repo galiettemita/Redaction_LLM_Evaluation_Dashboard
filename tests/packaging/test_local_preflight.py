@@ -18,10 +18,18 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 LOCAL = ROOT / "packaging" / "local"
 HTTP = build_opener(ProxyHandler({}))
+CHROME = Path("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")
+GENUINE_ASSETS = {
+    "/": ("web/dist/index.html", "ac2bd4d56becd360a2b5082bfd6a407d4af3672cde714c9d5cd83b1fa420263a"),
+    "/assets/index-Jwscaf87.css": ("web/dist/assets/index-Jwscaf87.css", "eb4db948b482664a1c92439fc97d44d1f99caad26b9fb0c951d93b5f55a5dcfa"),
+    "/assets/index-my5ZYDMr.js": ("web/dist/assets/index-my5ZYDMr.js", "2b153239406a0d00b566c61ec2b416eaca206db6d8b1c9b45103025f6480a8e1"),
+}
 
 
 def install_synthetic_bundle(root):
     dist = root / "web/dist"
+    if dist.exists():
+        shutil.rmtree(dist)
     (dist / "assets").mkdir(parents=True)
     files = [("index.html", b'<!doctype html><script type="module" src="/assets/index-smoke.js"></script>', "text/html; charset=utf-8"),
              ("assets/index-smoke.js", b'console.log("synthetic-only")', "text/javascript; charset=utf-8")]
@@ -43,6 +51,7 @@ def package(tmp_path):
     root.mkdir()
     for name in ("src", "packaging"):
         shutil.copytree(ROOT / name, root / name)
+    shutil.copytree(ROOT / "web/dist", root / "web/dist")
     return root
 
 
@@ -90,7 +99,7 @@ def simulated_python(tmp_path, *, system="Darwin", machine="arm64", version="3.1
     return str(wrapper)
 
 
-def test_preflight_is_read_only_and_reports_unqualified_runtime(package, tmp_path):
+def test_preflight_is_read_only_and_reports_verified_frontend_with_unqualified_runtime(package, tmp_path):
     env = environment(tmp_path, REDACTION_LAB_PYTHON=simulated_python(tmp_path))
     result = run(package, "preflight.sh", env)
     assert result.returncode == 0, result.stderr
@@ -98,7 +107,7 @@ def test_preflight_is_read_only_and_reports_unqualified_runtime(package, tmp_pat
     assert report["state"] == "DEGRADED"
     assert report["runtime_qualified"] is False
     assert report["host"] == "127.0.0.1"
-    assert report["frontend_available"] is False
+    assert report["frontend_available"] is True
     assert not Path(env["REDACTION_LAB_HOME"]).exists()
 
 
@@ -112,6 +121,18 @@ def test_preflight_only_reports_frontend_after_exact_bundle_verification(package
     result = run(package, "preflight.sh", env)
     assert result.returncode == 0
     assert json.loads(result.stdout)["frontend_available"] is False
+    assert not Path(env["REDACTION_LAB_HOME"]).exists()
+
+
+def test_preflight_verifies_the_genuine_reviewed_frontend_inventory(package, tmp_path):
+    env = environment(tmp_path, REDACTION_LAB_PYTHON=simulated_python(tmp_path))
+    result = run(package, "preflight.sh", env)
+    assert result.returncode == 0, result.stderr
+    report = json.loads(result.stdout)
+    assert report["frontend_available"] is True
+    for relative, expected_digest in GENUINE_ASSETS.values():
+        body = (package / relative).read_bytes()
+        assert sha256(body).hexdigest() == expected_digest
     assert not Path(env["REDACTION_LAB_HOME"]).exists()
 
 
@@ -218,7 +239,8 @@ def start(root, env):
 
 
 def test_synthetic_loopback_api_upload_fail_closed_and_restart(package, tmp_path):
-    assets = install_synthetic_bundle(package)
+    assets = {route: (package / relative).read_bytes()
+              for route, (relative, _) in GENUINE_ASSETS.items()}
     with socket.socket() as reservation:
         reservation.bind(("127.0.0.1", 0))
         port = reservation.getsockname()[1]
@@ -242,7 +264,7 @@ def test_synthetic_loopback_api_upload_fail_closed_and_restart(package, tmp_path
         for headers in ({"Host": "localhost"}, {"Origin": "https://example.org"}):
             status, _ = request(base + "/", headers=headers)
             assert status == 400
-        for target, headers in [("/%61ssets/index-smoke.js", []), ("/", ["Host: 127.0.0.1"]),
+        for target, headers in [("/%61ssets/index-my5ZYDMr.js", []), ("/", ["Host: 127.0.0.1"]),
                                 ("/", ["Content-Length: 0", "Content-Length: 0"]),
                                 ("/", ["Transfer-Encoding: chunked"])]:
             raw = ("GET " + target + " HTTP/1.1\r\nHost: 127.0.0.1:" + str(port) + "\r\n" +
@@ -287,6 +309,31 @@ def test_synthetic_loopback_api_upload_fail_closed_and_restart(package, tmp_path
         assert status == 200
         assert job_state["status"] == "ACCEPTED"
         assert job_state["source_id"] is None
+    finally:
+        process.terminate()
+        process.communicate(timeout=5)
+
+
+def test_existing_chrome_cli_renders_the_genuine_same_origin_application(package, tmp_path):
+    if not CHROME.is_file():
+        pytest.skip("Existing Google Chrome CLI is unavailable")
+    with socket.socket() as reservation:
+        reservation.bind(("127.0.0.1", 0))
+        port = reservation.getsockname()[1]
+    env = environment(tmp_path, REDACTION_LAB_PORT=str(port))
+    process, base, _ = start(package, env)
+    try:
+        browser = subprocess.run([
+            str(CHROME), "--headless=new", "--disable-gpu", "--no-first-run",
+            "--disable-background-networking", "--disable-component-update",
+            "--user-data-dir=" + str(tmp_path / "chrome-profile"),
+            "--virtual-time-budget=3000", "--dump-dom", base + "/",
+        ], capture_output=True, text=True, timeout=20)
+        assert browser.returncode == 0, browser.stderr
+        assert "<title>Redaction Lab — local document workspace</title>" in browser.stdout
+        assert "Every passage. Clear uncertainty." in browser.stdout
+        assert "Document processing unavailable" in browser.stdout
+        assert "No verified or experimental score is available." in browser.stdout
     finally:
         process.terminate()
         process.communicate(timeout=5)

@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 
+ROOT = Path(__file__).resolve().parents[2]
 HTML = b'<!doctype html><html><script type="module" src="/assets/index-test.js"></script></html>'
 JS = b'console.log("synthetic");'
 CSS = b'body { color: black; }'
@@ -50,6 +51,31 @@ def composed(bundle):
         start("418 I'm a Teapot", [("Content-Type", "application/json"), ("Content-Length", "2")])
         return [b"{}"]
     return create_static_app(api, root, config)
+
+
+def test_committed_manifest_serves_the_reviewed_frontend_byte_for_byte():
+    from redaction_lab.api.static import create_static_app, read_local_manifest
+
+    manifest = read_local_manifest(ROOT)
+    app = create_static_app(None, ROOT, manifest["frontend"])
+    expected = {
+        "/": ("web/dist/index.html", "text/html; charset=utf-8", 567,
+              "ac2bd4d56becd360a2b5082bfd6a407d4af3672cde714c9d5cd83b1fa420263a"),
+        "/assets/index-Jwscaf87.css": ("web/dist/assets/index-Jwscaf87.css", "text/css; charset=utf-8", 5353,
+              "eb4db948b482664a1c92439fc97d44d1f99caad26b9fb0c951d93b5f55a5dcfa"),
+        "/assets/index-my5ZYDMr.js": ("web/dist/assets/index-my5ZYDMr.js", "text/javascript; charset=utf-8", 211223,
+              "2b153239406a0d00b566c61ec2b416eaca206db6d8b1c9b45103025f6480a8e1"),
+    }
+    assert app.frontend_available is True
+    for route, (relative, mime, size, digest) in expected.items():
+        body = (ROOT / relative).read_bytes()
+        response = call(app, route)
+        assert len(body) == size
+        assert sha256(body).hexdigest() == digest
+        assert response["status"] == 200
+        assert response["body"] == body
+        assert response["headers"]["Content-Type"] == mime
+        assert response["headers"]["Content-Length"] == str(size)
 
 
 @pytest.mark.parametrize("path,body,mime", [
