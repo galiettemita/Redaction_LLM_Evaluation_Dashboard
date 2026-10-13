@@ -1,4 +1,8 @@
 
+## 2026-10-13 | E0061 | temporary-v1 source integration and browser-build packet
+
+Owner-approved non-force integration of reviewed six-file source feature and one handoff. Approved a new narrow browser rebuild/manifest packet for later implementation only; no new build, dist change, dependency installation, merge of future build, deployment or inference.
+
 ## 2026-10-13 | E0060 | temporary text-only prediction v1 authorized
 
 Owner approved narrow source-only experimental guesses using manually supplied text and synthetic tests, explicitly unvalidated and separate from PDF/Task-4/6. No build/merge/deploy authorization and no private data or external model calls.
