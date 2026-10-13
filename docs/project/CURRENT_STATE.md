@@ -1,6 +1,6 @@
 # Current state
 
-Updated: 2026-10-11 (America/New_York). Coordination epoch: **E0061**.
+Updated: 2026-10-11 (America/New_York). Coordination epoch: **E0062**.
 Integration branch: `main`. Canonical writer: **Lead/Architect**, within the owner's approved scope.
 Resolve the actual HEAD with GitHub; do not infer a current SHA from this file's timestamp.
 
@@ -92,3 +92,5 @@ E0059: Owner-authorized guarded integration of RL-MVP-007CP Assembly published H
 E0060: Owner approved [temporary text-only experimental prediction v1](task_packets/RL-MVP-TEMP-PRED-v1.md) as isolated source/test implementation, not PDF processing or inference. No authoritative Task 4/6 records or verified scores; independent QA/Research and separate merge gate. The existing built website is unchanged until a separately approved build/manifest action.
 
 E0061: Owner authorized guarded integration of temporary text-only source HEAD `1df79a434002193013d7332bdd35c6219cc47cc0` after exact-SHA QA PASS `3bbc81b1e0e5ad74bec622ee74fc86785436745a` and Research scoped PASS `c7bc59f84582860b4b4e17c9e2f45e730b2b9e55`. Source-only experimental heuristic remains absent from compiled website. [Browser build packet](task_packets/RL-MVP-TEMP-PRED-v1-BROWSER-BUILD.md) published and owner-approved for subsequent scoped code work only, NOT performed or merge approved. No real inference, PDF runtime, private data or deployment.
+
+E0062: Owner approved one zero-cost isolated npm ci --ignore-scripts --no-audit --no-fund using unchanged web/package-lock.json after full transitive integrity/license/engine/lifecycle/security preflight. [Browser build packet](task_packets/RL-MVP-TEMP-PRED-v1-BROWSER-BUILD.md) amended; all files, pins, tests, QA/Research and separate merge gates unchanged.
