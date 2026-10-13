@@ -214,4 +214,3 @@ def test_descriptor_validation_detects_asset_changes_while_reading(bundle, monke
         return result
     monkeypatch.setattr(os, "read", changing_read)
     assert composed(bundle).frontend_available is False
-
