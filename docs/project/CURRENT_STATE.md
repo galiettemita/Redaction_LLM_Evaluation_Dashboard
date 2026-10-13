@@ -1,6 +1,6 @@
 # Current state
 
-Updated: 2026-10-11 (America/New_York). Coordination epoch: **E0058**.
+Updated: 2026-10-11 (America/New_York). Coordination epoch: **E0059**.
 Integration branch: `main`. Canonical writer: **Lead/Architect**, within the owner's approved scope.
 Resolve the actual HEAD with GitHub; do not infer a current SHA from this file's timestamp.
 
@@ -86,3 +86,5 @@ E0056: Owner approved exact Vite pin substitution `7.1.12` -> `7.3.5` only withi
 E0057: Owner approved only npm `esbuild@0.27.2` override with `vite@7.3.5` unchanged in [7CP packet](task_packets/RL-MVP-007CP-WEBSITE-BUILD.md). Regenerate and audit full transitive lock before isolated zero-cost install; no other scopes, merge or runtime/data/inference/deployment permissions changed.
 
 E0058: Owner authorized integration of independently reviewed 7CP Frontend build HEAD `334920de5e885510eaa9cceadd0f33cfd0b8b2eb` and Packaging static host HEAD `d0fce23fd96d3781e5559e1bf50616006eaae8a0`; both scoped QA/Research PASS. Assets still deliberately unbound (`frontend.assets: null`); combined browser acceptance NOT established. [Assembly packet](task_packets/RL-MVP-007CP-ASSEMBLY.md) authorizes only isolated-branch manifest binding plus exact packaging tests, followed by fresh reviews and separate merge approval. No deployment, runtime/model operations, private data or final 7D acceptance.
+
+E0059: Owner-authorized guarded integration of RL-MVP-007CP Assembly published HEAD `91808b75896e7f9fc41d1f23e53b05fbddf46542` after exact implementation `0d7a2b56fabd13bb6a2471247b8dcc266ccab093` independent QA/security PASS `b1c6f89058cd8ba2b1c96387378bdb497cfc7820` and Research scoped PASS `2e5813ca7f58030fda59666a4aa2b7f9a898cdc0`. Genuine local browser bundle now manifest-bound. Reported 594 full pytest, 22 Node, Chrome and synthetic upload/restart tests are implementer evidence; independent exact full/browser runs not performed. No clean-device/final Task 7D acceptance, runtime qualification, scientific validation, deployment, private data or inference approval.
