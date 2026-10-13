@@ -10,18 +10,18 @@
     "dist_path": "web/dist",
     "assets": {
       "index.html": {
-        "sha256": "ac2bd4d56becd360a2b5082bfd6a407d4af3672cde714c9d5cd83b1fa420263a",
+        "sha256": "1a638c34649d4fc727a446b7f06f0103562af019bfc58b8d554514cbc8d09367",
         "byte_size": 567,
         "content_type": "text/html; charset=utf-8"
       },
-      "assets/index-Jwscaf87.css": {
-        "sha256": "eb4db948b482664a1c92439fc97d44d1f99caad26b9fb0c951d93b5f55a5dcfa",
-        "byte_size": 5353,
+      "assets/index-Dr7D93Wo.css": {
+        "sha256": "5e85c428f8aea611a729cccad5194870a956bb5b794f7d1f8ba6895ae7a867bd",
+        "byte_size": 6836,
         "content_type": "text/css; charset=utf-8"
       },
-      "assets/index-my5ZYDMr.js": {
-        "sha256": "2b153239406a0d00b566c61ec2b416eaca206db6d8b1c9b45103025f6480a8e1",
-        "byte_size": 211223,
+      "assets/index-D4KVD8ty.js": {
+        "sha256": "a088437a22f246a85be596cc2d34eddd5c6e4993e83085b2ad2975744aa8d4dc",
+        "byte_size": 216554,
         "content_type": "text/javascript; charset=utf-8"
       }
     }

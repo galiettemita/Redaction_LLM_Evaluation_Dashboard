@@ -61,3 +61,21 @@ test('production bundle is local, hashed, bounded, and has no remote runtime dep
     assert.equal(createHash('sha256').update(bytes).digest('hex').length, 64);
   }
 });
+
+test('shipped JavaScript includes the temporary manual demo and unscored status contract', async () => {
+  const names = await readdir(new URL('dist/assets/', root));
+  const javascript = names.find(name => /^index-[A-Za-z0-9_-]+\.js$/.test(name));
+  assert.ok(javascript, 'a generated JavaScript asset must be present');
+  const bundle = await read(`dist/assets/${javascript}`);
+  for (const required of [
+    'Experimental text-only demo',
+    'Manually entered demo text',
+    'Generate demo candidates',
+    'Clear text and remove results',
+    'TEMPORARY_UNVALIDATED',
+    'Verified score',
+    'Experimental score',
+  ]) {
+    assert.ok(bundle.includes(required), `shipped bundle is missing ${required}`);
+  }
+});

@@ -20,9 +20,9 @@ LOCAL = ROOT / "packaging" / "local"
 HTTP = build_opener(ProxyHandler({}))
 CHROME = Path("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")
 GENUINE_ASSETS = {
-    "/": ("web/dist/index.html", "ac2bd4d56becd360a2b5082bfd6a407d4af3672cde714c9d5cd83b1fa420263a"),
-    "/assets/index-Jwscaf87.css": ("web/dist/assets/index-Jwscaf87.css", "eb4db948b482664a1c92439fc97d44d1f99caad26b9fb0c951d93b5f55a5dcfa"),
-    "/assets/index-my5ZYDMr.js": ("web/dist/assets/index-my5ZYDMr.js", "2b153239406a0d00b566c61ec2b416eaca206db6d8b1c9b45103025f6480a8e1"),
+    "/": ("web/dist/index.html", "1a638c34649d4fc727a446b7f06f0103562af019bfc58b8d554514cbc8d09367"),
+    "/assets/index-Dr7D93Wo.css": ("web/dist/assets/index-Dr7D93Wo.css", "5e85c428f8aea611a729cccad5194870a956bb5b794f7d1f8ba6895ae7a867bd"),
+    "/assets/index-D4KVD8ty.js": ("web/dist/assets/index-D4KVD8ty.js", "a088437a22f246a85be596cc2d34eddd5c6e4993e83085b2ad2975744aa8d4dc"),
 }
 
 
@@ -264,7 +264,7 @@ def test_synthetic_loopback_api_upload_fail_closed_and_restart(package, tmp_path
         for headers in ({"Host": "localhost"}, {"Origin": "https://example.org"}):
             status, _ = request(base + "/", headers=headers)
             assert status == 400
-        for target, headers in [("/%61ssets/index-my5ZYDMr.js", []), ("/", ["Host: 127.0.0.1"]),
+        for target, headers in [("/%61ssets/index-D4KVD8ty.js", []), ("/", ["Host: 127.0.0.1"]),
                                 ("/", ["Content-Length: 0", "Content-Length: 0"]),
                                 ("/", ["Transfer-Encoding: chunked"])]:
             raw = ("GET " + target + " HTTP/1.1\r\nHost: 127.0.0.1:" + str(port) + "\r\n" +
@@ -296,6 +296,7 @@ def test_synthetic_loopback_api_upload_fail_closed_and_restart(package, tmp_path
         assert result["verified_score"] is None
         assert result["experimental_score"] is None
         assert result["truth_status"] == "UNKNOWN"
+        assert result["score_status"] == "NONE"
         assert (Path(env["REDACTION_LAB_HOME"]).stat().st_mode & 0o777) == 0o700
     finally:
         process.terminate()
@@ -334,6 +335,16 @@ def test_existing_chrome_cli_renders_the_genuine_same_origin_application(package
         assert "Every passage. Clear uncertainty." in browser.stdout
         assert "Document processing unavailable" in browser.stdout
         assert "No verified or experimental score is available." in browser.stdout
+        assert 'id="demo-title">Experimental text-only demo</h2>' in browser.stdout
+        assert "Plausible guesses are not proven correct." in browser.stdout
+        assert 'id="demo-text"' in browser.stdout
+        assert "Manually entered demo text" in browser.stdout
+        assert "Generate demo candidates" in browser.stdout
+        assert "Clear text and remove results" in browser.stdout
+        assert "Uploaded PDFs and references never fill this field." in browser.stdout
+        # Initial rendering must not invent candidates before manual submission.
+        assert "Unvalidated candidate phrases" not in browser.stdout
+        assert 'class="demo-marker"' not in browser.stdout
     finally:
         process.terminate()
         process.communicate(timeout=5)
