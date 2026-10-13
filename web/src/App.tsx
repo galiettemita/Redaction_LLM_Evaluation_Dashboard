@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { ApiError, presentResults, restoreHandle, serializeHandle, validatePdf } from './api';
 import type { AcceptedUpload, Handle, Health, Snapshot, createApi } from './api';
+import { generateTemporaryPredictions } from './temporaryPrediction';
 
 const STORAGE_KEY = 'redaction-lab:document-handle:v1';
 function readSaved(): Handle | null {
@@ -26,6 +27,9 @@ export default function App({ api }: { api: ReturnType<typeof createApi> }) {
   const [notice, setNotice] = useState('');
   const [recoveryVersion, setRecoveryVersion] = useState('');
   const [recoveryJob, setRecoveryJob] = useState('');
+  const [demoText, setDemoText] = useState('');
+  const [demoError, setDemoError] = useState('');
+  const [demoResult, setDemoResult] = useState<ReturnType<typeof generateTemporaryPredictions> | null>(null);
   const readController = useRef<AbortController | null>(null);
   const actionInFlight = useRef(false);
   const mounted = useRef(true);
@@ -91,6 +95,15 @@ export default function App({ api }: { api: ReturnType<typeof createApi> }) {
     const saved = restoreHandle(JSON.stringify({ schema: 1, version_id: recoveryVersion.trim(), job_id: recoveryJob.trim() }));
     if (!saved) { setError('Enter valid document and job IDs.'); return; }
     setAccepted(null); remember(saved); await refresh(saved);
+  }
+  function generateDemo(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setDemoError(''); setDemoResult(null);
+    try { setDemoResult(generateTemporaryPredictions(demoText)); }
+    catch (failure) { setDemoError(failure instanceof Error ? failure.message : 'The demo could not generate candidates. Check the text limits below.'); }
+  }
+  function clearDemo() {
+    setDemoText(''); setDemoError(''); setDemoResult(null);
   }
   const view = snapshot ? presentResults(snapshot.results) : null;
   return <>
@@ -162,6 +175,36 @@ export default function App({ api }: { api: ReturnType<typeof createApi> }) {
         <dl className="score-grid"><div><dt>Per redaction</dt><dd>{view?.targetScore ?? 'Not available'}</dd></div><div><dt>Per document</dt><dd>{view?.documentScore ?? 'Not available'}</dd></div><div><dt>Per model</dt><dd>{view?.modelScore ?? 'Not available'}</dd></div></dl>
         <p className="hint">No verified or experimental score is available. Missing, partial, unreadable or uncertain reference text means unknown accuracy.</p>
         <details><summary>Research context</summary><p>Only text passages can be reconstruction targets. Images, tables and wholly withheld pages are excluded. Document readiness is not prediction success, and a timeout or processing failure is not a factual error.</p><p>Trustworthy scoring and scientific validation remain pending. This interface displays the frozen API v0.1 response; it does not calculate accuracy.</p></details>
+      </section>
+      <section className="panel demo-panel" aria-labelledby="demo-title">
+        <div className="demo-heading"><h2 id="demo-title">Experimental text-only demo</h2><span className="unvalidated-badge">UNVALIDATED</span></div>
+        <p id="demo-warning" className="demo-warning">Plausible guesses are not proven correct. This temporary demo uses simple local rules, not PDF processing or AI/model inference. It creates no scores or research evidence.</p>
+        <form onSubmit={generateDemo} aria-describedby="demo-warning">
+          <label htmlFor="demo-text">Manually entered demo text</label>
+          <textarea id="demo-text" rows={5} value={demoText} aria-describedby={demoError ? 'demo-help demo-error' : 'demo-help'} aria-invalid={demoError ? true : undefined}
+            onChange={e => { setDemoText(e.target.value); setDemoError(''); setDemoResult(null); }}
+            placeholder="Synthetic example: The meeting took place in [REDACTED]." />
+          <p id="demo-help" className="hint">Enter synthetic or explicitly authorized plain text with 1–8 literal [REDACTED] markers. Limit: 4,000 UTF-8 bytes. Markup is rejected. Uploaded PDFs and references never fill this field.</p>
+          <div className="demo-actions"><button type="submit">Generate demo candidates</button><button type="button" className="secondary" onClick={clearDemo}>Clear text and remove results</button></div>
+        </form>
+        {demoError ? <p id="demo-error" className="demo-error" role="alert">{demoError}</p> : null}
+        <div className="demo-results" role="status" aria-live="polite" aria-atomic="true">
+          {demoResult ? <>
+            <h3>Unvalidated candidate phrases</h3>
+            <dl className="demo-metadata"><dt>Demo status</dt><dd>{demoResult.status}</dd>
+              <dt>Truth</dt><dd>{demoResult.truth_status} · accuracy unknown</dd>
+              <dt>Score status</dt><dd>{demoResult.score_status} · no scoring</dd>
+              <dt>Verified score</dt><dd>{String(demoResult.verified_score)} · not available</dd>
+              <dt>Experimental score</dt><dd>{String(demoResult.experimental_score)} · not available</dd>
+            </dl>
+            <div className="demo-markers">{demoResult.markers.map(marker => <section className="demo-marker" key={marker.marker_index} aria-labelledby={`demo-marker-${marker.marker_index}`}>
+              <h4 id={`demo-marker-${marker.marker_index}`}>Marker {marker.marker_index}</h4>
+              <p className="hint">Rule basis: {marker.basis} Candidates are alternatives, not recovered hidden text.</p>
+              <ol>{marker.candidates.map((candidate, index) => <li key={index}>{candidate}</li>)}</ol>
+            </section>)}</div>
+          </> : null}
+        </div>
+        <p className="hint">Demo text and candidates stay in this page’s memory. Clear them here or reload to remove them; they are not sent to the local API or saved in browser storage.</p>
       </section>
       <footer>Local, code-only interface · API v0.1 · Independent review pending</footer>
     </main>
