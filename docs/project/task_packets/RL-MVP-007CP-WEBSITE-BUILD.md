@@ -1,5 +1,5 @@
 # RL-MVP-007CP — approved local website build and same-origin hosting
-**OWNER APPROVED SCOPED IMPLEMENTATION / ZERO-COST ISOLATED BUILD; NOT MERGE/DEPLOY APPROVED.** E0056 amendment to E0055. Baseline main 39c5f4a8aabe921324375c6a07b2382641979a31 / E0054. Replaces the E0054 proposed-only restrictions for exactly this packet. API contract v0.1 unchanged.
+**OWNER APPROVED SCOPED IMPLEMENTATION / ZERO-COST ISOLATED BUILD; NOT MERGE/DEPLOY APPROVED.** E0057 amendment to E0055/E0056. Baseline main 39c5f4a8aabe921324375c6a07b2382641979a31 / E0054. Replaces the E0054 proposed-only restrictions for exactly this packet. API contract v0.1 unchanged.
 
 ## Goal and responsibilities
 Turn merged 7C React/TypeScript source and 7P API-only launcher into a browser-usable, loopback-only synthetic local website, with reproducible pinned build and secure same-origin asset serving. Two independent worktrees/branches and handoffs; no competing main edits. Frontend owner coordinates dependency preflight; Packaging owner can develop static-host code against a frozen dist layout in parallel.
@@ -24,3 +24,6 @@ No API/schema/Task 3/4/6 source modifications, no PDF runtime/Podman/VM/image ac
 
 ## E0056 exact-pin amendment
 Owner approved replacement of only the direct pin `vite@7.1.12` with `vite@7.3.5`, following Frontend preflight finding five advisories on the earlier pin. All other direct pins, allowed files, permissions, prohibited actions and independent review/merge gates remain unchanged. Repeat complete transitive existence, checksum, license, engine, install-hook, vulnerability and dependency-graph preflight before any isolated zero-cost install; do not treat the direct-pin advisory result as proof of transitive safety. If unsafe or incompatible, STOP for owner amendment. Existing Frontend blocked handoff is an input; code implementation may resume only under this published amendment.
+
+## E0057 exact dependency override
+Owner approved only the existing frontend package manifest's npm override `esbuild: 0.27.2`, with Vite remaining exactly 7.3.5. No other pinned versions or allowed files change. Regenerate the lockfile with package tooling, do not hand-edit it. Before any zero-cost isolated npm ci --ignore-scripts, recheck the entire transitive graph for integrity, security advisories, licenses, engines and lifecycle hooks. Stop on new unsafe or unauthorized dependencies. Run typecheck, production build, reproducibility and bundle security checks, full regressions and fresh exact-SHA independent QA and Research review. No merge, deployment, Podman/VM, private PDFs, real processing, inference, spending or final 7D acceptance.

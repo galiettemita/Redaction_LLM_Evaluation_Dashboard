@@ -1,4 +1,8 @@
 
+## 2026-10-13 | E0057 | esbuild transitive override approved
+
+Owner approved esbuild 0.27.2 override under unchanged Vite 7.3.5; full lockfile re-audit mandatory before isolated installation. This is coordination publication only, not implementation or merge.
+
 ## 2026-10-13 | E0056 | RL-MVP-007CP exact Vite pin amendment
 
 Owner replaced one unsafe approved Vite direct pin 7.1.12 with 7.3.5 following Frontend advisory preflight. All other pins/scopes/prohibitions unchanged; full transitive security/license/integrity recheck required before isolated zero-cost download/build. No implementation or merge by Lead.
