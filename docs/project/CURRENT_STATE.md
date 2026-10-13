@@ -1,6 +1,6 @@
 # Current state
 
-Updated: 2026-10-11 (America/New_York). Coordination epoch: **E0055**.
+Updated: 2026-10-11 (America/New_York). Coordination epoch: **E0056**.
 Integration branch: `main`. Canonical writer: **Lead/Architect**, within the owner's approved scope.
 Resolve the actual HEAD with GitHub; do not infer a current SHA from this file's timestamp.
 
@@ -80,3 +80,5 @@ E0053: Owner-authorized guarded integration of RL-MVP-007B API Backend published
 E0054: Owner authorized guarded integration of reviewed RL-MVP-007C frontend source and RL-MVP-007P API-only local launcher. Both exact candidate QA/security and Research reviews PASS within code/provenance scope; runnable website, browser accessibility, clean-recipient acceptance and qualified worker remain NOT ESTABLISHED. [Website build/static-host proposal](task_packets/RL-MVP-007CP-WEBSITE-BUILD-PROPOSAL.md) PUBLISHED FOR OWNER REVIEW ONLY. No implementation, dependency install/download, build, extra merge, deployment, real data or inference authorized by that proposal.
 
 E0055: Owner approved scoped [RL-MVP-007CP website build/static-host packet](task_packets/RL-MVP-007CP-WEBSITE-BUILD.md) with isolated zero-cost pinned frontend dependency build and independent same-origin Packaging branch, synthetic tests and fresh scoped QA/Research; separate merge approvals required. No Podman/VM, private data, real PDF/inference, paid calls, deployment or final 7D acceptance.
+
+E0056: Owner approved exact Vite pin substitution `7.1.12` -> `7.3.5` only within [7CP approved packet](task_packets/RL-MVP-007CP-WEBSITE-BUILD.md). All other pins, file scopes and zero-cost isolated install gates unchanged; repeat full transitive preflight. Static-host branch unmerged, formal reviews still required. No merge, deployment, private data, Podman/VM, inference or final 7D acceptance.

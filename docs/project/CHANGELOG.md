@@ -1,4 +1,8 @@
 
+## 2026-10-13 | E0056 | RL-MVP-007CP exact Vite pin amendment
+
+Owner replaced one unsafe approved Vite direct pin 7.1.12 with 7.3.5 following Frontend advisory preflight. All other pins/scopes/prohibitions unchanged; full transitive security/license/integrity recheck required before isolated zero-cost download/build. No implementation or merge by Lead.
+
 ## 2026-10-13 | E0055 | runnable website implementation authorized
 
 Owner approved bounded 7CP React/Vite pinned dependency build in isolated zero-cost environment after security/license checks and separate static-serving Packaging implementation, with synthetic tests and fresh QA/Research. Publication only: no code implementation/install/build/merge/deploy executed by Lead.
