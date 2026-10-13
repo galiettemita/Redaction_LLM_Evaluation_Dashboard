@@ -1,6 +1,21 @@
-# Redaction Lab frontend source — RL-MVP-007C
+# Redaction Lab local frontend — RL-MVP-007CP
 
-This is a **source-only React/TypeScript interface**, not a runnable frontend build or an installed application. The E0052 packet prohibits dependency downloads/installs and adding external dependencies. `package.json` deliberately declares no runtime or build packages, no build script, and no CDN. Opening `index.html` cannot execute TSX or resolve React. A separately authorized packaging/build step must supply approved pinned local React, React DOM, TypeScript and bundler dependencies and a reproducible build/lockfile before recipient acceptance. Do not run `npm install` or fetch packages for this packet.
+This directory contains the React/TypeScript source and the built local production bundle. It uses exact dependency pins, an integrity-pinned npm lock and no CDN. The generated `dist/` assets are intended to be served by Redaction Lab's same-origin, loopback-only local launcher; opening source `index.html` directly is not supported.
+
+## Reproducible build
+
+Prerequisite: Node 24 and npm 11 on macOS Apple Silicon. From this directory:
+
+```sh
+npm ci --ignore-scripts --no-audit --no-fund
+npm run typecheck
+npm run build
+npm test
+```
+
+Do not remove `--ignore-scripts`: the approved build does not authorize dependency lifecycle hooks. The direct dependencies are React and React DOM 19.2.0; development dependencies are TypeScript 5.9.3, Vite 7.3.5 and React type packages 19.2.2. The approved npm override holds esbuild at 0.27.2. `package-lock.json` pins the complete graph with SHA-512 integrity metadata.
+
+The production build emits hashed JavaScript and CSS under `dist/assets/`, with no source maps, remote runtime imports, CDN references, credentials or telemetry. Rebuilding the same source and lock in the verified environment produced byte-identical output. The committed bundle is still subject to fresh independent QA/security and Research review.
 
 ## What is implemented
 
@@ -8,25 +23,25 @@ This is a **source-only React/TypeScript interface**, not a runnable frontend bu
 - Same-origin requests restricted to the browser's `127.0.0.1` HTTP(S) origin; redirects fail rather than forwarding files. No analytics, CDN, external service, prediction endpoint or model call.
 - Document/job status, recovery with saved document/job IDs, manually refreshed stored status, and three result levels preserving null/unknown accuracy. Reconnect only reads; writes are never automatically retried. No automatic processing.
 - A versioned localStorage recovery handle containing only two opaque IDs. File contents, names, reference text and payloads are not stored there. If storage is unavailable, copy the displayed IDs. Restore them with “Restore an existing document.” Recovery refers to the same installation/origin; it is not a portable document export.
-- Explicit unqualified-runtime state and disabled processing. Health v0.1 always reports `runtime_qualified:false`; a future qualified runtime/schema requires an approved contract change.
+- Explicit unqualified-runtime state and disabled processing. Health v0.1 reports `runtime_qualified:false`; a future qualified runtime/schema requires an approved contract change.
 - Responsive layout, semantic regions, skip link, associated labels/help, visible keyboard focus, minimum 44px controls, live status and alert feedback, native disclosure controls, and text labels independent of color. Accessibility is source-reviewed only, not browser-verified.
 
 The frozen API returns an empty target list and null target/document/model summaries even when document processing is `AVAILABLE`. This UI therefore shows no fabricated passages, answers, model rankings or scores. Numeric or nonempty future result payloads fail closed as incompatible with this version. File type/size checks aid the user; server validation remains authoritative. Accepted upload and completed processing are distinct states. A reference upload never implies trustworthy truth. The interface does not expose raw server/transport error strings.
 
-Safe native PDF preview is not qualified in this source-only release, so there is no PDF embedding, browser parsing, download endpoint or external preview service. The document workspace says preview is unavailable. Multipage viewing, passage selection and release comparison await a separately approved safe viewer and result contract; they are not claimed implemented.
+Safe native PDF preview is not qualified in this release, so there is no PDF embedding, browser parsing, download endpoint or external preview service. The document workspace says preview is unavailable. Multipage viewing, passage selection and release comparison await a separately approved safe viewer and result contract; they are not claimed implemented.
 
-## Tests available without installing anything
+## Contract and build tests
 
-With an already installed Node **24 or later** (built-in TypeScript stripping, Fetch/FormData/File):
+After the integrity-pinned installation above:
 
 ```sh
 cd web
 npm test
 ```
 
-Or from the repository root: `node --test web/tests/contract.test.js`. The tests execute the real `src/api.ts` against complete synthetic API responses and a controlled transport. They cover route/method/multipart shape, optional reference isolation, rejected origins/redirect policy, invalid file/size guards, same-origin status recovery, identity mismatch, runtime 503 and acceptance semantics, no write retries, safe errors, malformed contract/version rejection, all result states/nulls, forbidden scores/truth/targets and recovery ID validation. They require no React install, live HTTP service, private PDFs, model, VM or runtime operations.
+Or from the repository root: `node --test web/tests/contract.test.js web/tests/build.test.js`. The tests execute the real `src/api.ts` against complete synthetic API responses and a controlled transport. They also verify exact package configuration, the approved esbuild override, lock integrity metadata, hashed local output, size limits, source-map absence, secret patterns and external URL restrictions. They require no live PDF processing, private PDFs, model, VM or inference runtime.
 
-Tests do not establish a frontend build, browser rendering, keyboard/screen-reader behavior or end-to-end installation. Those checks remain NOT RUN until the build prerequisite is explicitly authorized and available. `src/main.tsx` is a future bundler entry; source imports use the normal React/TypeScript module resolution pattern. Serve the eventual compiled app and `/api/v1` from the same `127.0.0.1` origin; do not use an unrelated dev-server port or CORS proxy.
+Serve this compiled app and `/api/v1` from the same `127.0.0.1` origin; do not use an unrelated development-server port or CORS proxy. The build and synthetic browser smoke do not establish screen-reader conformance, clean-recipient installation, qualified PDF processing or final Task 7D acceptance.
 
 ## Task acceptance checklist
 
@@ -36,8 +51,10 @@ Tests do not establish a frontend build, browser rendering, keyboard/screen-read
 - [x] Null scores, unknown truth, unqualified runtime and empty result payloads represented honestly.
 - [x] Recovery and refresh never start new work; no automatic POST retry.
 - [x] Source layout and accessibility affordances included.
-- [ ] Runnable frontend bundle / TSX typecheck (approved dependencies absent).
-- [ ] Browser visual, interaction and accessibility testing (no runnable build).
+- [x] Exact dependency graph, lock integrity, vulnerability, license, engine and lifecycle preflight.
+- [x] Runnable production bundle and strict TSX typecheck.
+- [x] Deterministic rebuild and local-bundle security checks.
+- [ ] Manual screen-reader testing and clean-recipient installation.
 - [ ] Independent exact-candidate QA/security and Research reviews.
 - [ ] Owner integration approval, deployment and recipient acceptance.
 
