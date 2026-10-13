@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "package_version": "0.1.0-api-demo",
+  "api_version": "0.1",
+  "supported_platform": {"system": "Darwin", "machine": "arm64"},
+  "python_version": "3.12.14",
+  "host": "127.0.0.1",
+  "default_port": 8765,
+  "dependency_pins": {
+    "pdfplumber": "0.11.10",
+    "pdfminer.six": "20260107",
+    "pypdf": "6.20.0",
+    "pypdfium2": "5.14.0",
+    "pydantic": "2.14.0",
+    "pydantic-core": "2.50.0",
+    "annotated-types": "0.8.0",
+    "typing-extensions": "4.16.0",
+    "typing-inspection": "0.4.4",
+    "reportlab": "4.5.1",
+    "Pillow": "12.3.0",
+    "charset-normalizer": "3.5.2",
+    "cryptography": "50.0.2",
+    "cffi": "2.1.1",
+    "pycparser": "3.11"
+  },
+  "pdf_worker": {
+    "lock_path": "packaging/pdf-worker/runtime.lock",
+    "lock_sha256": "aec1716357b99cffe877bcfff0a2610ad5932da4a5fa9326cdf9d86ff6e8996a",
+    "runtime_qualified": false
+  },
+  "delivery_status": {
+    "frontend_available": false,
+    "offline_prerequisite_bundle_available": false,
+    "recipient_acceptance": "NOT_RUN",
+    "inference_available": false,
+    "scientific_validation": "PENDING"
+  }
+}
