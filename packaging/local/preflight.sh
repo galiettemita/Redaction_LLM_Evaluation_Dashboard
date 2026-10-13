@@ -14,6 +14,7 @@ fi
 exec "$python_executable" -I -B - "$package_dir" <<'PY'
 import hashlib
 import importlib.metadata
+import runpy
 import json
 import os
 from pathlib import Path
@@ -30,7 +31,10 @@ def fail(code, message):
 try:
     local = Path(sys.argv[1])
     root = local.parents[1]
-    manifest = json.loads((local / "manifest.json").read_text(encoding="utf-8"))
+    # This helper uses only stdlib. Avoid importing application dependencies
+    # until their platform/interpreter/installed-version checks have passed.
+    static = runpy.run_path(str(root / "src/redaction_lab/api/static.py"))
+    manifest = static["read_local_manifest"](root)
     host = os.environ.get("REDACTION_LAB_HOST", "127.0.0.1")
     if host != "127.0.0.1" or manifest["host"] != "127.0.0.1":
         fail("INVALID_HOST", "Host must be exactly 127.0.0.1")
@@ -60,6 +64,7 @@ try:
     sys.path.insert(0, str(root / "src"))
     from redaction_lab.application.paths import resolve_paths, preflight_directories
     from redaction_lab.api.app import create_app
+    frontend = static["create_static_app"](None, root, manifest.get("frontend"))
     try:
         paths = resolve_paths()
         if (paths.root == Path.home() or paths.root in Path.home().parents
@@ -73,8 +78,8 @@ try:
     print(json.dumps({
         "api_version": "0.1", "state": "DEGRADED", "runtime_qualified": False,
         "mode": "local", "host": host, "port": int(raw_port),
-        "frontend_available": False, "recipient_acceptance": "NOT_RUN",
-        "message": "API prerequisites match; PDF processing and inference remain unavailable",
+        "frontend_available": frontend.frontend_available, "recipient_acceptance": "NOT_RUN",
+        "message": "API prerequisites match; frontend availability requires a verified bundle; PDF processing and inference remain unavailable",
     }, sort_keys=True))
 except (OSError, ValueError, KeyError, TypeError, ImportError):
     fail("PACKAGE_INVALID", "Package files or imports are unavailable; nothing was installed")

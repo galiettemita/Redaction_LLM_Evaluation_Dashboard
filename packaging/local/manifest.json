@@ -1,11 +1,12 @@
 {
   "schema_version": 1,
-  "package_version": "0.1.0-api-demo",
+  "package_version": "0.1.0-local-website-demo",
   "api_version": "0.1",
   "supported_platform": {"system": "Darwin", "machine": "arm64"},
   "python_version": "3.12.14",
   "host": "127.0.0.1",
   "default_port": 8765,
+  "frontend": {"dist_path": "web/dist", "assets": null},
   "dependency_pins": {
     "pdfplumber": "0.11.10",
     "pdfminer.six": "20260107",

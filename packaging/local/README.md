@@ -1,14 +1,20 @@
-# Local API demo package
+# Local website and API demo package
 
 This candidate starts the merged Task 7B API on your own macOS Apple Silicon
-computer. It is an API diagnostic demo: PDF processing is unavailable because
+computer. It can compose a verified frontend bundle on the same origin as the
+API. This branch has no genuine approved build; the frontend build is blocked
+pending the Vite dependency amendment. Only synthetic bundle fixtures have been
+tested here. PDF processing is unavailable because
 the PDF-worker runtime is unqualified; prediction and evaluation models are
 unavailable; accuracy remains unknown and numeric scores remain null.
 
-The baseline has no reviewed and merged frontend build artifact. `web/dist` is
-outside Task 7C's authorized files. Serving frontend assets requires later
-integration/Task 7D authority. Opening `/` returns the API's JSON 404; the health
-endpoint is a diagnostic, not the website. This package is neither a standalone
+The manifest deliberately has `frontend.assets: null` and
+`delivery_status.frontend_available: false`. Until a separately reviewed genuine
+build is pinned, `/` returns 503 `FRONTEND_UNAVAILABLE` and `/api/v1/health`
+remains an API diagnostic. A future approved integration must place the exact
+Frontend artifact under `web/dist` and update the manifest inventory with its
+reviewed paths, sizes, SHA-256 hashes and MIME types; arbitrary builds are not
+accepted. This package is neither a standalone
 installer nor evidence of clean recipient-device acceptance, runtime isolation,
 model availability or scientific validity.
 
@@ -23,8 +29,8 @@ compatible environment and are candidate reproducibility pins, not approval of a
 production stack or software license inventory. Preflight checks every listed
 version and imports the application from this package's `src` directory.
 
-No account, credentials, API keys, Node, Podman or model artifacts are needed for
-this degraded API demo. Scripts never install, download, build images, create
+No account, credentials, API keys, Node, Podman or model artifacts are needed at
+runtime. Scripts never install, download, build assets/images, create
 VMs or start Podman. No prerequisite installation is authorized under Task 7P.
 If an interpreter or dependency is missing or mismatched, stop and arrange a
 separately authorized prerequisite environment. Do not change pins just to bypass
@@ -53,7 +59,9 @@ these scripts require no internet connection.
    sh packaging/local/launch.sh --check
    ```
 
-   Exit 0 with `state: DEGRADED` means the API prerequisites matched. It does not
+   Exit 0 with `state: DEGRADED` means the API prerequisites matched.
+   `frontend_available: true` is emitted only after exact bundle verification;
+   this branch reports false without a genuine artifact. It does not
    mean PDF processing works. Error codes identify incompatible platform/Python,
    missing or mismatched dependencies, unsafe storage, or a changed worker lock.
    Preflight creates no data directory or database and makes no runtime calls.
@@ -63,10 +71,14 @@ these scripts require no internet connection.
    sh packaging/local/launch.sh
    ```
 
-6. In a browser's address bar, type `http://127.0.0.1:8765/api/v1/health` and press
-   **Return**. Expect API version `0.1`, `mode: local`, `state: DEGRADED` and
+6. Read the launcher output. If it prints `Verified frontend assets`, type
+   `http://127.0.0.1:8765/` into your browser's address bar and press **Return**.
+   If it prints `FRONTEND_UNAVAILABLE`, use
+   `http://127.0.0.1:8765/api/v1/health` for the API diagnostic. Expect API
+   version `0.1`, `mode: local`, `state: DEGRADED` and
    `runtime_qualified: false`. Use `127.0.0.1`; `localhost`, another host, IPv6 or
    cross-origin requests are rejected. No browser is opened automatically.
+   Frontend availability never changes the API's degraded runtime status.
 7. Return to Terminal and press **Control-C** to stop the API. Restarting with the
    same storage directory preserves uploaded synthetic bytes and accepted jobs.
 
@@ -107,6 +119,33 @@ unverified, returning 503 `RUNTIME_UNVERIFIED`; uploads remain accepted with
 unknown truth, empty targets and null scores. Refreshing, reading health or
 restarting does not dispatch a paid run. No inference path is connected.
 
+## Static asset boundary
+
+Only `/` and exact manifest-listed `/assets/<produced-name>.js` or `.css` routes
+support GET/HEAD. There is no `/index.html` alias, directory listing, source-map
+serving or fallback for unknown routes. Queries, encoded/absolute request targets,
+static bodies, transfer encoding and duplicate singleton HTTP headers are
+rejected. Successful HEAD responses carry the exact GET length and no body.
+Normal `/api/v1` requests retain their existing API behavior; the HTTP handler
+rejects ambiguous framing before WSGI, which has no chunked-body decoder.
+
+The install root, manifest and frontend tree must belong to the launching
+account and must not be writable by group/others. Every path component is
+opened with directory descriptors and no-follow flags. Assets must be regular,
+single-link files; missing, extra, symlinked, redirected, changed or incorrectly
+hashed files fail frontend verification. Limits are 32 files, 4 MiB per file
+and 8 MiB total. The only permitted dist entries are `index.html` and `assets`.
+Bytes are validated once and retained as an immutable snapshot, so a later
+filesystem modification cannot cause a request to read a different file.
+Restart is required after an approved package update. No assets or upload data
+share a filesystem route.
+
+Static responses use exact MIME types, no-store, nosniff, no-referrer, denied
+framing and a restrictive content-security policy allowing local scripts,
+styles and connections only. No CDN, cross-origin fetch, inline script or eval
+is enabled. Failed frontend verification leaves the API diagnostic usable;
+an unsafe/invalid package manifest prevents launch entirely.
+
 ## Candidate evidence checklist
 
 - [x] Manifest records platform, interpreter/dependency pins and unavailable gates.
@@ -114,10 +153,14 @@ restarting does not dispatch a paid run. No inference path is connected.
 - [x] Synthetic script checks cover prerequisites, unsafe storage and runtime lock.
 - [x] Synthetic loopback API checks cover upload, fail-closed processing, null
       results, Host/Origin rejection and restart persistence in a copied package.
+- [x] Synthetic static GET/HEAD, exact bytes/MIME/length, security headers and
+      routing/framing/confinement checks pass with a frozen fixture inventory.
+- [x] Frontend verification fails closed and preserves API-only diagnostics.
 - [ ] Independent exact-candidate QA/security review and owner merge authorization.
-- [ ] Frontend integration and full browser workflow.
+- [ ] Genuine frontend build, reviewed hash-pinned integration and browser workflow
+      (BLOCKED pending Frontend dependency amendment/build).
 - [ ] Offline prerequisite bundle, SBOM/license inventory and PDF runtime qualification.
 - [ ] Clean second-device recipient acceptance and authorized real models.
 
 Completed test execution and exact candidate SHAs are recorded in the unique
-Task 7P Packaging handoff; these checks do not settle the pending gates above.
+Task 7CP Packaging handoff; these checks do not settle the pending gates above.

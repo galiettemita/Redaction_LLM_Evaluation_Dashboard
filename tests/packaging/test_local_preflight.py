@@ -1,6 +1,7 @@
 """Synthetic packaging checks; no runtime, model, installer or private data."""
 
 import json
+from hashlib import sha256
 import os
 from pathlib import Path
 import shutil
@@ -17,6 +18,22 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 LOCAL = ROOT / "packaging" / "local"
 HTTP = build_opener(ProxyHandler({}))
+
+
+def install_synthetic_bundle(root):
+    dist = root / "web/dist"
+    (dist / "assets").mkdir(parents=True)
+    files = [("index.html", b'<!doctype html><script type="module" src="/assets/index-smoke.js"></script>', "text/html; charset=utf-8"),
+             ("assets/index-smoke.js", b'console.log("synthetic-only")', "text/javascript; charset=utf-8")]
+    entries = {}
+    for name, body, mime in files:
+        (dist / name).write_bytes(body)
+        entries[name] = {"byte_size": len(body), "sha256": sha256(body).hexdigest(), "content_type": mime}
+    manifest_path = root / "packaging/local/manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    manifest["frontend"] = {"dist_path": "web/dist", "assets": entries}
+    manifest_path.write_text(json.dumps(manifest))
+    return dict(("/" if name == "index.html" else "/" + name, body) for name, body, _ in files)
 
 
 @pytest.fixture
@@ -44,13 +61,13 @@ def run(root, script, env, *args):
                           env=env, cwd="/", capture_output=True, text=True, timeout=15)
 
 
-def simulated_python(tmp_path, *, system="Darwin", machine="arm64", version="3.12.14", missing=None, wrong=None):
+def simulated_python(tmp_path, *, system="Darwin", machine="arm64", version="3.12.14", missing=None, wrong=None, blocked_import=None):
     # Simulate external interpreter/platform/installed metadata, then execute the
     # real shell script's Python payload. All validation and path code stay real.
     wrapper = tmp_path / "test-python"
     wrapper.write_text(
         f"#!{sys.executable}\n"
-        "import sys, platform, importlib.metadata\n"
+        "import sys, platform, importlib.metadata, builtins\n"
         "sys.dont_write_bytecode = True\n"
         f"platform.system = lambda: {system!r}\n"
         f"platform.machine = lambda: {machine!r}\n"
@@ -61,6 +78,11 @@ def simulated_python(tmp_path, *, system="Darwin", machine="arm64", version="3.1
         f"    if name == {wrong!r}: return '0.0.0'\n"
         "    return original(name)\n"
         "importlib.metadata.version = version\n"
+        "original_import = builtins.__import__\n"
+        "def guarded_import(name, *args, **kwargs):\n"
+        f"    if name == {blocked_import!r}: raise ImportError('missing prerequisite')\n"
+        "    return original_import(name, *args, **kwargs)\n"
+        "builtins.__import__ = guarded_import\n"
         "sys.argv = [sys.argv[0], *sys.argv[4:]]\n"
         "exec(compile(sys.stdin.read(), '<packaging-payload>', 'exec'))\n"
     )
@@ -80,7 +102,40 @@ def test_preflight_is_read_only_and_reports_unqualified_runtime(package, tmp_pat
     assert not Path(env["REDACTION_LAB_HOME"]).exists()
 
 
+def test_preflight_only_reports_frontend_after_exact_bundle_verification(package, tmp_path):
+    install_synthetic_bundle(package)
+    env = environment(tmp_path, REDACTION_LAB_PYTHON=simulated_python(tmp_path))
+    result = run(package, "preflight.sh", env)
+    assert result.returncode == 0
+    assert json.loads(result.stdout)["frontend_available"] is True
+    (package / "web/dist/assets/index-smoke.js").write_bytes(b"tampered")
+    result = run(package, "preflight.sh", env)
+    assert result.returncode == 0
+    assert json.loads(result.stdout)["frontend_available"] is False
+    assert not Path(env["REDACTION_LAB_HOME"]).exists()
+
+
+@pytest.mark.parametrize("mutation", ["symlink", "duplicate-key", "oversize"])
+def test_preflight_rejects_untrusted_package_manifest(package, tmp_path, mutation):
+    manifest = package / "packaging/local/manifest.json"
+    if mutation == "symlink":
+        target = tmp_path / "redirected-manifest"
+        manifest.rename(target)
+        manifest.symlink_to(target)
+    elif mutation == "duplicate-key":
+        text = manifest.read_text()
+        manifest.write_text(text.replace('"schema_version": 1', '"schema_version": 1, "schema_version": 1'))
+    else:
+        manifest.write_bytes(b" " * (64 * 1024 + 1))
+    result = run(package, "preflight.sh", environment(tmp_path))
+    assert result.returncode != 0
+    assert json.loads(result.stdout)["error"]["code"] == "PACKAGE_INVALID"
+    assert not (tmp_path / "local state").exists()
+
+
 @pytest.mark.parametrize("settings,code", [
+    ({"system": "Linux", "blocked_import": "pypdf"}, "UNSUPPORTED_PLATFORM"),
+    ({"missing": "pypdf", "blocked_import": "pypdf"}, "DEPENDENCY_MISSING"),
     ({"system": "Linux"}, "UNSUPPORTED_PLATFORM"),
     ({"machine": "x86_64"}, "UNSUPPORTED_PLATFORM"),
     ({"version": "3.11.9"}, "PYTHON_PIN_MISMATCH"),
@@ -163,12 +218,39 @@ def start(root, env):
 
 
 def test_synthetic_loopback_api_upload_fail_closed_and_restart(package, tmp_path):
+    assets = install_synthetic_bundle(package)
     with socket.socket() as reservation:
         reservation.bind(("127.0.0.1", 0))
         port = reservation.getsockname()[1]
     env = environment(tmp_path, REDACTION_LAB_PORT=str(port))
     process, base, health = start(package, env)
     try:
+        for path, body in assets.items():
+            with HTTP.open(base + path, timeout=2) as response:
+                assert response.status == 200
+                assert response.read() == body
+                assert response.headers["Content-Length"] == str(len(body))
+                assert "script-src 'self'" in response.headers["Content-Security-Policy"]
+            with HTTP.open(Request(base + path, method="HEAD"), timeout=2) as response:
+                assert response.read() == b""
+                assert response.headers["Content-Length"] == str(len(body))
+        for target in ("/assets/", "/index.html", "/missing", "/.env"):
+            status, _ = request(base + target)
+            assert status == 404
+        status, _ = request(base + "/?asset=secret")
+        assert status == 400
+        for headers in ({"Host": "localhost"}, {"Origin": "https://example.org"}):
+            status, _ = request(base + "/", headers=headers)
+            assert status == 400
+        for target, headers in [("/%61ssets/index-smoke.js", []), ("/", ["Host: 127.0.0.1"]),
+                                ("/", ["Content-Length: 0", "Content-Length: 0"]),
+                                ("/", ["Transfer-Encoding: chunked"])]:
+            raw = ("GET " + target + " HTTP/1.1\r\nHost: 127.0.0.1:" + str(port) + "\r\n" +
+                   "\r\n".join(headers) + "\r\n\r\n").encode("ascii")
+            with socket.create_connection(("127.0.0.1", port), timeout=2) as connection:
+                connection.sendall(raw)
+                reply = connection.recv(4096)
+                assert reply.split(b"\r\n")[0].split()[1] == b"400"
         assert health == {"api_version": "0.1", "state": "DEGRADED", "runtime_qualified": False, "mode": "local"}
         status, _ = request(base + "/api/v1/health", headers={"Host": "localhost"})
         assert status == 400
@@ -190,6 +272,7 @@ def test_synthetic_loopback_api_upload_fail_closed_and_restart(package, tmp_path
         assert status == 200
         assert result["targets"] == []
         assert result["verified_score"] is None
+        assert result["experimental_score"] is None
         assert result["truth_status"] == "UNKNOWN"
         assert (Path(env["REDACTION_LAB_HOME"]).stat().st_mode & 0o777) == 0o700
     finally:
@@ -198,6 +281,8 @@ def test_synthetic_loopback_api_upload_fail_closed_and_restart(package, tmp_path
     assert "synthetic-package" not in error_log
     process, base, _ = start(package, env)
     try:
+        with HTTP.open(base + "/", timeout=2) as response:
+            assert response.read() == assets["/"]
         status, job_state = request(base + f"/api/v1/jobs/{job}")
         assert status == 200
         assert job_state["status"] == "ACCEPTED"
