@@ -1,4 +1,8 @@
 
+## 2026-10-13 | E0062 | temporary-v1 browser-build dependency prerequisite
+
+Owner approved one zero-cost isolated unchanged-lock npm ci after complete security/integrity/license/engine/lifecycle preflight; no build or install executed by Lead and all later reviews/merge controls remain.
+
 ## 2026-10-13 | E0061 | temporary-v1 source integration and browser-build packet
 
 Owner-approved non-force integration of reviewed six-file source feature and one handoff. Approved a new narrow browser rebuild/manifest packet for later implementation only; no new build, dist change, dependency installation, merge of future build, deployment or inference.
