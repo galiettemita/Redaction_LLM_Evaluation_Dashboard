@@ -74,16 +74,18 @@ def _category_for_marker(
 
 
 def _has_javascript_scheme(text: str) -> bool:
-    lowered = text.lower()
+    casefolded = text.casefold()
     position = 0
     while True:
-        position = lowered.find("javascript", position)
+        position = casefolded.find("javascript", position)
         if position < 0:
             return False
         end = position + len("javascript")
-        while end < len(text) and text[end].isspace():
+        while end < len(casefolded) and (
+            casefolded[end].isspace() or casefolded[end] == "\ufeff"
+        ):
             end += 1
-        if end < len(text) and text[end] == ":":
+        if end < len(casefolded) and casefolded[end] == ":":
             return True
         position += 1
 

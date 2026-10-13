@@ -65,6 +65,23 @@ test('rejects NUL, markup and javascript-style payloads', () => {
   }
 });
 
+test('rejects javascript schemes with Unicode case and separator characters', () => {
+  for (const hostile of [
+    '\u0130javascript:alert(1) [REDACTED]',
+    'javascript\uFEFF:alert(1) [REDACTED]',
+    'javascript\u0085:alert(1) [REDACTED]',
+  ]) {
+    assert.throws(() => generateTemporaryPredictions(hostile), /input|markup|payload/i);
+  }
+});
+
+test('rejects isolated UTF-16 surrogate halves while accepting valid Unicode pairs', () => {
+  for (const hostile of ['\uD800[REDACTED]', '\uDC00[REDACTED]']) {
+    assert.throws(() => generateTemporaryPredictions(hostile), /surrogate|Unicode|input/i);
+  }
+  assert.equal(generateTemporaryPredictions('🙂[REDACTED]').markers.length, 1);
+});
+
 test('numbers multiple markers in order and returns the same result on every call', () => {
   const input = 'They met [REDACTED] in [REDACTED] on [REDACTED].';
   const first = generateTemporaryPredictions(input);

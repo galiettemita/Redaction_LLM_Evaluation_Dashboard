@@ -42,6 +42,10 @@ def test_returns_unvalidated_unknown_result_with_generic_person_candidates() -> 
         "<script>alert(1)</script> [REDACTED]",
         "javascript:alert(1) [REDACTED]",
         "JaVaScRiPt :alert(1) [REDACTED]",
+        "İjavascript:alert(1) [REDACTED]",
+        "javascript\ufeff:alert(1) [REDACTED]",
+        "javascript\u0085:alert(1) [REDACTED]",
+        "\ud800[REDACTED]",
     ],
 )
 def test_rejects_empty_invalid_or_hostile_text(text: str) -> None:

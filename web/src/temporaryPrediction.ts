@@ -60,9 +60,26 @@ function markerPrediction(text: string, markerOffset: number, markerIndex: numbe
   };
 }
 
+function hasUnpairedSurrogate(text: string): boolean {
+  for (let index = 0; index < text.length; index++) {
+    const codeUnit = text.charCodeAt(index);
+    if (codeUnit >= 0xd800 && codeUnit <= 0xdbff) {
+      const next = text.charCodeAt(index + 1);
+      if (next < 0xdc00 || next > 0xdfff) return true;
+      index++;
+    } else if (codeUnit >= 0xdc00 && codeUnit <= 0xdfff) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export function generateTemporaryPredictions(text: string): TemporaryPredictionResult {
   if (typeof text !== 'string' || text.length === 0) {
     throw new TypeError('Input must be a nonempty string.');
+  }
+  if (hasUnpairedSurrogate(text)) {
+    throw new TypeError('Input contains an unpaired Unicode surrogate.');
   }
   if (new TextEncoder().encode(text).byteLength > MAX_UTF8_BYTES) {
     throw new RangeError('Input exceeds the 4000 UTF-8 byte limit.');
@@ -70,7 +87,8 @@ export function generateTemporaryPredictions(text: string): TemporaryPredictionR
   if (text.includes('\0')) {
     throw new TypeError('Input contains a NUL character.');
   }
-  if (/[<>]/.test(text) || /javascript\s*:/i.test(text)) {
+  const normalizedText = text.toLowerCase();
+  if (/[<>]/.test(text) || /javascript[\s\u0085\uFEFF]*:/.test(normalizedText)) {
     throw new TypeError('Input contains markup or a javascript-style payload.');
   }
 
