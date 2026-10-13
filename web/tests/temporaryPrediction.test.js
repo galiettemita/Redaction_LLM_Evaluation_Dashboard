@@ -70,13 +70,18 @@ test('rejects javascript schemes with Unicode case and separator characters', ()
     '\u0130javascript:alert(1) [REDACTED]',
     'javascript\uFEFF:alert(1) [REDACTED]',
     'javascript\u0085:alert(1) [REDACTED]',
+    'javascript\u001C:alert(1) [REDACTED]',
+    'javascript\u001D:alert(1) [REDACTED]',
+    'javascript\u001E:alert(1) [REDACTED]',
+    'javascript\u001F:alert(1) [REDACTED]',
+    'java\u017Fcript:alert(1) [REDACTED]',
   ]) {
     assert.throws(() => generateTemporaryPredictions(hostile), /input|markup|payload/i);
   }
 });
 
 test('rejects isolated UTF-16 surrogate halves while accepting valid Unicode pairs', () => {
-  for (const hostile of ['\uD800[REDACTED]', '\uDC00[REDACTED]']) {
+  for (const hostile of ['\uD800[REDACTED]', '\uDC00[REDACTED]', '[REDACTED]\uD800']) {
     assert.throws(() => generateTemporaryPredictions(hostile), /surrogate|Unicode|input/i);
   }
   assert.equal(generateTemporaryPredictions('🙂[REDACTED]').markers.length, 1);

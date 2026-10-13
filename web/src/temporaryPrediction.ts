@@ -65,7 +65,7 @@ function hasUnpairedSurrogate(text: string): boolean {
     const codeUnit = text.charCodeAt(index);
     if (codeUnit >= 0xd800 && codeUnit <= 0xdbff) {
       const next = text.charCodeAt(index + 1);
-      if (next < 0xdc00 || next > 0xdfff) return true;
+      if (!(next >= 0xdc00 && next <= 0xdfff)) return true;
       index++;
     } else if (codeUnit >= 0xdc00 && codeUnit <= 0xdfff) {
       return true;
@@ -87,8 +87,8 @@ export function generateTemporaryPredictions(text: string): TemporaryPredictionR
   if (text.includes('\0')) {
     throw new TypeError('Input contains a NUL character.');
   }
-  const normalizedText = text.toLowerCase();
-  if (/[<>]/.test(text) || /javascript[\s\u0085\uFEFF]*:/.test(normalizedText)) {
+  const normalizedText = text.toLowerCase().replace(/\u017F/g, 's');
+  if (/[<>]/.test(text) || /javascript[\s\u001C-\u001F\u0085\uFEFF]*:/.test(normalizedText)) {
     throw new TypeError('Input contains markup or a javascript-style payload.');
   }
 
