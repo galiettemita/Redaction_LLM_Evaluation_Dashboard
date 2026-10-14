@@ -1,6 +1,6 @@
 # Current state
 
-Updated: 2026-10-11 (America/New_York). Coordination epoch: **E0065**.
+Updated: 2026-10-11 (America/New_York). Coordination epoch: **E0066**.
 Integration branch: `main`. Canonical writer: **Lead/Architect**, within the owner's approved scope.
 Resolve the actual HEAD with GitHub; do not infer a current SHA from this file's timestamp.
 
@@ -100,3 +100,5 @@ E0063: Owner-authorized guarded integration of temporary v1 browser build HEAD `
 E0064: Owner approved [RL-MVP-007D-QUALIFICATION-01](task_packets/RL-MVP-007D-QUALIFICATION-01.md) Gate A ONLY: read-only QA/security feasibility and dependency/license/runtime inventory, clean-recipient requirements assessment, proposed Gate B plan, unique branch handoffs, and independent Research review. Packet published; **Gate A inspection NOT YET EXECUTED**. No installs/downloads, code changes, test/runtime/VM/PDF operations, inference, private data, costs, deployment, or Gate B permitted. QA report and Research handoff are the next incoming artifacts. E0063 browser integration remains unchanged.
 
 E0065: Owner approved [emergency synthetic-only real-inference task packet](task_packets/RL-MVP-007D-EMERGENCY-REAL-INFERENCE.md) plus [API v0.2](API_CONTRACT_V0_2.md). **PACKET PUBLISHED; implementation NOT STARTED/NOT VERIFIED.** Codex may implement only listed paths on isolated branch and conditionally acquire zero-cost pinned runtimes/model AFTER exact source/hash/license/hardware verification and disk headroom. Previous ~3 GiB free is a hard pre-install risk. New API must preserve PDF isolation, redacted-only Task 4 source authority, null scores and v0.1 compatibility. QA/Security + Research exact-SHA reviews and owner merge approval remain required. No private data, public deployment, spending, scientific method/scoring change, or extra files/Task 3/6/schema edits. E0064 Gate A read-only history remains; E0065 provides task-specific incremental authority only.
+
+E0066: Owner authorized [emergency code-only amendment](task_packets/RL-MVP-007D-EMERGENCY-CODE-ONLY-AMENDMENT-01.md). Codex may perform isolated-branch E0065-scoped source/test implementation and mock/synthetic automated tests despite 6.16 GiB free; runtime operations still require 15 GiB and all integrity/licensing gates. No installation/download, live PDF processing, model inference, private data, paid calls, deployment, merge or scientific scoring change. Implementation NOT STARTED. Independent exact-SHA QA/Research reviews and separate owner merge authorization required.
