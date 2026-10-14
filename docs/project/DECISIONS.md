@@ -1,6 +1,6 @@
 # Decision register
 
-Baseline: [MASTER_SPEC.md](MASTER_SPEC.md), imported 2026-10-06. Epoch E0065.
+Baseline: [MASTER_SPEC.md](MASTER_SPEC.md), imported 2026-10-06. Epoch E0066.
 Product decision IDs `DEC-...` are distinct from the source PDF's open-decision IDs `D01`-`D10`.
 
 ## Authority
@@ -132,3 +132,6 @@ On 2026-10-13 (America/New_York), the product owner approved publication of [RL-
 ## E0065 — owner-authorized emergency experimental real-inference vertical slice
 
 Owner approved on 2026-10-13 (America/New_York) [RL-MVP-007D-EMERGENCY-REAL-INFERENCE](task_packets/RL-MVP-007D-EMERGENCY-REAL-INFERENCE.md) and [API v0.2](API_CONTRACT_V0_2.md) for narrowly scoped isolated-branch code/test implementation, conditional zero-cost pinned Podman/Ollama/model acquisition, PDF-worker qualification and genuine **synthetic-only** local inference **only after** verified sources/full hashes/licenses, hardware compatibility and sufficient disk headroom. No blanket license/data clearance was granted. Previous disk preflight ~3 GiB free is a hard pre-install reassessment gate; no user-file deletion or unapproved workaround. QA/security and Research independently review exact candidate; owner must separately authorize merge. No private PDFs, paid calls, public deployment, scientific score/method changes or Task 3/6/database-schema changes. v0.1 remains unchanged until separately approved v0.2 integration. E0064 Gate A history preserved; Gate A's read-only restriction is superseded **only for this explicitly bounded emergency task**. No claim of actual installation, inference, scientific validation, recipient acceptance or release.
+
+## E0066 — owner-approved code-only emergency amendment
+Owner approved [Task 7D Code-Only Amendment 01](task_packets/RL-MVP-007D-EMERGENCY-CODE-ONLY-AMENDMENT-01.md). Permit isolated-branch code changes and mock/synthetic automated tests within existing E0065 file scope, despite failed disk gate. Forbid downloads, installations, Podman/VM execution, real PDF processing, genuine inference, costs, deployment and merge. Maintain original runtime storage/integrity/license gates, null scoring and independent reviews.
