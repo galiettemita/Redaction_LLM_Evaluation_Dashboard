@@ -1,6 +1,6 @@
 # Current state
 
-Updated: 2026-10-11 (America/New_York). Coordination epoch: **E0062**.
+Updated: 2026-10-11 (America/New_York). Coordination epoch: **E0063**.
 Integration branch: `main`. Canonical writer: **Lead/Architect**, within the owner's approved scope.
 Resolve the actual HEAD with GitHub; do not infer a current SHA from this file's timestamp.
 
@@ -94,3 +94,5 @@ E0060: Owner approved [temporary text-only experimental prediction v1](task_pack
 E0061: Owner authorized guarded integration of temporary text-only source HEAD `1df79a434002193013d7332bdd35c6219cc47cc0` after exact-SHA QA PASS `3bbc81b1e0e5ad74bec622ee74fc86785436745a` and Research scoped PASS `c7bc59f84582860b4b4e17c9e2f45e730b2b9e55`. Source-only experimental heuristic remains absent from compiled website. [Browser build packet](task_packets/RL-MVP-TEMP-PRED-v1-BROWSER-BUILD.md) published and owner-approved for subsequent scoped code work only, NOT performed or merge approved. No real inference, PDF runtime, private data or deployment.
 
 E0062: Owner approved one zero-cost isolated npm ci --ignore-scripts --no-audit --no-fund using unchanged web/package-lock.json after full transitive integrity/license/engine/lifecycle/security preflight. [Browser build packet](task_packets/RL-MVP-TEMP-PRED-v1-BROWSER-BUILD.md) amended; all files, pins, tests, QA/Research and separate merge gates unchanged.
+
+E0063: Owner-authorized guarded integration of temporary v1 browser build HEAD `d0a26aceaea66cde47837eabbd6e9ddf179b0945` (implementation `10bb4536509b0a437825569581f51d7c7d0a42f5`) after exact-SHA independent QA/security PASS `40d206009eb5a4992153763ed10aadff6471f66e` and Research scoped PASS `e59636a172b9554e2587c01f161907fb143cd939`. Browser-visible TEMPORARY_UNVALIDATED manual text guesses only; not PDF inference, accuracy, deployment or final Task 7D acceptance. Local loopback showcase permitted.
