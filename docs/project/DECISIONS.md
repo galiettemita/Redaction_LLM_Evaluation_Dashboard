@@ -1,6 +1,6 @@
 # Decision register
 
-Baseline: [MASTER_SPEC.md](MASTER_SPEC.md), imported 2026-10-06. Epoch E0063.
+Baseline: [MASTER_SPEC.md](MASTER_SPEC.md), imported 2026-10-06. Epoch E0064.
 Product decision IDs `DEC-...` are distinct from the source PDF's open-decision IDs `D01`-`D10`.
 
 ## Authority
@@ -124,3 +124,7 @@ Record: title; UTC timestamp; proposer; human approval evidence/reference and da
 Approved amendments override conflicting baseline clauses only within their recorded scope. Proposed alternatives do not override anything. Conflicting approved records require Lead reconciliation and human clarification where needed.
 
 A critical correction first places affected work on hold in CURRENT_STATE, then receives impact review. The accepted update changes this register and the affected canonical files in one integration commit. Receivers acknowledge the new epoch in their next task handoff before resuming. An absent acknowledgment is `NOT ACKNOWLEDGED`, never presumed consent.
+
+## E0064 — RL-MVP-007D Gate A read-only feasibility authorization
+
+On 2026-10-13 (America/New_York), the product owner approved publication of [RL-MVP-007D-QUALIFICATION-01](task_packets/RL-MVP-007D-QUALIFICATION-01.md) and Gate A read-only QA/security feasibility inspection, PDF runtime/dependency and license inventory, clean-recipient requirements and proposed Gate B acceptance plan, scoped task handoffs, and independent Research review. **No code changes, dependency installs/downloads, tests, PDF/VM/container runtime operation, private data, model inference, paid calls, spending, deployment, merge or Gate B execution are authorized.** Gate A completion is not scientific validation or final recipient acceptance. Lead must obtain separate owner approval for an exact Gate B execution packet.
