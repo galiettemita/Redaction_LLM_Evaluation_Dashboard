@@ -1,4 +1,9 @@
 
+
+## E0065 — 2026-10-13 — emergency experimental inference authorization
+
+Owner authorized publication of `docs/project/API_CONTRACT_V0_2.md` and `docs/project/task_packets/RL-MVP-007D-EMERGENCY-REAL-INFERENCE.md` plus bounded isolated-branch implementation. Zero-cost local runtime/model acquisition requires verified full hashes/license/platform/disk prerequisites; synthetic-only inference. Requires independent QA/security and Research exact-SHA reviews and separate merge authorization. No implementation, runtime installation, inference, paid calls or deployment occurred in this coordination update. Preserve v0.1 and all null-score/truth-isolation constraints.
+
 ## 2026-10-13 | E0063 | temporary v1 browser bundle integrated
 
 Owner-authorized guarded integration of reviewed deterministic temporary text-only prediction panel assets/manifest, after independent QA/security and Research scoped PASS. Loopback showcase only; no real inference, PDF runtime, scoring, private data, public deployment or final Task 7D acceptance.
