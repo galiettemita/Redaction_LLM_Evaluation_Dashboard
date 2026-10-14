@@ -4,6 +4,8 @@ This file is the Lead-maintained routing/index record. Each specialist writes a 
 
 ## Initial inbox
 
+| E0064 / RL-MVP-007D Gate A read-only qualification | Lead -> QA/Security, Research -> Lead | OWNER APPROVED — GATE A ONLY; NOT EXECUTED | [Approved packet](task_packets/RL-MVP-007D-QUALIFICATION-01.md): QA read-only inventory and proposed Gate B; independent Research scoped methodology handoff; no runtime/tests/install/code, inference, costs, deployment or Gate B. Recipients review live HEAD and publish unique branch handoffs. |
+
 | Item | Sender -> receiver | State | Next action |
 | --- | --- | --- | --- |
 | E0001 / RL-OPS-001 coordination baseline | Setup -> all roles | AVAILABLE; no receiver acknowledgment recorded | Read current HEAD and instructions on first active task. |
