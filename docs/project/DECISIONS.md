@@ -1,6 +1,6 @@
 # Decision register
 
-Baseline: [MASTER_SPEC.md](MASTER_SPEC.md), imported 2026-10-06. Epoch E0064.
+Baseline: [MASTER_SPEC.md](MASTER_SPEC.md), imported 2026-10-06. Epoch E0065.
 Product decision IDs `DEC-...` are distinct from the source PDF's open-decision IDs `D01`-`D10`.
 
 ## Authority
@@ -128,3 +128,7 @@ A critical correction first places affected work on hold in CURRENT_STATE, then 
 ## E0064 — RL-MVP-007D Gate A read-only feasibility authorization
 
 On 2026-10-13 (America/New_York), the product owner approved publication of [RL-MVP-007D-QUALIFICATION-01](task_packets/RL-MVP-007D-QUALIFICATION-01.md) and Gate A read-only QA/security feasibility inspection, PDF runtime/dependency and license inventory, clean-recipient requirements and proposed Gate B acceptance plan, scoped task handoffs, and independent Research review. **No code changes, dependency installs/downloads, tests, PDF/VM/container runtime operation, private data, model inference, paid calls, spending, deployment, merge or Gate B execution are authorized.** Gate A completion is not scientific validation or final recipient acceptance. Lead must obtain separate owner approval for an exact Gate B execution packet.
+
+## E0065 — owner-authorized emergency experimental real-inference vertical slice
+
+Owner approved on 2026-10-13 (America/New_York) [RL-MVP-007D-EMERGENCY-REAL-INFERENCE](task_packets/RL-MVP-007D-EMERGENCY-REAL-INFERENCE.md) and [API v0.2](API_CONTRACT_V0_2.md) for narrowly scoped isolated-branch code/test implementation, conditional zero-cost pinned Podman/Ollama/model acquisition, PDF-worker qualification and genuine **synthetic-only** local inference **only after** verified sources/full hashes/licenses, hardware compatibility and sufficient disk headroom. No blanket license/data clearance was granted. Previous disk preflight ~3 GiB free is a hard pre-install reassessment gate; no user-file deletion or unapproved workaround. QA/security and Research independently review exact candidate; owner must separately authorize merge. No private PDFs, paid calls, public deployment, scientific score/method changes or Task 3/6/database-schema changes. v0.1 remains unchanged until separately approved v0.2 integration. E0064 Gate A history preserved; Gate A's read-only restriction is superseded **only for this explicitly bounded emergency task**. No claim of actual installation, inference, scientific validation, recipient acceptance or release.
