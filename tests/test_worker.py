@@ -22,6 +22,7 @@ from redaction_lab.fixtures import make_synthetic_pair
 from redaction_lab.prediction_source import derive_prediction_source
 from redaction_lab.store import ResolvedAttempt, RunStore
 from redaction_lab.worker import run_pending_once
+from redaction_lab.worker import run_job_once
 
 
 NOW = datetime(2026, 10, 9, tzinfo=UTC)
@@ -144,6 +145,21 @@ class CrashingAdapter(MockAdapter):
     async def predict(self, manifest: PredictionManifest) -> PredictionResponse:
         self.calls += 1
         raise RuntimeError("worker died after dispatch began")
+
+
+def test_target_scoped_worker_never_drains_an_unrelated_pending_job(tmp_path) -> None:
+    store = RunStore(tmp_path / "run.sqlite3")
+    source = _ingest(store, tmp_path)
+    run = _run(source)
+    first = store.enqueue(source.source_id, source.targets[0].target_id, run)
+    second = store.enqueue(source.source_id, source.targets[1].target_id, run)
+    adapter = MockAdapter()
+
+    assert asyncio.run(run_job_once(store, adapter, second)) is True
+
+    assert store.job(first).state == "PENDING"
+    assert store.job(second).state == "COMPLETE"
+    assert adapter.calls == 1
 
 
 def test_only_stored_pdf_source_can_enqueue_not_direct_or_forged_manifest(tmp_path) -> None:

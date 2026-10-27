@@ -8,8 +8,9 @@ from pathlib import Path
 import pytest
 
 import redaction_lab.application.isolation as isolation_module
-from redaction_lab.api.app import create_app
+from redaction_lab.api.app import LocalApi, create_app
 from redaction_lab.application.application_store import ApplicationStore, ProcessingStatus
+from redaction_lab.application.application_store import StoredDocumentVersion
 from redaction_lab.application.artifact_store import ArtifactStore
 from redaction_lab.application.upload_service import UploadService
 
@@ -112,9 +113,9 @@ def test_health_is_versioned_and_truthfully_degraded(tmp_path: Path) -> None:
         artifacts.close()
 
     assert status == 200
-    assert headers["X-Redaction-Lab-API"] == "0.1"
+    assert headers["X-Redaction-Lab-API"] == "0.2"
     assert payload == {
-        "api_version": "0.1",
+        "api_version": "0.2",
         "state": "DEGRADED",
         "runtime_qualified": False,
         "mode": "local",
@@ -204,6 +205,46 @@ def test_results_remain_pending_with_null_scores_and_no_fabricated_targets(
         "experimental_score": None,
         "truth_status": "UNKNOWN",
     }
+
+
+def test_v02_result_payload_exposes_only_revalidated_attempt_provenance() -> None:
+    version = StoredDocumentVersion(
+        version_id="version-1",
+        document_id="document-1",
+        project_id="project-1",
+        role=__import__("redaction_lab.contracts", fromlist=["DocumentRole"]).DocumentRole.REDACTED,
+        artifact_key="sha256/aa/file.pdf",
+        sha256="a" * 64,
+        byte_size=10,
+        page_count=1,
+        processing_state=ProcessingStatus.READY,
+        source_id="source-1",
+        created_at=datetime(2026, 10, 13, tzinfo=UTC),
+    )
+    target = {
+        "target_id": "target-1",
+        "target_version": "target-v1",
+        "page_index": 0,
+        "normalized_bbox": [0.1, 0.2, 0.3, 0.4],
+        "attempt_id": "attempt-1",
+        "attempt_status": "SUCCEEDED",
+        "prediction": "Synthetic prediction <not markup>",
+        "model_id": "model-1",
+        "provider_model_id": "model-1",
+        "model_config_id": "config-1",
+        "request_hash": "b" * 64,
+        "response_hash": "c" * 64,
+    }
+
+    result = LocalApi._result_payload(version, (target,))
+
+    assert result["status"] == "AVAILABLE"
+    assert result["targets"] == [target]
+    assert result["truth_status"] == "UNKNOWN"
+    assert result["score_status"] == "NONE"
+    assert result["verified_score"] is None
+    assert result["experimental_score"] is None
+    assert result["summaries"] == {"target": None, "document": None, "model": None}
 
 
 def test_unverified_runtime_returns_503_without_claiming_job_or_creating_source(

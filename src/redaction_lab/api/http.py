@@ -15,7 +15,7 @@ from urllib.parse import urlsplit
 from redaction_lab.application.config import MAX_PAIR_BYTES, MAX_PDF_BYTES
 
 
-API_VERSION = "0.1"
+API_VERSION = "0.2"
 MAX_MULTIPART_OVERHEAD_BYTES = 64 * 1024
 MAX_UPLOAD_BODY_BYTES = MAX_PAIR_BYTES + MAX_MULTIPART_OVERHEAD_BYTES
 _HOST_PATTERN = re.compile(r"^127\.0\.0\.1(?::([0-9]{1,5}))?$")

@@ -14,6 +14,18 @@ async def run_pending_once(store: RunStore, adapter: PredictionAdapter) -> bool:
     if pending is None:
         return False
 
+    return await run_job_once(store, adapter, pending.job_id)
+
+
+async def run_job_once(
+    store: RunStore, adapter: PredictionAdapter, job_id: str
+) -> bool:
+    """Dispatch exactly one named durable intent; never drain unrelated work."""
+
+    pending = store.job(job_id)
+    if pending.state != "PENDING":
+        return False
+
     request_hash = adapter.request_hash(pending.manifest)
     attempt_id = store.claim(
         pending.job_id,
