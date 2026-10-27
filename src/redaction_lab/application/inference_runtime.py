@@ -25,22 +25,29 @@ class InferenceRuntimeUnavailable(RuntimeError):
     """The pinned local model runtime has not been independently qualified."""
 
 
-@dataclass(frozen=True)
+@dataclass
 class VerifiedInferenceRuntime:
     adapter: PredictionAdapter
     model_config_id: str
     model_manifest_digest: str
     process: subprocess.Popen[bytes] | None = None
+    executable_fd: int | None = None
 
     def close(self) -> None:
-        if self.process is None or self.process.poll() is not None:
-            return
-        self.process.terminate()
-        try:
-            self.process.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            self.process.kill()
-            self.process.wait(timeout=5)
+        process, self.process = self.process, None
+        descriptor, self.executable_fd = self.executable_fd, None
+        if process is not None and process.poll() is None:
+            process.terminate()
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait(timeout=5)
+        if descriptor is not None:
+            try:
+                os.close(descriptor)
+            except OSError:
+                pass
 
 
 class _RuntimeBoundAdapter(PredictionAdapter):
@@ -101,7 +108,7 @@ class InferenceRuntime:
 
     @staticmethod
     def _start_owned_runtime(
-        executable: Path, model_store: Path
+        executable_fd: int, model_store: Path
     ) -> subprocess.Popen[bytes]:
         try:
             connection = socket.create_connection(("127.0.0.1", 11434), timeout=0.25)
@@ -114,11 +121,12 @@ class InferenceRuntime:
             )
         try:
             return subprocess.Popen(
-                [str(executable), "serve"],
+                [f"/dev/fd/{executable_fd}", "serve"],
                 stdin=subprocess.DEVNULL,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 close_fds=True,
+                pass_fds=(executable_fd,),
                 env={
                     "PATH": "/usr/bin:/bin",
                     "OLLAMA_HOST": "127.0.0.1:11434",
@@ -129,10 +137,68 @@ class InferenceRuntime:
             raise InferenceRuntimeUnavailable("could not start owned Ollama runtime") from error
 
     @staticmethod
+    def _file_identity(info: os.stat_result) -> tuple[int, ...]:
+        return (
+            info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns,
+            info.st_ctime_ns, info.st_mode, info.st_uid, info.st_nlink,
+        )
+
+    @classmethod
+    def _hash_descriptor(cls, descriptor: int) -> tuple[str, tuple[int, ...]]:
+        before = os.fstat(descriptor)
+        os.lseek(descriptor, 0, os.SEEK_SET)
+        digest = sha256()
+        while chunk := os.read(descriptor, 1024 * 1024):
+            digest.update(chunk)
+        after = os.fstat(descriptor)
+        if cls._file_identity(before) != cls._file_identity(after):
+            raise InferenceRuntimeUnavailable("executable changed during verification")
+        return "sha256:" + digest.hexdigest(), cls._file_identity(after)
+
+    @classmethod
+    def _open_verified_executable(
+        cls, executable: Path, expected: str
+    ) -> tuple[int, tuple[int, ...]]:
+        if not executable.is_absolute():
+            raise InferenceRuntimeUnavailable("locked Ollama executable is unavailable")
+        for parent in executable.parents:
+            try:
+                info = parent.lstat()
+            except OSError as error:
+                raise InferenceRuntimeUnavailable("executable path is unavailable") from error
+            if (
+                parent.is_symlink()
+                or not stat.S_ISDIR(info.st_mode)
+                or info.st_uid not in {0, os.geteuid()}
+                or info.st_mode & 0o022
+            ):
+                raise InferenceRuntimeUnavailable("executable path is untrusted")
+        try:
+            descriptor = os.open(executable, os.O_RDONLY | os.O_NOFOLLOW)
+            info = os.fstat(descriptor)
+            if (
+                not stat.S_ISREG(info.st_mode)
+                or info.st_uid != os.geteuid()
+                or info.st_mode & 0o022
+                or info.st_nlink != 1
+                or not info.st_mode & stat.S_IXUSR
+            ):
+                raise InferenceRuntimeUnavailable("locked Ollama executable is untrusted")
+            observed, identity = cls._hash_descriptor(descriptor)
+            if observed != expected:
+                raise InferenceRuntimeUnavailable("Ollama executable digest mismatch")
+            return descriptor, identity
+        except Exception:
+            if "descriptor" in locals():
+                os.close(descriptor)
+            raise
+
+    @staticmethod
     def _assert_model_files(model_store: Path, value: dict[str, object]) -> None:
         files = value.get("model_files")
         if not isinstance(files, dict) or not 1 <= len(files) <= 128:
             raise InferenceRuntimeUnavailable("model file inventory is incomplete")
+        expected_files: dict[str, str] = {}
         for relative, expected in files.items():
             if (
                 not isinstance(relative, str)
@@ -143,29 +209,57 @@ class InferenceRuntime:
                 or expected.endswith("0" * 64)
             ):
                 raise InferenceRuntimeUnavailable("model file inventory is invalid")
-            candidate = model_store.joinpath(*relative.split("/"))
-            current = model_store
+            expected_files[relative] = expected
+
+        observed_files: dict[str, Path] = {}
+        directories: list[tuple[Path, str]] = [(model_store, "")]
+        visited = 0
+        while directories:
+            directory, prefix = directories.pop()
+            visited += 1
+            if visited > 256:
+                raise InferenceRuntimeUnavailable("model store inventory is too large")
             try:
-                for component in relative.split("/")[:-1]:
-                    current = current / component
-                    if current.is_symlink() or not current.is_dir():
-                        raise InferenceRuntimeUnavailable("model file path is untrusted")
-                info = candidate.stat()
-                if (
-                    candidate.is_symlink()
-                    or not stat.S_ISREG(info.st_mode)
-                    or info.st_uid != os.geteuid()
-                    or info.st_mode & 0o022
-                    or info.st_nlink != 1
-                ):
-                    raise InferenceRuntimeUnavailable("model file is untrusted")
-                observed = sha256()
-                with candidate.open("rb") as stream:
-                    for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                entries = tuple(os.scandir(directory))
+            except OSError as error:
+                raise InferenceRuntimeUnavailable("model store is unavailable") from error
+            for entry in entries:
+                relative = prefix + entry.name
+                try:
+                    info = entry.stat(follow_symlinks=False)
+                except OSError as error:
+                    raise InferenceRuntimeUnavailable("model file is unavailable") from error
+                if entry.is_symlink() or info.st_uid != os.geteuid() or info.st_mode & 0o022:
+                    raise InferenceRuntimeUnavailable("model store entry is untrusted")
+                if stat.S_ISDIR(info.st_mode):
+                    directories.append((Path(entry.path), relative + "/"))
+                elif stat.S_ISREG(info.st_mode) and info.st_nlink == 1:
+                    observed_files[relative] = Path(entry.path)
+                else:
+                    raise InferenceRuntimeUnavailable("model store entry is untrusted")
+
+        if set(observed_files) != set(expected_files):
+            raise InferenceRuntimeUnavailable("model file inventory is incomplete")
+        for relative, candidate in observed_files.items():
+            try:
+                descriptor = os.open(candidate, os.O_RDONLY | os.O_NOFOLLOW)
+                try:
+                    before = os.fstat(descriptor)
+                    observed = sha256()
+                    while chunk := os.read(descriptor, 1024 * 1024):
                         observed.update(chunk)
+                    after = os.fstat(descriptor)
+                finally:
+                    os.close(descriptor)
             except OSError as error:
                 raise InferenceRuntimeUnavailable("model file is unavailable") from error
-            if "sha256:" + observed.hexdigest() != expected:
+            identity = lambda info: (
+                info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns,
+                info.st_ctime_ns, info.st_mode, info.st_uid, info.st_nlink,
+            )
+            if identity(before) != identity(after):
+                raise InferenceRuntimeUnavailable("model file changed during verification")
+            if "sha256:" + observed.hexdigest() != expected_files[relative]:
                 raise InferenceRuntimeUnavailable("model file digest mismatch")
 
     def verified(self) -> VerifiedInferenceRuntime:
@@ -205,17 +299,6 @@ class InferenceRuntime:
         if value["model_id"] != value["provider_model_id"]:
             raise InferenceRuntimeUnavailable("provider model identity mismatch")
         executable = Path(value["ollama_executable"])
-        if not executable.is_absolute() or executable.is_symlink() or not os.access(executable, os.X_OK):
-            raise InferenceRuntimeUnavailable("locked Ollama executable is unavailable")
-        try:
-            executable_hash = sha256()
-            with executable.open("rb") as stream:
-                for chunk in iter(lambda: stream.read(1024 * 1024), b""):
-                    executable_hash.update(chunk)
-        except OSError as error:
-            raise InferenceRuntimeUnavailable("Ollama executable verification failed") from error
-        if "sha256:" + executable_hash.hexdigest() != executable_digest:
-            raise InferenceRuntimeUnavailable("Ollama executable digest mismatch")
         model_store = Path(value["model_store"])
         try:
             model_store_info = model_store.stat()
@@ -230,20 +313,50 @@ class InferenceRuntime:
         ):
             raise InferenceRuntimeUnavailable("locked model store is untrusted")
         self._assert_model_files(model_store, value)
+        executable_fd, executable_identity = self._open_verified_executable(
+            executable, executable_digest
+        )
         try:
             completed = subprocess.run(
-                [str(executable), "--version"],
+                [f"/dev/fd/{executable_fd}", "--version"],
                 check=False,
                 capture_output=True,
                 text=True,
                 timeout=5,
                 env={"PATH": "/usr/bin:/bin"},
+                pass_fds=(executable_fd,),
             )
         except (OSError, subprocess.SubprocessError) as error:
+            os.close(executable_fd)
             raise InferenceRuntimeUnavailable("Ollama executable verification failed") from error
         if completed.returncode != 0 or completed.stdout.strip() != f"ollama version {value['ollama_version']}":
+            os.close(executable_fd)
             raise InferenceRuntimeUnavailable("Ollama version mismatch")
-        process = self._start_owned_runtime(executable, model_store)
+        observed_digest, observed_identity = self._hash_descriptor(executable_fd)
+        if observed_digest != executable_digest or observed_identity != executable_identity:
+            os.close(executable_fd)
+            raise InferenceRuntimeUnavailable("Ollama executable changed before launch")
+        try:
+            process = self._start_owned_runtime(executable_fd, model_store)
+        except Exception:
+            os.close(executable_fd)
+            raise
+        try:
+            observed_digest, observed_identity = self._hash_descriptor(executable_fd)
+            if observed_digest != executable_digest or observed_identity != executable_identity:
+                raise InferenceRuntimeUnavailable("Ollama executable changed during launch")
+        except Exception:
+            VerifiedInferenceRuntime(
+                adapter=OllamaAdapter(
+                    endpoint=str(value["endpoint"]), model_id=str(value["model_id"]),
+                    model_config_id=str(value["model_config_id"]), timeout_seconds=60,
+                ),
+                model_config_id=str(value["model_config_id"]),
+                model_manifest_digest=digest,
+                process=process,
+                executable_fd=executable_fd,
+            ).close()
+            raise
         opener = build_opener(ProxyHandler({}), _NoRedirect())
         try:
             deadline = time.monotonic() + 5
@@ -273,6 +386,7 @@ class InferenceRuntime:
                 model_config_id=str(value["model_config_id"]),
                 model_manifest_digest=digest,
                 process=process,
+                executable_fd=executable_fd,
             )
         except Exception:
             if process.poll() is None:
@@ -282,4 +396,5 @@ class InferenceRuntime:
                 except subprocess.TimeoutExpired:
                     process.kill()
                     process.wait(timeout=5)
+            os.close(executable_fd)
             raise

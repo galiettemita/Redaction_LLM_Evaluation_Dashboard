@@ -4,6 +4,7 @@ import asyncio
 from io import BytesIO
 from hashlib import sha256
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -99,7 +100,11 @@ def test_runtime_verifies_exact_executable_version_and_full_model_digest(
 
     monkeypatch.setattr("redaction_lab.application.inference_runtime.subprocess.run", fake_run)
     monkeypatch.setattr("redaction_lab.application.inference_runtime.build_opener", lambda *handlers: Opener())
-    monkeypatch.setattr(InferenceRuntime, "_start_owned_runtime", lambda self, executable, model_store: process)
+    def fake_start(self, executable_fd, model_store):
+        observed["serve_fd"] = executable_fd
+        return process
+
+    monkeypatch.setattr(InferenceRuntime, "_start_owned_runtime", fake_start)
 
     verified = InferenceRuntime().verified()
     adapter = verified.adapter
@@ -107,8 +112,11 @@ def test_runtime_verifies_exact_executable_version_and_full_model_digest(
     assert adapter.model_id == value["model_id"]
     assert verified.model_manifest_digest == value["model_manifest_digest"]
     assert verified.model_config_id == value["model_config_id"]
-    assert observed["command"] == [value["ollama_executable"], "--version"]
+    assert observed["command"][0].startswith("/dev/fd/")
+    assert observed["command"][1] == "--version"
+    assert observed["command"][0] == f"/dev/fd/{observed['serve_fd']}"
     assert observed["kwargs"]["env"] == {"PATH": "/usr/bin:/bin"}
+    assert observed["kwargs"]["pass_fds"]
     assert observed["urls"] == [
         "http://127.0.0.1:11434/api/version",
         "http://127.0.0.1:11434/api/tags",
@@ -174,7 +182,7 @@ def test_owned_runtime_refuses_preexisting_loopback_listener(tmp_path, monkeypat
         lambda *args, **kwargs: Connection(),
     )
     with pytest.raises(InferenceRuntimeUnavailable, match="unowned"):
-        InferenceRuntime._start_owned_runtime(executable, model_store)
+        InferenceRuntime._start_owned_runtime(123, model_store)
 
 
 def test_owned_runtime_launches_only_pinned_binary_and_confined_model_store(
@@ -202,14 +210,19 @@ def test_owned_runtime_launches_only_pinned_binary_and_confined_model_store(
         "redaction_lab.application.inference_runtime.subprocess.Popen", popen
     )
 
-    assert InferenceRuntime._start_owned_runtime(executable, model_store) is process
-    assert observed["command"] == [str(executable), "serve"]
+    descriptor = os.open(executable, os.O_RDONLY)
+    try:
+        assert InferenceRuntime._start_owned_runtime(descriptor, model_store) is process
+    finally:
+        os.close(descriptor)
+    assert observed["command"] == [f"/dev/fd/{descriptor}", "serve"]
     assert observed["kwargs"]["env"] == {
         "PATH": "/usr/bin:/bin",
         "OLLAMA_HOST": "127.0.0.1:11434",
         "OLLAMA_MODELS": str(model_store),
     }
     assert observed["kwargs"]["close_fds"] is True
+    assert observed["kwargs"]["pass_fds"] == (descriptor,)
 
 
 def test_model_file_inventory_detects_blob_substitution(tmp_path) -> None:
@@ -219,3 +232,25 @@ def test_model_file_inventory_detects_blob_substitution(tmp_path) -> None:
     next(model_store.iterdir()).write_bytes(b"substituted")
     with pytest.raises(InferenceRuntimeUnavailable, match="digest mismatch"):
         InferenceRuntime._assert_model_files(model_store, value)
+
+
+def test_model_file_inventory_rejects_unlisted_payload(tmp_path) -> None:
+    _, value = _lock(tmp_path)
+    model_store = Path(value["model_store"])
+    (model_store / "unlisted-actual-model-blob").write_bytes(b"unlisted")
+    with pytest.raises(InferenceRuntimeUnavailable, match="inventory is incomplete"):
+        InferenceRuntime._assert_model_files(model_store, value)
+
+
+@pytest.mark.parametrize("mutation", ["writable", "hardlink"])
+def test_executable_descriptor_rejects_mutable_or_aliased_binary(tmp_path, mutation) -> None:
+    executable = tmp_path / "ollama"
+    executable.write_bytes(b"synthetic")
+    executable.chmod(0o700)
+    digest = "sha256:" + sha256(executable.read_bytes()).hexdigest()
+    if mutation == "writable":
+        executable.chmod(0o720)
+    else:
+        os.link(executable, tmp_path / "ollama-alias")
+    with pytest.raises(InferenceRuntimeUnavailable, match="untrusted"):
+        InferenceRuntime._open_verified_executable(executable, digest)
