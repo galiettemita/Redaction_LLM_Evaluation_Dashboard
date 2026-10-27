@@ -4,6 +4,8 @@ This file is the Lead-maintained routing/index record. Each specialist writes a 
 
 ## Initial inbox
 
+| E0068 / RL-MVP-007D Correction 01 execution | Lead -> Backend/Codex, QA/security, Research | OWNER APPROVED CODE-ONLY; NOT IMPLEMENTED | [Execution amendment](task_packets/RL-MVP-007D-E0066-CORRECTION-01-EXECUTION.md): four grouped QA fixes, exactly three source and three test paths including newly authorized `adapters/ollama.py`, one handoff. Fresh exact-SHA QA/Research, separate merge gate. No runtime/install/inference/deploy. |
+
 | E0067 / RL-MVP-007D E0066 grouped Correction 01 | Lead -> Backend/Codex, QA/Security, Research | PACKET PUBLISHED; EXECUTION NOT AUTHORIZED | [Correction packet](task_packets/RL-MVP-007D-E0066-CORRECTION-01.md) covers four independently reported QA issues on `e6669c2`; Codex first reports read-only file-scope feasibility. `adapters/ollama.py` and new helper paths need owner amendment if required. Research handoff not verified; no merge/runtime/inference/deployment. |
 
 | E0066 / Task 7D emergency Code-Only Amendment 01 | Lead -> Backend/Codex, QA, Research | OWNER APPROVED — CODE ONLY; NOT IMPLEMENTED | [Amendment](task_packets/RL-MVP-007D-EMERGENCY-CODE-ONLY-AMENDMENT-01.md): existing isolated branch and scoped code/mock tests permitted without passing disk gate. Installs/downloads, real PDF/runtime/inference, costs, deployment and merge remain forbidden; exact-SHA independent reviews required. |
