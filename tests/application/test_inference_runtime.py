@@ -254,3 +254,18 @@ def test_executable_descriptor_rejects_mutable_or_aliased_binary(tmp_path, mutat
         os.link(executable, tmp_path / "ollama-alias")
     with pytest.raises(InferenceRuntimeUnavailable, match="untrusted"):
         InferenceRuntime._open_verified_executable(executable, digest)
+
+
+@pytest.mark.parametrize("mutation", ["writable", "symlink"])
+def test_runtime_lock_rejects_mutable_or_redirected_file(tmp_path, mutation) -> None:
+    path, _ = _lock(tmp_path)
+    if mutation == "writable":
+        path.chmod(0o666)
+        target = path
+    else:
+        target = tmp_path / "redirected.lock"
+        path.rename(target)
+        path.symlink_to(target)
+        target = path
+    with pytest.raises(InferenceRuntimeUnavailable):
+        InferenceRuntime._read_lock(target)

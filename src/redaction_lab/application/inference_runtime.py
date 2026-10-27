@@ -143,6 +143,54 @@ class InferenceRuntime:
             info.st_ctime_ns, info.st_mode, info.st_uid, info.st_nlink,
         )
 
+    @staticmethod
+    def _audit_parent_directories(path: Path) -> None:
+        for parent in path.parents:
+            try:
+                info = parent.lstat()
+            except OSError as error:
+                raise InferenceRuntimeUnavailable("runtime path is unavailable") from error
+            if (
+                parent.is_symlink()
+                or not stat.S_ISDIR(info.st_mode)
+                or info.st_uid not in {0, os.geteuid()}
+                or info.st_mode & 0o022
+            ):
+                raise InferenceRuntimeUnavailable("runtime path is untrusted")
+
+    @classmethod
+    def _read_lock(cls, path: Path) -> dict[str, object]:
+        if not path.is_absolute():
+            raise InferenceRuntimeUnavailable("model runtime lock is unavailable")
+        cls._audit_parent_directories(path)
+        try:
+            descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+            try:
+                before = os.fstat(descriptor)
+                if (
+                    not stat.S_ISREG(before.st_mode)
+                    or before.st_uid != os.geteuid()
+                    or before.st_mode & 0o022
+                    or before.st_nlink != 1
+                    or not 0 < before.st_size <= 64 * 1024
+                ):
+                    raise InferenceRuntimeUnavailable("model runtime lock is untrusted")
+                raw = os.read(descriptor, 64 * 1024 + 1)
+                after = os.fstat(descriptor)
+            finally:
+                os.close(descriptor)
+        except OSError as error:
+            raise InferenceRuntimeUnavailable("model runtime lock is unavailable") from error
+        if len(raw) != before.st_size or cls._file_identity(before) != cls._file_identity(after):
+            raise InferenceRuntimeUnavailable("model runtime lock changed during verification")
+        try:
+            value = json.loads(raw.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as error:
+            raise InferenceRuntimeUnavailable("model runtime lock is unavailable") from error
+        if not isinstance(value, dict):
+            raise InferenceRuntimeUnavailable("model runtime lock is invalid")
+        return value
+
     @classmethod
     def _hash_descriptor(cls, descriptor: int) -> tuple[str, tuple[int, ...]]:
         before = os.fstat(descriptor)
@@ -161,18 +209,7 @@ class InferenceRuntime:
     ) -> tuple[int, tuple[int, ...]]:
         if not executable.is_absolute():
             raise InferenceRuntimeUnavailable("locked Ollama executable is unavailable")
-        for parent in executable.parents:
-            try:
-                info = parent.lstat()
-            except OSError as error:
-                raise InferenceRuntimeUnavailable("executable path is unavailable") from error
-            if (
-                parent.is_symlink()
-                or not stat.S_ISDIR(info.st_mode)
-                or info.st_uid not in {0, os.geteuid()}
-                or info.st_mode & 0o022
-            ):
-                raise InferenceRuntimeUnavailable("executable path is untrusted")
+        cls._audit_parent_directories(executable)
         try:
             descriptor = os.open(executable, os.O_RDONLY | os.O_NOFOLLOW)
             info = os.fstat(descriptor)
@@ -263,10 +300,7 @@ class InferenceRuntime:
                 raise InferenceRuntimeUnavailable("model file digest mismatch")
 
     def verified(self) -> VerifiedInferenceRuntime:
-        try:
-            value = json.loads(self.LOCK_PATH.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError) as error:
-            raise InferenceRuntimeUnavailable("model runtime lock is unavailable") from error
+        value = self._read_lock(self.LOCK_PATH)
         required = {
             "schema": 1,
             "runtime_verified": True,
@@ -300,13 +334,15 @@ class InferenceRuntime:
             raise InferenceRuntimeUnavailable("provider model identity mismatch")
         executable = Path(value["ollama_executable"])
         model_store = Path(value["model_store"])
+        if not model_store.is_absolute():
+            raise InferenceRuntimeUnavailable("locked model store is unavailable")
+        self._audit_parent_directories(model_store)
         try:
             model_store_info = model_store.stat()
         except OSError as error:
             raise InferenceRuntimeUnavailable("locked model store is unavailable") from error
         if (
-            not model_store.is_absolute()
-            or model_store.is_symlink()
+            model_store.is_symlink()
             or not stat.S_ISDIR(model_store_info.st_mode)
             or model_store_info.st_uid != os.geteuid()
             or model_store_info.st_mode & 0o022
