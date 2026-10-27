@@ -591,10 +591,11 @@ class RunStore:
             ).fetchone()
 
         attempt = ModelAttempt.model_validate_json(row["attempt_json"])
-        expected_attempt_id = f"attempt-{sha256(json.dumps(
-            (row['job_id'], row['request_hash'], row['model_config_id']),
-            separators=(',', ':'),
-        ).encode()).hexdigest()}"
+        attempt_seed = json.dumps(
+            (row["job_id"], row["request_hash"], row["model_config_id"]),
+            separators=(",", ":"),
+        ).encode()
+        expected_attempt_id = f"attempt-{sha256(attempt_seed).hexdigest()}"
         expected = (
             attempt_id,
             expected_attempt_id,
