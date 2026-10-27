@@ -84,7 +84,16 @@ class PredictionService:
         source_id, run = self._run_definition(version_id)
         existing = self.runs.jobs_for_run(run.run_id, project_id=run.project_id)
         if existing:
-            return tuple(job.job_id for job in existing)
+            source = self.runs.source(source_id)
+            observed = {job.manifest.target_id for job in existing}
+            expected = {target.target_id for target in source.targets}
+            if not observed <= expected:
+                raise ValueError("run contains an unexpected target intent")
+            for target in source.targets:
+                if target.target_id not in observed:
+                    self.runs.enqueue(source_id, target.target_id, run)
+            repaired = self.runs.jobs_for_run(run.run_id, project_id=run.project_id)
+            return tuple(job.job_id for job in repaired)
         adapter = InferenceRuntime().verified_adapter()
         source = self.runs.source(source_id)
         job_ids = tuple(

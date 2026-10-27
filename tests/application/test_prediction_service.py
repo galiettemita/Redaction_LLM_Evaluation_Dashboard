@@ -164,6 +164,27 @@ def test_service_crash_leaves_in_doubt_and_repeated_call_never_dispatches(
     assert [job.state for job in jobs].count("PENDING") == 1
 
 
+def test_duplicate_repairs_partial_intent_set_without_dispatch(tmp_path, monkeypatch) -> None:
+    app_store, run_store, version_id, source = _ready_source(tmp_path)
+    service = PredictionService(app_store)
+    source_id, run = service._run_definition(version_id)
+    first_job = run_store.enqueue(source_id, source.targets[0].target_id, run)
+    adapter = RecordingAdapter(run_store)
+    monkeypatch.setattr(
+        "redaction_lab.application.prediction_service.InferenceRuntime.verified_adapter",
+        lambda self: adapter,
+    )
+
+    repaired = asyncio.run(service.run(version_id))
+
+    assert repaired[0] == first_job
+    assert len(repaired) == len(source.targets) == 2
+    assert adapter.manifests == []
+    assert [job.manifest.target_id for job in run_store.jobs_for_run(
+        run.run_id, project_id=run.project_id
+    )] == [target.target_id for target in source.targets]
+
+
 def test_results_revalidate_project_source_and_attempt_provenance(tmp_path, monkeypatch) -> None:
     app_store, run_store, version_id, source = _ready_source(tmp_path)
     adapter = RecordingAdapter(run_store)

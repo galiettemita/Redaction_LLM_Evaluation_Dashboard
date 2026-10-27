@@ -427,7 +427,18 @@ class RunStore:
             ).fetchall()
             for row in rows:
                 self._validate_bound_job(connection, row)
-        return tuple(self._stored_job(row) for row in rows)
+        jobs = tuple(self._stored_job(row) for row in rows)
+        if not jobs:
+            return ()
+        source = self.source(jobs[0].source_id)
+        by_target = {job.manifest.target_id: job for job in jobs}
+        if len(by_target) != len(jobs):
+            raise ValueError("run contains duplicate target intents")
+        return tuple(
+            by_target[target.target_id]
+            for target in source.targets
+            if target.target_id in by_target
+        )
 
     def jobs_for_source(
         self, source_id: str | None, *, project_id: str
