@@ -6,6 +6,16 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONPATH=/app/src
 
 WORKDIR /app
+COPY packaging/pdf-worker/requirements.lock /tmp/redaction-lab-requirements.lock
+COPY packaging/pdf-worker/wheelhouse /wheelhouse
+RUN python -m pip install \
+    --disable-pip-version-check \
+    --no-cache-dir \
+    --no-index \
+    --find-links=/wheelhouse \
+    --require-hashes \
+    --requirement /tmp/redaction-lab-requirements.lock \
+    && rm -rf /wheelhouse /tmp/redaction-lab-requirements.lock
 COPY src /app/src
 
 USER 65532:65532

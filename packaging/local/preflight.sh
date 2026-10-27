@@ -61,6 +61,16 @@ try:
     lock = json.loads(lock_bytes)
     if lock.get("runtime_verified") is not False or worker["runtime_qualified"] is not False:
         fail("RUNTIME_NOT_AUTHORIZED", "This candidate permits only the unqualified API demo")
+    model = manifest["model_runtime"]
+    model_lock_bytes = (root / model["lock_path"]).read_bytes()
+    if hashlib.sha256(model_lock_bytes).hexdigest() != model["lock_sha256"]:
+        fail("MODEL_RUNTIME_LOCK_MISMATCH", "Model runtime lock changed; a separately reviewed package is required")
+    model_lock = json.loads(model_lock_bytes)
+    if model_lock.get("runtime_verified") is not False or model["runtime_qualified"] is not False:
+        fail("MODEL_RUNTIME_NOT_AUTHORIZED", "Unqualified model runtime cannot be distributed")
+    delivery = manifest["delivery_status"]
+    if delivery.get("candidate_distribution_status") != "DISTRIBUTABLE":
+        fail("FRONTEND_BUILD_REQUIRED", "API v0.2 source is not paired with a verified v0.2 frontend bundle; candidate is non-distributable")
     sys.path.insert(0, str(root / "src"))
     from redaction_lab.application.paths import resolve_paths, preflight_directories
     from redaction_lab.api.app import create_app
@@ -76,7 +86,7 @@ try:
     except (OSError, ValueError):
         fail("UNSAFE_DATA_HOME", "Choose a dedicated private absolute data directory outside the checkout, without symlinks")
     print(json.dumps({
-        "api_version": "0.1", "state": "DEGRADED", "runtime_qualified": False,
+        "api_version": manifest["api_version"], "state": "DEGRADED", "runtime_qualified": False,
         "mode": "local", "host": host, "port": int(raw_port),
         "frontend_available": frontend.frontend_available, "recipient_acceptance": "NOT_RUN",
         "message": "API prerequisites match; frontend availability requires a verified bundle; PDF processing and inference remain unavailable",
