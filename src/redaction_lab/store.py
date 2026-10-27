@@ -461,6 +461,28 @@ class RunStore:
         by_target = {job.manifest.target_id: job for job in map(self._stored_job, rows)}
         return tuple(by_target[target.target_id] for target in source.targets if target.target_id in by_target)
 
+    def runs_for_source(
+        self, source_id: str, *, project_id: str
+    ) -> tuple[RunDefinition, ...]:
+        """Return every distinct, revalidated run bound to one source."""
+
+        source = self.source(source_id)
+        if source.project_id != project_id:
+            raise ValueError("source project identity mismatch")
+        with self._connect() as connection:
+            rows = connection.execute(
+                """SELECT * FROM jobs WHERE source_id = ? AND project_id = ?
+                   ORDER BY created_at, job_id""",
+                (source_id, project_id),
+            ).fetchall()
+            runs: dict[str, RunDefinition] = {}
+            for row in rows:
+                _, run = self._validate_bound_job(connection, row)
+                previous = runs.setdefault(run.run_id, run)
+                if previous != run:
+                    raise ValueError("run identity has inconsistent definitions")
+        return tuple(runs.values())
+
     def next_pending(self) -> StoredJob | None:
         with self._connect() as connection:
             row = connection.execute(

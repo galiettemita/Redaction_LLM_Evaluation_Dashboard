@@ -169,7 +169,7 @@ export default function App({ api }: { api: ReturnType<typeof createApi> }) {
               {snapshot ? <><dt>Pages</dt><dd>{snapshot.document.page_count === null ? 'Not established' : snapshot.document.page_count}</dd></> : null}
             </dl>
             <div className="preview-placeholder"><span className="document-icon" aria-hidden="true">▤</span><h3>Local PDF preview unavailable</h3><p>A safe browser viewer has not been qualified in this source-only release. Previewing cannot establish targets or revealed truth.</p></div>
-            <button type="button" className="secondary" disabled={busy || snapshot?.job.status !== 'ACCEPTED'} aria-describedby="process-help" onClick={() => void processDocument()}>Process document</button>
+            <button type="button" className="secondary" disabled={busy || !snapshot || !['ACCEPTED', 'READY'].includes(snapshot.job.status)} aria-describedby="process-help" onClick={() => void processDocument()}>Process or resume document</button>
             <p id="process-help" className="hint">This explicit action verifies the isolated PDF and model runtimes before creating any model attempt. Refresh and reconnect never start work.</p>
             <details><summary>Document details</summary><p className="hint">Saved identifiers refer to this installation. Browser refresh reads stored state; it does not create a new run.</p>
               {snapshot ? <dl className="metadata"><dt>SHA-256</dt><dd>{snapshot.document.sha256}</dd><dt>Bytes</dt><dd>{snapshot.document.byte_size}</dd>
@@ -189,7 +189,7 @@ export default function App({ api }: { api: ReturnType<typeof createApi> }) {
           <dl className="metadata"><dt>Attempt</dt><dd>{target.attempt_status}</dd><dt>Model</dt><dd>{target.model_id}</dd><dt>Region</dt><dd>{target.normalized_bbox.join(', ')}</dd></dl>
           <p>{target.prediction ?? 'No prediction text was returned.'}</p>
         </article>)}</div> : null}
-        <details><summary>Research context</summary><p>Only text passages can be reconstruction targets. Images, tables and wholly withheld pages are excluded. Document readiness is not prediction success, and a timeout or processing failure is not a factual error.</p><p>Trustworthy scoring and scientific validation remain pending. This interface displays the frozen API v0.1 response; it does not calculate accuracy.</p></details>
+        <details><summary>Research context</summary><p>Only text passages can be reconstruction targets. Images, tables and wholly withheld pages are excluded. Document readiness is not prediction success, and a timeout or processing failure is not a factual error.</p><p>Trustworthy scoring and scientific validation remain pending. This interface displays the frozen API v0.2 response; it does not calculate accuracy.</p></details>
       </section>
       <section className="panel demo-panel" aria-labelledby="demo-title">
         <div className="demo-heading"><h2 id="demo-title">Experimental text-only demo</h2><span className="unvalidated-badge">UNVALIDATED</span></div>

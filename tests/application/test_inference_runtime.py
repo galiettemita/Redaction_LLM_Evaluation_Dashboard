@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from io import BytesIO
+from hashlib import sha256
 import json
 
 import pytest
@@ -28,6 +29,7 @@ def _lock(tmp_path, **overrides):
         "runtime_verified": True,
         "endpoint": "http://127.0.0.1:11434",
         "ollama_executable": str(executable),
+        "ollama_executable_sha256": "sha256:" + sha256(executable.read_bytes()).hexdigest(),
         "ollama_version": "0.12.9",
         "model_id": "qwen2.5:1.5b-instruct-q4_K_M",
         "provider_model_id": "qwen2.5:1.5b-instruct-q4_K_M",
@@ -70,9 +72,12 @@ def test_runtime_verifies_exact_executable_version_and_full_model_digest(
     monkeypatch.setattr("redaction_lab.application.inference_runtime.subprocess.run", fake_run)
     monkeypatch.setattr("redaction_lab.application.inference_runtime.build_opener", lambda *handlers: Opener())
 
-    adapter = InferenceRuntime().verified_adapter()
+    verified = InferenceRuntime().verified()
+    adapter = verified.adapter
 
     assert adapter.model_id == value["model_id"]
+    assert verified.model_manifest_digest == value["model_manifest_digest"]
+    assert verified.model_config_id == value["model_config_id"]
     assert observed["command"] == [value["ollama_executable"], "--version"]
     assert observed["kwargs"]["env"] == {"PATH": "/usr/bin:/bin"}
     assert observed["urls"] == [
@@ -87,6 +92,7 @@ def test_runtime_verifies_exact_executable_version_and_full_model_digest(
         {"endpoint": "http://localhost:11434"},
         {"model_manifest_digest": "sha256:" + "a" * 12},
         {"model_id": "substituted-model"},
+        {"ollama_executable_sha256": "sha256:" + "b" * 64},
     ],
 )
 def test_runtime_rejects_endpoint_digest_or_model_substitution_before_dispatch(

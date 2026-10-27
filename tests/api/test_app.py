@@ -13,6 +13,7 @@ from redaction_lab.application.application_store import ApplicationStore, Proces
 from redaction_lab.application.application_store import StoredDocumentVersion
 from redaction_lab.application.artifact_store import ArtifactStore
 from redaction_lab.application.upload_service import UploadService
+from redaction_lab.application.inference_runtime import InferenceRuntimeUnavailable
 
 
 def _app(tmp_path: Path):
@@ -294,6 +295,76 @@ def test_unverified_runtime_returns_503_without_claiming_job_or_creating_source(
     assert stored.owner is None
     assert stored.source_id is None
     assert source_count_after == source_count_before
+
+
+def test_ready_job_can_explicitly_resume_after_model_runtime_recovers(
+    tmp_path: Path, monkeypatch
+) -> None:
+    app, store, artifacts = _app(tmp_path)
+    try:
+        _, _, uploaded = _upload(app)
+        job_id = uploaded["redacted"]["job_id"]
+        claimed = store.claim_next(owner="synthetic-document-worker", now=datetime.now(UTC))
+        assert claimed is not None
+        store.record_runtime(
+            job_id,
+            owner="synthetic-document-worker",
+            request_nonce="a" * 32,
+            protocol_version="pdf-worker-v1",
+            image_digest="sha256:" + "b" * 64,
+            page_count=1,
+        )
+        version = store.get_version(uploaded["redacted"]["version_id"])
+        with store.connect() as connection:
+            connection.execute(
+                """INSERT INTO canonical_sources (
+                    source_id, source_version, project_id, source_sha256, role,
+                    redacted_document_version_id, detector_version,
+                    canonicalizer_version, canonical_document_version_id,
+                    canonical_hash, canonical_json, targets_json, ingested_at, provenance
+                ) VALUES (?, ?, ?, ?, 'REDACTED', ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    "source-synthetic-ready", "synthetic-api-test", version.project_id,
+                    version.sha256, version.version_id, "synthetic-detector",
+                    "synthetic-canonicalizer", "canonical-synthetic-ready", "c" * 64,
+                    "{}", "[]", datetime.now(UTC).isoformat(), "synthetic-api-test",
+                ),
+            )
+        store.complete_job(
+            job_id,
+            owner="synthetic-document-worker",
+            status=ProcessingStatus.READY,
+            page_count=1,
+            source_id="source-synthetic-ready",
+            reason_code=None,
+        )
+
+        async def unavailable(version_id):
+            raise InferenceRuntimeUnavailable("synthetic unavailable")
+
+        monkeypatch.setattr(app.predictions, "run", unavailable)
+        blocked_status, _, blocked = _request(
+            app, "POST", f"/api/v1/jobs/{job_id}/process"
+        )
+        calls = []
+
+        async def recovered(version_id):
+            calls.append(version_id)
+            return ()
+
+        monkeypatch.setattr(app.predictions, "run", recovered)
+        resumed_status, _, resumed = _request(
+            app, "POST", f"/api/v1/jobs/{job_id}/process"
+        )
+    finally:
+        artifacts.close()
+
+    assert blocked_status == 503
+    assert blocked["error"]["code"] == "MODEL_RUNTIME_UNVERIFIED"
+    assert blocked["status"] == "READY"
+    assert resumed_status == 200
+    assert resumed["status"] == "READY"
+    assert calls == [uploaded["redacted"]["version_id"]]
 
 
 def test_process_request_rejects_nonempty_body_without_claiming_job(

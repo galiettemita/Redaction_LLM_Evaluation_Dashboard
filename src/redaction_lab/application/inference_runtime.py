@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+from hashlib import sha256
 import json
 import os
 from pathlib import Path
@@ -15,6 +17,13 @@ from redaction_lab.adapters.ollama import OllamaAdapter
 
 class InferenceRuntimeUnavailable(RuntimeError):
     """The pinned local model runtime has not been independently qualified."""
+
+
+@dataclass(frozen=True)
+class VerifiedInferenceRuntime:
+    adapter: OllamaAdapter
+    model_config_id: str
+    model_manifest_digest: str
 
 
 class _NoRedirect(HTTPRedirectHandler):
@@ -38,7 +47,7 @@ class InferenceRuntime:
         except (OSError, UnicodeDecodeError, json.JSONDecodeError, HTTPError, URLError, ValueError) as error:
             raise InferenceRuntimeUnavailable("model runtime verification failed") from error
 
-    def verified_adapter(self) -> OllamaAdapter:
+    def verified(self) -> VerifiedInferenceRuntime:
         try:
             value = json.loads(self.LOCK_PATH.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as error:
@@ -52,6 +61,7 @@ class InferenceRuntime:
             raise InferenceRuntimeUnavailable("model runtime is unverified")
         strings = (
             "ollama_executable",
+            "ollama_executable_sha256",
             "model_id",
             "provider_model_id",
             "model_config_id",
@@ -60,14 +70,30 @@ class InferenceRuntime:
         )
         if any(not isinstance(value.get(key), str) or not value[key].strip() for key in strings):
             raise InferenceRuntimeUnavailable("model runtime identity is incomplete")
+        if re.fullmatch(r"[A-Za-z0-9._:+-]{1,128}", value["model_config_id"]) is None:
+            raise InferenceRuntimeUnavailable("model configuration identity is invalid")
         digest = value["model_manifest_digest"]
-        if re.fullmatch(r"sha256:[0-9a-f]{64}", digest) is None or digest.endswith("0" * 64):
+        executable_digest = value["ollama_executable_sha256"]
+        if any(
+            re.fullmatch(r"sha256:[0-9a-f]{64}", candidate) is None
+            or candidate.endswith("0" * 64)
+            for candidate in (digest, executable_digest)
+        ):
             raise InferenceRuntimeUnavailable("model manifest digest is not full SHA-256")
         if value["model_id"] != value["provider_model_id"]:
             raise InferenceRuntimeUnavailable("provider model identity mismatch")
         executable = Path(value["ollama_executable"])
         if not executable.is_absolute() or executable.is_symlink() or not os.access(executable, os.X_OK):
             raise InferenceRuntimeUnavailable("locked Ollama executable is unavailable")
+        try:
+            executable_hash = sha256()
+            with executable.open("rb") as stream:
+                for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                    executable_hash.update(chunk)
+        except OSError as error:
+            raise InferenceRuntimeUnavailable("Ollama executable verification failed") from error
+        if "sha256:" + executable_hash.hexdigest() != executable_digest:
+            raise InferenceRuntimeUnavailable("Ollama executable digest mismatch")
         try:
             completed = subprocess.run(
                 [str(executable), "--version"],
@@ -94,9 +120,15 @@ class InferenceRuntime:
             for model in models
         ):
             raise InferenceRuntimeUnavailable("model manifest identity mismatch")
-        return OllamaAdapter(
-            endpoint=value["endpoint"],
-            model_id=value["model_id"],
-            model_config_id=value["model_config_id"],
-            timeout_seconds=60,
+        adapter = OllamaAdapter(
+            endpoint=value["endpoint"], model_id=value["model_id"],
+            model_config_id=value["model_config_id"], timeout_seconds=60,
         )
+        return VerifiedInferenceRuntime(
+            adapter=adapter,
+            model_config_id=value["model_config_id"],
+            model_manifest_digest=digest,
+        )
+
+    def verified_adapter(self) -> OllamaAdapter:
+        return self.verified().adapter

@@ -9,6 +9,7 @@ import pytest
 from redaction_lab.adapters.base import PredictionAdapter, PredictionResponse
 from redaction_lab.application.application_store import ApplicationStore, ProcessingStatus
 from redaction_lab.application.prediction_service import PredictionService
+from redaction_lab.application.inference_runtime import VerifiedInferenceRuntime
 from redaction_lab.contracts import AttemptStatus, DocumentRole, PredictionManifest, TokenUsage
 from redaction_lab.pdf_detector import DETECTOR_VERSION
 from redaction_lab.canonical import CANONICALIZER_VERSION
@@ -20,6 +21,7 @@ from redaction_lab.prediction_source import (
     build_prediction_source_from_material,
 )
 from redaction_lab.store import RunStore
+from redaction_lab.worker import run_job_once
 
 
 NOW = datetime(2026, 10, 13, tzinfo=UTC)
@@ -53,6 +55,14 @@ class RecordingAdapter(PredictionAdapter):
             completed_at=NOW,
             provider_model_id=manifest.model_id,
         )
+
+
+def _verified(adapter: RecordingAdapter, digest: str = "a") -> VerifiedInferenceRuntime:
+    return VerifiedInferenceRuntime(
+        adapter=adapter,
+        model_config_id=adapter.model_config_id,
+        model_manifest_digest="sha256:" + digest * 64,
+    )
 
 
 def _ready_source(tmp_path):
@@ -124,8 +134,8 @@ def test_service_persists_all_intents_before_target_scoped_dispatch_and_is_idemp
     app_store, run_store, version_id, source = _ready_source(tmp_path)
     adapter = RecordingAdapter(run_store)
     monkeypatch.setattr(
-        "redaction_lab.application.prediction_service.InferenceRuntime.verified_adapter",
-        lambda self: adapter,
+        "redaction_lab.application.prediction_service.InferenceRuntime.verified",
+        lambda self: _verified(adapter),
     )
 
     service = PredictionService(app_store)
@@ -141,45 +151,53 @@ def test_service_persists_all_intents_before_target_scoped_dispatch_and_is_idemp
     assert len(run_store.attempts()) == 2
 
 
-def test_service_crash_leaves_in_doubt_and_repeated_call_never_dispatches(
+def test_service_crash_leaves_in_doubt_and_resume_never_retries_claimed_attempt(
     tmp_path, monkeypatch
 ) -> None:
     app_store, run_store, version_id, _ = _ready_source(tmp_path)
     adapter = RecordingAdapter(run_store, crash=True)
     monkeypatch.setattr(
-        "redaction_lab.application.prediction_service.InferenceRuntime.verified_adapter",
-        lambda self: adapter,
+        "redaction_lab.application.prediction_service.InferenceRuntime.verified",
+        lambda self: _verified(adapter),
     )
     service = PredictionService(app_store)
 
     with pytest.raises(RuntimeError, match="provider crash"):
         asyncio.run(service.run(version_id))
+    in_doubt = service.results(version_id)
+    adapter.crash = False
     asyncio.run(service.run(version_id))
 
-    jobs = run_store.jobs_for_source(
-        app_store.get_version(version_id).source_id, project_id="project-service"
-    )
-    assert len(adapter.manifests) == 1
+    _, run = service._stored_run(version_id)
+    assert run is not None
+    jobs = run_store.jobs_for_run(run.run_id, project_id="project-service")
+    assert in_doubt[0]["attempt_status"] == "IN_DOUBT"
+    assert in_doubt[0]["prediction"] is None
+    assert len(adapter.manifests) == 2
     assert [job.state for job in jobs].count("IN_DOUBT") == 1
-    assert [job.state for job in jobs].count("PENDING") == 1
+    assert [job.state for job in jobs].count("COMPLETE") == 1
 
 
-def test_duplicate_repairs_partial_intent_set_without_dispatch(tmp_path, monkeypatch) -> None:
+def test_explicit_resume_repairs_partial_intent_set_and_dispatches_only_pending(tmp_path, monkeypatch) -> None:
     app_store, run_store, version_id, source = _ready_source(tmp_path)
     service = PredictionService(app_store)
-    source_id, run = service._run_definition(version_id)
+    source_id, run = service._run_definition(
+        version_id,
+        model_config_id="ollama-qwen-test-config",
+        model_manifest_digest="sha256:" + "a" * 64,
+    )
     first_job = run_store.enqueue(source_id, source.targets[0].target_id, run)
     adapter = RecordingAdapter(run_store)
     monkeypatch.setattr(
-        "redaction_lab.application.prediction_service.InferenceRuntime.verified_adapter",
-        lambda self: adapter,
+        "redaction_lab.application.prediction_service.InferenceRuntime.verified",
+        lambda self: _verified(adapter),
     )
 
     repaired = asyncio.run(service.run(version_id))
 
     assert repaired[0] == first_job
     assert len(repaired) == len(source.targets) == 2
-    assert adapter.manifests == []
+    assert len(adapter.manifests) == 2
     assert [job.manifest.target_id for job in run_store.jobs_for_run(
         run.run_id, project_id=run.project_id
     )] == [target.target_id for target in source.targets]
@@ -189,8 +207,8 @@ def test_results_revalidate_project_source_and_attempt_provenance(tmp_path, monk
     app_store, run_store, version_id, source = _ready_source(tmp_path)
     adapter = RecordingAdapter(run_store)
     monkeypatch.setattr(
-        "redaction_lab.application.prediction_service.InferenceRuntime.verified_adapter",
-        lambda self: adapter,
+        "redaction_lab.application.prediction_service.InferenceRuntime.verified",
+        lambda self: _verified(adapter),
     )
     service = PredictionService(app_store)
     asyncio.run(service.run(version_id))
@@ -202,3 +220,55 @@ def test_results_revalidate_project_source_and_attempt_provenance(tmp_path, monk
     assert all(item["prediction"].startswith("prediction:") for item in results)
     with pytest.raises(ValueError, match="project"):
         run_store.jobs_for_source(source.source_id, project_id="other-project")
+
+
+def test_results_ignore_other_authentic_task4_run_for_same_source(tmp_path, monkeypatch) -> None:
+    app_store, run_store, version_id, source = _ready_source(tmp_path)
+    adapter = RecordingAdapter(run_store)
+    monkeypatch.setattr(
+        "redaction_lab.application.prediction_service.InferenceRuntime.verified",
+        lambda self: _verified(adapter),
+    )
+    service = PredictionService(app_store)
+    asyncio.run(service.run(version_id))
+    _, service_run = service._stored_run(version_id)
+    assert service_run is not None
+    legacy = service_run.model_copy(
+        update={"run_id": "run-legacy-task4", "created_by": "legacy-task4-worker"}
+    )
+    legacy_jobs = tuple(
+        run_store.enqueue(source.source_id, target.target_id, legacy)
+        for target in source.targets
+    )
+    for legacy_job in legacy_jobs:
+        asyncio.run(run_job_once(run_store, adapter, legacy_job))
+
+    results = service.results(version_id)
+
+    assert len(results) == len(source.targets) == 2
+    legacy_attempts = {run_store.job(job_id).attempt_id for job_id in legacy_jobs}
+    assert all(item["attempt_id"] not in legacy_attempts for item in results)
+
+
+def test_run_identity_changes_with_model_digest_or_configuration(tmp_path) -> None:
+    app_store, _, version_id, _ = _ready_source(tmp_path)
+    service = PredictionService(app_store)
+    _, first = service._run_definition(
+        version_id,
+        model_config_id="config-a",
+        model_manifest_digest="sha256:" + "a" * 64,
+    )
+    _, changed_digest = service._run_definition(
+        version_id,
+        model_config_id="config-a",
+        model_manifest_digest="sha256:" + "b" * 64,
+    )
+    _, changed_config = service._run_definition(
+        version_id,
+        model_config_id="config-b",
+        model_manifest_digest="sha256:" + "a" * 64,
+    )
+
+    assert len({first.run_id, changed_digest.run_id, changed_config.run_id}) == 3
+    assert "model_manifest_digest" in first.created_by
+    assert "model_config_id" in first.created_by

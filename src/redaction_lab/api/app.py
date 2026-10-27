@@ -180,50 +180,53 @@ class LocalApi:
     def _process(self, job_id: str) -> tuple[int, dict[str, object]]:
         with self._orchestration_lock:
             job = self.store.get_job(job_id)
-            if job.status is not ProcessingStatus.ACCEPTED:
+            if job.status is ProcessingStatus.READY:
+                current = job
+            elif job.status is not ProcessingStatus.ACCEPTED:
                 raise HttpProblem(409, "JOB_CONFLICT", "Job is not accepted work")
-            with self.store.connect() as connection:
-                next_row = connection.execute(
-                    "SELECT job_id FROM application_jobs WHERE status='ACCEPTED' "
-                    "ORDER BY created_at, job_id LIMIT 1"
-                ).fetchone()
-            if next_row is None or next_row["job_id"] != job_id:
-                raise HttpProblem(
-                    409,
-                    "JOB_CONFLICT",
-                    "An earlier document job must be processed first",
-                )
-            try:
-                worked = DocumentWorker(self.store, self.artifacts).run_once(
-                    owner=f"local-api-{os.getpid()}"
-                )
-            except (
-                RuntimeUnavailable,
-                OSError,
-                JSONDecodeError,
-                KeyError,
-                TypeError,
-                ValueError,
-            ):
-                current = self.store.get_job(job_id)
-                if (
-                    current.status is not ProcessingStatus.ACCEPTED
-                    or current.owner is not None
+            else:
+                with self.store.connect() as connection:
+                    next_row = connection.execute(
+                        "SELECT job_id FROM application_jobs WHERE status='ACCEPTED' "
+                        "ORDER BY created_at, job_id LIMIT 1"
+                    ).fetchone()
+                if next_row is None or next_row["job_id"] != job_id:
+                    raise HttpProblem(
+                        409,
+                        "JOB_CONFLICT",
+                        "An earlier document job must be processed first",
+                    )
+                try:
+                    worked = DocumentWorker(self.store, self.artifacts).run_once(
+                        owner=f"local-api-{os.getpid()}"
+                    )
+                except (
+                    RuntimeUnavailable,
+                    OSError,
+                    JSONDecodeError,
+                    KeyError,
+                    TypeError,
+                    ValueError,
                 ):
-                    raise
-                return 503, {
-                    "error": {
-                        "code": "RUNTIME_UNVERIFIED",
-                        "message": (
-                            "PDF processing runtime is not qualified on this installation"
-                        ),
-                    },
-                    "job_id": current.job_id,
-                    "status": current.status.value,
-                }
-            if not worked:
-                raise HttpProblem(409, "JOB_CONFLICT", "Another job is processing")
-            current = self.store.get_job(job_id)
+                    current = self.store.get_job(job_id)
+                    if (
+                        current.status is not ProcessingStatus.ACCEPTED
+                        or current.owner is not None
+                    ):
+                        raise
+                    return 503, {
+                        "error": {
+                            "code": "RUNTIME_UNVERIFIED",
+                            "message": (
+                                "PDF processing runtime is not qualified on this installation"
+                            ),
+                        },
+                        "job_id": current.job_id,
+                        "status": current.status.value,
+                    }
+                if not worked:
+                    raise HttpProblem(409, "JOB_CONFLICT", "Another job is processing")
+                current = self.store.get_job(job_id)
             if current.status is ProcessingStatus.READY and current.role is DocumentRole.REDACTED:
                 try:
                     asyncio.run(self.predictions.run(current.version_id))
