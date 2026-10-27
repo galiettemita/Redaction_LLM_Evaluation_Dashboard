@@ -162,31 +162,34 @@ class PredictionService:
             return tuple(job.job_id for job in existing)
 
         verified = InferenceRuntime().verified()
-        if run is None:
-            source_id, run = self._run_definition(
-                version_id,
-                model_config_id=verified.model_config_id,
-                model_manifest_digest=verified.model_manifest_digest,
-            )
-        elif self._runtime_identity(run) != (
-            verified.model_config_id,
-            verified.model_manifest_digest,
-        ):
-            raise ValueError("qualified runtime does not match the frozen run")
+        try:
+            if run is None:
+                source_id, run = self._run_definition(
+                    version_id,
+                    model_config_id=verified.model_config_id,
+                    model_manifest_digest=verified.model_manifest_digest,
+                )
+            elif self._runtime_identity(run) != (
+                verified.model_config_id,
+                verified.model_manifest_digest,
+            ):
+                raise ValueError("qualified runtime does not match the frozen run")
 
-        source = self.runs.source(source_id)
-        observed = {job.manifest.target_id for job in existing}
-        expected = {target.target_id for target in source.targets}
-        if not observed <= expected:
-            raise ValueError("run contains an unexpected target intent")
-        for target in source.targets:
-            if target.target_id not in observed:
-                self.runs.enqueue(source_id, target.target_id, run)
-        jobs = self.runs.jobs_for_run(run.run_id, project_id=run.project_id)
-        for job in jobs:
-            if job.state == "PENDING":
-                await run_job_once(self.runs, verified.adapter, job.job_id)
-        return tuple(job.job_id for job in jobs)
+            source = self.runs.source(source_id)
+            observed = {job.manifest.target_id for job in existing}
+            expected = {target.target_id for target in source.targets}
+            if not observed <= expected:
+                raise ValueError("run contains an unexpected target intent")
+            for target in source.targets:
+                if target.target_id not in observed:
+                    self.runs.enqueue(source_id, target.target_id, run)
+            jobs = self.runs.jobs_for_run(run.run_id, project_id=run.project_id)
+            for job in jobs:
+                if job.state == "PENDING":
+                    await run_job_once(self.runs, verified.adapter, job.job_id)
+            return tuple(job.job_id for job in jobs)
+        finally:
+            verified.close()
 
     def results(self, version_id: str) -> tuple[dict[str, object], ...]:
         version = self.store.get_version(version_id)
