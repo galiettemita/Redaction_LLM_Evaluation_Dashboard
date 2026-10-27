@@ -1,6 +1,6 @@
 # Current state
 
-Updated: 2026-10-11 (America/New_York). Coordination epoch: **E0067**.
+Updated: 2026-10-11 (America/New_York). Coordination epoch: **E0068**.
 Integration branch: `main`. Canonical writer: **Lead/Architect**, within the owner's approved scope.
 Resolve the actual HEAD with GitHub; do not infer a current SHA from this file's timestamp.
 
@@ -104,3 +104,5 @@ E0065: Owner approved [emergency synthetic-only real-inference task packet](task
 E0066: Owner authorized [emergency code-only amendment](task_packets/RL-MVP-007D-EMERGENCY-CODE-ONLY-AMENDMENT-01.md). Codex may perform isolated-branch E0065-scoped source/test implementation and mock/synthetic automated tests despite 6.16 GiB free; runtime operations still require 15 GiB and all integrity/licensing gates. No installation/download, live PDF processing, model inference, private data, paid calls, deployment, merge or scientific scoring change. Implementation NOT STARTED. Independent exact-SHA QA/Research reviews and separate owner merge authorization required.
 
 E0067: Backend E0066 code candidate `e6669c2234dbb683225b40e3642551092628e6aa` published in branch head `0998af7afb0218e9bceebe1eb571a62228133c9f` (NOT MERGED). Two QA/security reviews on that exact candidate both CHANGES_REQUESTED, latest `2f39c26cda6b13344abf558777ceb981687a06af` identifies crash-orphaned Ollama, substituted model identity before database writes, oversized HTTP response classification and incomplete semantic run ID. Research review publication remains unverified. Owner authorized publishing [grouped Correction 01 packet](task_packets/RL-MVP-007D-E0066-CORRECTION-01.md), NOT its execution or new source files. Codex next performs a read-only exact-file-scope feasibility check; out-of-scope `adapters/ollama.py` or new supervisor helper requires explicit owner amendment. No installations, real PDF/inference, costs, deployment or merge.
+
+E0068: Owner approved [Correction 01 code-only execution](task_packets/RL-MVP-007D-E0066-CORRECTION-01-EXECUTION.md), adding only `src/redaction_lab/adapters/ollama.py` to strict six source/test paths plus one Backend handoff. Codex may perform grouped four-defect TDD repair on existing isolated E0066 branch; implementation NOT YET EXECUTED under E0068. Exact-SHA independent QA/security and Research review required; no merge, runtime installs, PDFs, real inference, spending or deployment. Existing `e6669c2` remains CHANGES_REQUESTED.
