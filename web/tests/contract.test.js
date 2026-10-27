@@ -7,7 +7,7 @@ let api;
 try { api = await import('../src/api.ts'); } catch (error) {
   if (error.code !== 'ERR_MODULE_NOT_FOUND') throw error;
 }
-const health = { api_version: '0.1', state: 'DEGRADED', runtime_qualified: false, mode: 'local' };
+const health = { api_version: '0.2', state: 'DEGRADED', runtime_qualified: false, mode: 'local' };
 const upload = { pair_id: 'pair-1', project_id: 'project-1', redacted: {
   version_id: 'version-1', job_id: 'job-1', sha256: 'a'.repeat(64), byte_size: 9, status: 'ACCEPTED'
 }, reference: null, truth_status: 'UNKNOWN' };
@@ -18,7 +18,7 @@ const result = { version_id: 'version-1', status: 'PENDING', targets: [],
   summaries: { target: null, document: null, model: null }, score_status: 'NONE',
   verified_score: null, experimental_score: null, truth_status: 'UNKNOWN' };
 const pdf = () => new File(['%PDF-test'], 'synthetic.pdf', { type: 'application/pdf' });
-function response(body, status = 200, version = '0.1') {
+function response(body, status = 200, version = '0.2') {
   return new Response(JSON.stringify(body), { status, headers: {
     'Content-Type': 'application/json', 'X-Redaction-Lab-API': version
   } });
@@ -27,7 +27,7 @@ function client(transport) {
   assert.ok(api, 'Frontend API implementation is missing');
   return api.createApi('http://127.0.0.1:8765', transport);
 }
-test('accepts the local v0.1 health shape without upgrading runtime readiness', async () => {
+test('accepts the local v0.2 health shape without upgrading runtime readiness', async () => {
   assert.deepEqual(await client(async () => response(health)).health(), health);
 });
 test('rejects non-string health state instead of coercing JSON arrays into readiness', async () => {
@@ -124,8 +124,8 @@ test('never retries a failed write or reveals raw transport errors', async () =>
   assert.equal(calls, 1);
 });
 test('rejects missing or incompatible contract headers and malformed JSON', async () => {
-  for (const transport of [async () => response(health, 200, '0.2'),
-    async () => new Response('broken', { headers: { 'X-Redaction-Lab-API': '0.1', 'Content-Type': 'application/json' } }),
+  for (const transport of [async () => response(health, 200, '0.1'),
+    async () => new Response('broken', { headers: { 'X-Redaction-Lab-API': '0.2', 'Content-Type': 'application/json' } }),
     async () => new Response(JSON.stringify(health), { headers: { 'Content-Type': 'text/html' } })]) {
     await assert.rejects(() => client(transport).health(), /contract/i);
   }
@@ -152,6 +152,18 @@ test('rejects numeric scores, fabricated targets and promoted reference truth', 
     const local = client(async () => response({ ...result, ...change }));
     await assert.rejects(() => local.results('version-1'), /contract/i);
   }
+});
+test('accepts exact v0.2 model-attempt provenance while preserving null scores', async () => {
+  const target = { target_id: 'target-1', target_version: 'target-v1', page_index: 0,
+    normalized_bbox: [0.1, 0.2, 0.3, 0.4], attempt_id: 'attempt-1', attempt_status: 'SUCCEEDED',
+    prediction: '<script>inert prediction text</script>', model_id: 'model-1', provider_model_id: 'model-1',
+    model_config_id: 'config-1', request_hash: 'b'.repeat(64), response_hash: 'c'.repeat(64) };
+  const value = { ...result, status: 'AVAILABLE', targets: [target] };
+  const received = await client(async () => response(value)).results('version-1');
+  assert.deepEqual(received.targets, [target]);
+  const view = api.presentResults(received);
+  assert.deepEqual(view.targets, [target]);
+  assert.equal(view.targetScore, 'Not available');
 });
 test('rejects non-string result status instead of coercing JSON arrays into completion', async () => {
   for (const status of [['AVAILABLE'], ['PENDING'], null, 1, true, { status: 'AVAILABLE' }]) {

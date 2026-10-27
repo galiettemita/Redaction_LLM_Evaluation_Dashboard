@@ -62,6 +62,9 @@ dd { margin: 0; overflow-wrap: anywhere; }
 .score-grid > div { background: #f6f8fa; border: 1px solid #e1e7eb; border-radius: 6px; padding: 16px; }
 .score-grid dt { font-size: 13px; margin-bottom: 9px; }
 .score-grid dd { font-size: 18px; font-weight: 650; }
+.prediction-list { display: grid; gap: 14px; margin-top: 20px; }
+.prediction-card { padding: 17px; border: 1px solid #e1e7eb; border-radius: 6px; background: #fff; overflow-wrap: anywhere; }
+.prediction-card h4 { margin: 0 0 12px; font-size: 15px; }
 .demo-panel { margin-top: 24px; border-top: 4px solid #946812; }
 .demo-heading { display: flex; align-items: center; justify-content: space-between; gap: 15px; flex-wrap: wrap; }
 .unvalidated-badge { padding: 5px 10px; border: 1px solid #d6b76e; border-radius: 5px; color: #644609; background: #fff3da; font-size: 12px; font-weight: 750; }

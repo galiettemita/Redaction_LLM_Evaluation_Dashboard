@@ -1,5 +1,5 @@
-/** Frozen API v0.1 consumer. No prediction endpoints or browser scoring. */
-export type Health = { api_version: '0.1'; state: 'READY' | 'DEGRADED'; runtime_qualified: false; mode: 'local' };
+/** API v0.2 consumer. Predictions are provenance records, never revealed truth. */
+export type Health = { api_version: '0.2'; state: 'READY' | 'DEGRADED'; runtime_qualified: false; mode: 'local' };
 export type Handle = { version_id: string; job_id: string };
 export type ProcessingStatus = 'ACCEPTED' | 'PROCESSING' | 'READY' | 'NO_REDACTIONS' | 'UNSUPPORTED' | 'FAILED';
 export type Job = Handle & { status: ProcessingStatus; reason_code: string | null; source_id: string | null };
@@ -9,8 +9,13 @@ export type Document = Handle & { role: 'REDACTED'; sha256: string; byte_size: n
 export type AcceptedUpload = { pair_id: string; project_id: string; redacted: Handle & {
   sha256: string; byte_size: number; status: 'ACCEPTED' };
   reference: { version_id: string; sha256: string; byte_size: number } | null; truth_status: 'UNKNOWN' };
+export type AttemptStatus = 'SUCCEEDED' | 'REFUSED' | 'TIMEOUT' | 'MALFORMED' | 'ERROR' | 'IN_DOUBT';
+export type PredictionTarget = { target_id: string; target_version: string; page_index: number;
+  normalized_bbox: [number, number, number, number]; attempt_id: string; attempt_status: AttemptStatus;
+  prediction: string | null; model_id: string; provider_model_id: string | null; model_config_id: string;
+  request_hash: string; response_hash: string | null };
 export type Results = { version_id: string; status: 'PENDING' | 'UNSUPPORTED' | 'NO_REDACTIONS' | 'FAILED' | 'NEEDS_REVIEW' | 'AVAILABLE';
-  targets: never[]; summaries: { target: null; document: null; model: null };
+  targets: PredictionTarget[]; summaries: { target: null; document: null; model: null };
   score_status: 'NONE'; verified_score: null; experimental_score: null; truth_status: 'UNKNOWN' };
 export type Snapshot = { document: Document; job: Job; results: Results };
 const MAX_BYTES = 25 * 1024 * 1024;
@@ -22,6 +27,22 @@ const nullableText = (value: unknown) => value === null || (typeof value === 'st
 const digest = (value: unknown) => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
 const bytes = (value: unknown) => typeof value === 'number' && Number.isSafeInteger(value) && value > 0 && value <= MAX_BYTES;
 const status = (value: unknown) => typeof value === 'string' && processing.includes(value);
+const boundedText = (value: unknown, limit = 256) => typeof value === 'string' && value.length > 0 && value.length <= limit && !/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(value);
+function predictionTarget(value: unknown): value is PredictionTarget {
+  if (!object(value) || !identifier(value.target_id) || !identifier(value.target_version) ||
+      !identifier(value.attempt_id) || !boundedText(value.model_id) || !boundedText(value.model_config_id) ||
+      !(value.provider_model_id === null || boundedText(value.provider_model_id)) || !digest(value.request_hash) ||
+      !(value.response_hash === null || digest(value.response_hash)) ||
+      typeof value.attempt_status !== 'string' || !['SUCCEEDED', 'REFUSED', 'TIMEOUT', 'MALFORMED', 'ERROR', 'IN_DOUBT'].includes(value.attempt_status) ||
+      typeof value.page_index !== 'number' || !Number.isInteger(value.page_index) || value.page_index < 0 || value.page_index >= 100 ||
+      !Array.isArray(value.normalized_bbox) || value.normalized_bbox.length !== 4 ||
+      !value.normalized_bbox.every(coordinate => typeof coordinate === 'number' && Number.isFinite(coordinate) && coordinate >= 0 && coordinate <= 1)) return false;
+  const [x0, y0, x1, y1] = value.normalized_bbox;
+  if (!(x0 < x1 && y0 < y1)) return false;
+  return value.attempt_status === 'SUCCEEDED'
+    ? boundedText(value.prediction, 1_048_576) && value.response_hash !== null && value.provider_model_id === value.model_id
+    : value.prediction === null;
+}
 export class ApiError extends Error {
   code: string;
   status: number;
@@ -29,7 +50,7 @@ export class ApiError extends Error {
     super(message); this.name = 'ApiError'; this.code = code; this.status = status;
   }
 }
-const mismatch = () => new ApiError('CONTRACT_MISMATCH', 'The local service response does not match API contract v0.1.');
+const mismatch = () => new ApiError('CONTRACT_MISMATCH', 'The local service response does not match API contract v0.2.');
 function checked<T>(value: unknown, valid: boolean): T { if (!valid) throw mismatch(); return value as T; }
 function requireId(value: string) { if (!identifier(value)) throw new ApiError('INVALID_INPUT', 'The saved identifier is invalid.'); return value; }
 export function validatePdf(file: File | null, required = true): void {
@@ -43,6 +64,7 @@ export function validatePdf(file: File | null, required = true): void {
 function publicError(code: string, httpStatus: number): ApiError {
   const messages: Record<string, string> = {
     RUNTIME_UNVERIFIED: 'PDF processing is unavailable because this installation is not qualified. Your accepted job has not started.',
+    MODEL_RUNTIME_UNVERIFIED: 'The document is ready, but model inference is unavailable because this installation is not qualified.',
     PAYLOAD_TOO_LARGE: 'Each PDF must be 25 MiB or smaller.',
     JOB_CONFLICT: 'This job cannot be started now. Refresh its saved status.',
     UPLOAD_CONFLICT: 'This upload already has a job. Restore its saved status instead of starting again.',
@@ -71,7 +93,7 @@ export function createApi(origin: string, transport: typeof fetch = globalThis.f
       if (signal?.aborted) throw new ApiError('ABORTED', 'Status refresh was cancelled.');
       throw new ApiError('CONNECTION_FAILED', 'Could not reach the local service. Refresh saved status before repeating an upload or process request.');
     }
-    if (response.headers.get('X-Redaction-Lab-API') !== '0.1' ||
+    if (response.headers.get('X-Redaction-Lab-API') !== '0.2' ||
         response.headers.get('Content-Type')?.split(';')[0].trim() !== 'application/json') throw mismatch();
     let payload: unknown;
     try { payload = await response.json(); } catch { throw mismatch(); }
@@ -84,7 +106,7 @@ export function createApi(origin: string, transport: typeof fetch = globalThis.f
   }
   async function health(signal?: AbortSignal): Promise<Health> {
     const value = await request('/api/v1/health', 'GET', undefined, signal);
-    return checked(value, object(value) && value.api_version === '0.1' && typeof value.state === 'string' && ['READY', 'DEGRADED'].includes(value.state) &&
+    return checked(value, object(value) && value.api_version === '0.2' && typeof value.state === 'string' && ['READY', 'DEGRADED'].includes(value.state) &&
       value.runtime_qualified === false && value.mode === 'local');
   }
   async function upload(projectId: string, redacted: File | null, reference: File | null): Promise<AcceptedUpload> {
@@ -122,7 +144,9 @@ export function createApi(origin: string, transport: typeof fetch = globalThis.f
   async function results(versionId: string, signal?: AbortSignal): Promise<Results> {
     const value = await request(`/api/v1/results/${requireId(versionId)}`, 'GET', undefined, signal);
     return checked(value, object(value) && value.version_id === versionId && typeof value.status === 'string' && resultStates.includes(value.status) &&
-      Array.isArray(value.targets) && value.targets.length === 0 && object(value.summaries) &&
+      Array.isArray(value.targets) && value.targets.every(predictionTarget) &&
+      new Set(value.targets.map(target => target.target_id)).size === value.targets.length &&
+      new Set(value.targets.map(target => target.attempt_id)).size === value.targets.length && object(value.summaries) &&
       value.summaries.target === null && value.summaries.document === null && value.summaries.model === null &&
       value.score_status === 'NONE' && value.verified_score === null && value.experimental_score === null && value.truth_status === 'UNKNOWN');
   }
@@ -153,8 +177,8 @@ export function presentResults(result: Results) {
     NO_REDACTIONS: ['No supported text redactions found', 'Processing found no supported text redactions. No predictions are available.'],
     FAILED: ['Document processing failed', 'A processing failure is not an incorrect prediction. No accuracy can be established.'],
     NEEDS_REVIEW: ['Needs review', 'The document needs review. Predictions and scores are unavailable.'],
-    AVAILABLE: ['Document processing complete', 'This API does not yet supply passage predictions or evaluation summaries.'],
+    AVAILABLE: ['Document processing complete', result.targets.length ? `${result.targets.length} model attempt${result.targets.length === 1 ? '' : 's'} available. Accuracy remains unknown.` : 'No model prediction attempts are available.'],
   }[result.status];
   return { heading: state[0], detail: state[1], accuracy: 'Accuracy unknown', targetScore: 'Not available',
-    documentScore: 'Not available', modelScore: 'Not available' };
+    documentScore: 'Not available', modelScore: 'Not available', targets: result.targets };
 }

@@ -96,6 +96,16 @@ export default function App({ api }: { api: ReturnType<typeof createApi> }) {
     if (!saved) { setError('Enter valid document and job IDs.'); return; }
     setAccepted(null); remember(saved); await refresh(saved);
   }
+  async function processDocument() {
+    if (!handle || actionInFlight.current || busy) return;
+    actionInFlight.current = true; setBusy(true); setError(''); setNotice('');
+    try {
+      await api.process(handle.job_id);
+      if (mounted.current) { setNotice('Processing finished. Refreshing stored results.'); await refresh(handle); }
+    } catch (failure) {
+      if (mounted.current) { setError(safeMessage(failure)); await refresh(handle); }
+    } finally { actionInFlight.current = false; if (mounted.current) setBusy(false); }
+  }
   function generateDemo(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setDemoError(''); setDemoResult(null);
@@ -117,8 +127,8 @@ export default function App({ api }: { api: ReturnType<typeof createApi> }) {
         <p>Upload a redacted PDF and, optionally, a matching reference. Follow the saved document’s progress here.</p>
       </div>
       <section className="runtime-banner" aria-labelledby="runtime-title">
-        <h2 id="runtime-title">{health ? 'Document processing unavailable' : 'Checking local service'}</h2>
-        <p>{health ? 'This installation’s PDF processing has not been qualified. Uploads can be accepted, but processing and AI predictions are unavailable.' :
+        <h2 id="runtime-title">{health ? 'Local service connected' : 'Checking local service'}</h2>
+        <p>{health ? 'Runtime integrity is checked again before PDF processing and model inference. Unqualified work fails closed without a substitute prediction.' :
           error ? 'The local service could not be checked. Use Refresh status after starting the approved local service.' : 'Connecting to the local service. No document processing starts on reconnect.'}</p>
         <button type="button" className="secondary" disabled={busy} onClick={() => void refresh()}>Refresh status</button>
       </section>
@@ -159,8 +169,8 @@ export default function App({ api }: { api: ReturnType<typeof createApi> }) {
               {snapshot ? <><dt>Pages</dt><dd>{snapshot.document.page_count === null ? 'Not established' : snapshot.document.page_count}</dd></> : null}
             </dl>
             <div className="preview-placeholder"><span className="document-icon" aria-hidden="true">▤</span><h3>Local PDF preview unavailable</h3><p>A safe browser viewer has not been qualified in this source-only release. Previewing cannot establish targets or revealed truth.</p></div>
-            <button type="button" className="secondary" disabled aria-describedby="process-help">Process document</button>
-            <p id="process-help" className="hint">PDF processing is unavailable on this installation. Upload acceptance is separate from processing.</p>
+            <button type="button" className="secondary" disabled={busy || snapshot?.job.status !== 'ACCEPTED'} aria-describedby="process-help" onClick={() => void processDocument()}>Process document</button>
+            <p id="process-help" className="hint">This explicit action verifies the isolated PDF and model runtimes before creating any model attempt. Refresh and reconnect never start work.</p>
             <details><summary>Document details</summary><p className="hint">Saved identifiers refer to this installation. Browser refresh reads stored state; it does not create a new run.</p>
               {snapshot ? <dl className="metadata"><dt>SHA-256</dt><dd>{snapshot.document.sha256}</dd><dt>Bytes</dt><dd>{snapshot.document.byte_size}</dd>
                 <dt>Processing state</dt><dd>{snapshot.document.processing_status}</dd></dl> : null}
@@ -174,6 +184,11 @@ export default function App({ api }: { api: ReturnType<typeof createApi> }) {
         <p>{view?.detail ?? 'Upload or restore a document, then refresh its saved status. Predictions are not available through this API.'}</p>
         <dl className="score-grid"><div><dt>Per redaction</dt><dd>{view?.targetScore ?? 'Not available'}</dd></div><div><dt>Per document</dt><dd>{view?.documentScore ?? 'Not available'}</dd></div><div><dt>Per model</dt><dd>{view?.modelScore ?? 'Not available'}</dd></div></dl>
         <p className="hint">No verified or experimental score is available. Missing, partial, unreadable or uncertain reference text means unknown accuracy.</p>
+        {view?.targets.length ? <div className="prediction-list">{view.targets.map(target => <article className="prediction-card" key={target.attempt_id}>
+          <h4>Page {target.page_index + 1} · redaction {target.target_id}</h4>
+          <dl className="metadata"><dt>Attempt</dt><dd>{target.attempt_status}</dd><dt>Model</dt><dd>{target.model_id}</dd><dt>Region</dt><dd>{target.normalized_bbox.join(', ')}</dd></dl>
+          <p>{target.prediction ?? 'No prediction text was returned.'}</p>
+        </article>)}</div> : null}
         <details><summary>Research context</summary><p>Only text passages can be reconstruction targets. Images, tables and wholly withheld pages are excluded. Document readiness is not prediction success, and a timeout or processing failure is not a factual error.</p><p>Trustworthy scoring and scientific validation remain pending. This interface displays the frozen API v0.1 response; it does not calculate accuracy.</p></details>
       </section>
       <section className="panel demo-panel" aria-labelledby="demo-title">
@@ -206,7 +221,7 @@ export default function App({ api }: { api: ReturnType<typeof createApi> }) {
         </div>
         <p className="hint">Demo text and candidates stay in this page’s memory. Clear them here or reload to remove them; they are not sent to the local API or saved in browser storage.</p>
       </section>
-      <footer>Local, code-only interface · API v0.1 · Independent review pending</footer>
+      <footer>Local, code-only interface · API v0.2 · Independent review pending</footer>
     </main>
   </>;
 }
