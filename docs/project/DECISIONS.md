@@ -1,6 +1,6 @@
 # Decision register
 
-Baseline: [MASTER_SPEC.md](MASTER_SPEC.md), imported 2026-10-06. Epoch E0066.
+Baseline: [MASTER_SPEC.md](MASTER_SPEC.md), imported 2026-10-06. Epoch E0067.
 Product decision IDs `DEC-...` are distinct from the source PDF's open-decision IDs `D01`-`D10`.
 
 ## Authority
@@ -135,3 +135,7 @@ Owner approved on 2026-10-13 (America/New_York) [RL-MVP-007D-EMERGENCY-REAL-INFE
 
 ## E0066 — owner-approved code-only emergency amendment
 Owner approved [Task 7D Code-Only Amendment 01](task_packets/RL-MVP-007D-EMERGENCY-CODE-ONLY-AMENDMENT-01.md). Permit isolated-branch code changes and mock/synthetic automated tests within existing E0065 file scope, despite failed disk gate. Forbid downloads, installations, Podman/VM execution, real PDF processing, genuine inference, costs, deployment and merge. Maintain original runtime storage/integrity/license gates, null scoring and independent reviews.
+
+## E0067 — owner-approved grouped correction packet publication (execution not yet authorized)
+
+On 2026-10-27, owner approved preparation/publication of [RL-MVP-007D E0066 Correction 01](task_packets/RL-MVP-007D-E0066-CORRECTION-01.md) for four QA findings: crash-safe Ollama ownership, before-mutation model ID verification, oversize-response MALFORMED classification, and complete run ID semantics. This authorization covers the **correction plan only**; Codex must confirm scope feasibility, and out-of-scope files (notably `src/redaction_lab/adapters/ollama.py`), dependencies or helpers require explicit owner amendment before implementation. Existing runtime/download/real PDF/inference/spend/deployment/merge restrictions continue. Research handoff is not yet verified. Candidate `e6669c2` is CHANGES_REQUESTED, not merge-ready.
