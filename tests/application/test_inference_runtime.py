@@ -292,7 +292,11 @@ def test_supervisor_reaps_owned_child_after_abrupt_application_exit(tmp_path) ->
             str(model_store),
             str(owned_pids_path),
         ],
-        env={"PATH": os.environ["PATH"], "PYTHONPATH": str(Path.cwd() / "src")},
+        env={
+            "PATH": os.environ["PATH"],
+            "PYTHONPATH": str(Path.cwd() / "src"),
+            "PYTHONDONTWRITEBYTECODE": "1",
+        },
     )
     assert parent.wait(timeout=5) == 0
     _wait_for(owned_pids_path.exists)
