@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import asyncio
+from contextlib import contextmanager
 from datetime import UTC, datetime
 import errno
 from hashlib import sha256
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import socket
+import threading
 from urllib.error import HTTPError, URLError
 from urllib.request import Request
 from urllib.request import ProxyHandler
@@ -500,3 +503,119 @@ def test_private_transport_mock_cannot_bypass_response_size_limit(
     response = asyncio.run(adapter.predict(_manifest()))
     assert response.status is AttemptStatus.MALFORMED
     assert response.prediction is None
+
+
+@contextmanager
+def _loopback_response(
+    body: bytes,
+    *,
+    status: int = 200,
+    release: threading.Event | None = None,
+):
+    finished = threading.Event()
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_POST(self):
+            self.rfile.read(int(self.headers.get("Content-Length", "0")))
+            if release is not None:
+                release.wait(timeout=2)
+            self.send_response(status)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            try:
+                self.wfile.write(body)
+            except (BrokenPipeError, ConnectionResetError):
+                pass
+
+        def finish(self):
+            try:
+                super().finish()
+            finally:
+                finished.set()
+
+        def log_message(self, *_args):
+            pass
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    server.daemon_threads = True
+    server.block_on_close = False
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield f"http://127.0.0.1:{server.server_port}", finished
+    finally:
+        if release is not None:
+            release.set()
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+@pytest.mark.parametrize(
+    ("size", "expected"),
+    [
+        (MAX_RESPONSE_BYTES, AttemptStatus.MALFORMED),
+        (MAX_RESPONSE_BYTES + 1, AttemptStatus.MALFORMED),
+    ],
+)
+def test_real_stdlib_transport_bounds_and_classifies_provider_content(
+    size: int, expected: AttemptStatus
+) -> None:
+    body = b"x" * size
+    with _loopback_response(body) as (endpoint, finished):
+        adapter = OllamaAdapter(
+            endpoint=endpoint,
+            model_id="local-model",
+            model_config_id="config-v1",
+        )
+
+        response = asyncio.run(adapter.predict(_manifest()))
+
+        assert response.status is expected
+        assert response.prediction is None
+        assert response.response_hash == sha256(body).hexdigest()
+        assert finished.wait(timeout=2)
+
+
+def test_real_stdlib_transport_keeps_timeout_distinct_from_http_error() -> None:
+    release = threading.Event()
+    with _loopback_response(b"{}", release=release) as (endpoint, _):
+        timeout_adapter = OllamaAdapter(
+            endpoint=endpoint,
+            model_id="local-model",
+            model_config_id="config-v1",
+            timeout_seconds=0.05,
+        )
+        assert (
+            asyncio.run(timeout_adapter.predict(_manifest())).status
+            is AttemptStatus.TIMEOUT
+        )
+
+    with _loopback_response(b"unavailable", status=503) as (endpoint, finished):
+        error_adapter = OllamaAdapter(
+            endpoint=endpoint,
+            model_id="local-model",
+            model_config_id="config-v1",
+        )
+        assert (
+            asyncio.run(error_adapter.predict(_manifest())).status
+            is AttemptStatus.ERROR
+        )
+        assert finished.wait(timeout=2)
+
+
+def test_real_stdlib_connection_refusal_remains_error() -> None:
+    probe = socket.socket()
+    probe.bind(("127.0.0.1", 0))
+    port = probe.getsockname()[1]
+    probe.close()
+    adapter = OllamaAdapter(
+        endpoint=f"http://127.0.0.1:{port}",
+        model_id="local-model",
+        model_config_id="config-v1",
+        timeout_seconds=0.5,
+    )
+
+    response = asyncio.run(adapter.predict(_manifest()))
+
+    assert response.status is AttemptStatus.ERROR

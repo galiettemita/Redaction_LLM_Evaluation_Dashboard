@@ -131,8 +131,6 @@ class OllamaAdapter(PredictionAdapter):
             )
             with self._opener.open(request, timeout=timeout) as response:
                 result = response.read(MAX_RESPONSE_BYTES + 1)
-            if len(result) > MAX_RESPONSE_BYTES:
-                raise ValueError("response exceeds size limit")
             return result
 
         return await asyncio.to_thread(send)
