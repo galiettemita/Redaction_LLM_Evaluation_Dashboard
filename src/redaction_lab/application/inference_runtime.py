@@ -75,6 +75,7 @@ class _SupervisedProcess:
 @dataclass
 class VerifiedInferenceRuntime:
     adapter: PredictionAdapter
+    model_id: str
     model_config_id: str
     model_manifest_digest: str
     process: subprocess.Popen[bytes] | _SupervisedProcess | None = None
@@ -555,6 +556,7 @@ class InferenceRuntime:
                     endpoint=str(value["endpoint"]), model_id=str(value["model_id"]),
                     model_config_id=str(value["model_config_id"]), timeout_seconds=60,
                 ),
+                model_id=str(value["model_id"]),
                 model_config_id=str(value["model_config_id"]),
                 model_manifest_digest=digest,
                 process=process,
@@ -587,6 +589,7 @@ class InferenceRuntime:
 
             return VerifiedInferenceRuntime(
                 adapter=_RuntimeBoundAdapter(adapter, assert_runtime),
+                model_id=str(value["model_id"]),
                 model_config_id=str(value["model_config_id"]),
                 model_manifest_digest=digest,
                 process=process,

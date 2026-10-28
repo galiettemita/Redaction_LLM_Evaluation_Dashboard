@@ -3,13 +3,18 @@ from __future__ import annotations
 import asyncio
 from datetime import UTC, datetime
 from hashlib import sha256
+import json
 
 import pytest
 
 from redaction_lab.adapters.base import PredictionAdapter, PredictionResponse
 from redaction_lab.application.application_store import ApplicationStore, ProcessingStatus
-from redaction_lab.application.prediction_service import PredictionService
-from redaction_lab.application.inference_runtime import VerifiedInferenceRuntime
+from redaction_lab.application import prediction_service
+from redaction_lab.application.prediction_service import MODEL_ID, PredictionService
+from redaction_lab.application.inference_runtime import (
+    InferenceRuntimeUnavailable,
+    VerifiedInferenceRuntime,
+)
 from redaction_lab.contracts import AttemptStatus, DocumentRole, PredictionManifest, TokenUsage
 from redaction_lab.pdf_detector import DETECTOR_VERSION
 from redaction_lab.canonical import CANONICALIZER_VERSION
@@ -28,6 +33,7 @@ NOW = datetime(2026, 10, 13, tzinfo=UTC)
 
 
 class RecordingAdapter(PredictionAdapter):
+    model_id = MODEL_ID
     model_config_id = "ollama-qwen-test-config"
 
     def __init__(self, store: RunStore, *, crash: bool = False) -> None:
@@ -60,6 +66,7 @@ class RecordingAdapter(PredictionAdapter):
 def _verified(adapter: RecordingAdapter, digest: str = "a") -> VerifiedInferenceRuntime:
     return VerifiedInferenceRuntime(
         adapter=adapter,
+        model_id=adapter.model_id,
         model_config_id=adapter.model_config_id,
         model_manifest_digest="sha256:" + digest * 64,
     )
@@ -272,3 +279,139 @@ def test_run_identity_changes_with_model_digest_or_configuration(tmp_path) -> No
     assert len({first.run_id, changed_digest.run_id, changed_config.run_id}) == 3
     assert "model_manifest_digest" in first.created_by
     assert "model_config_id" in first.created_by
+
+
+def test_consistently_substituted_runtime_fails_before_any_intent_mutation(
+    tmp_path, monkeypatch
+) -> None:
+    app_store, run_store, version_id, source = _ready_source(tmp_path)
+    rejected_adapter = RecordingAdapter(run_store)
+    rejected_adapter.model_id = "substituted-model"
+
+    class RejectedRuntime:
+        adapter = rejected_adapter
+        model_id = "substituted-model"
+        model_config_id = "substituted-config"
+        model_manifest_digest = "sha256:" + "c" * 64
+        closed = False
+
+        def close(self):
+            self.closed = True
+
+    rejected = RejectedRuntime()
+    approved = _verified(RecordingAdapter(run_store))
+    runtimes = iter((rejected, approved))
+    monkeypatch.setattr(
+        "redaction_lab.application.prediction_service.InferenceRuntime.verified",
+        lambda self: next(runtimes),
+    )
+    service = PredictionService(app_store)
+
+    with pytest.raises(InferenceRuntimeUnavailable, match="approved model"):
+        asyncio.run(service.run(version_id))
+
+    assert rejected.closed is True
+    assert run_store.runs_for_source(
+        source.source_id, project_id=source.project_id
+    ) == ()
+    assert asyncio.run(service.run(version_id))
+
+
+@pytest.mark.parametrize(
+    ("name", "changed"),
+    [
+        ("RUN_VERSION", "run-v-next"),
+        ("MODEL_ID", "changed-model"),
+        ("EXPERIMENT_CONDITION", "changed-condition"),
+        ("COMMON_CONTEXT_BUDGET", 65_536),
+        ("CONTEXT_POLICY", "changed-policy"),
+        ("PROMPT_ID", "changed-prompt"),
+        ("PROMPT_VERSION", "prompt-v-next"),
+        ("SETTINGS", {"temperature": 0.1}),
+        ("ATTEMPT_POLICY", "changed-attempt-policy"),
+        ("TOOL_PERMISSIONS", ("changed-tool",)),
+        ("BUDGET_LABEL", "changed-budget"),
+        ("SERVICE_ID", "application-prediction-service-next"),
+    ],
+)
+def test_run_identity_changes_with_every_frozen_semantic(
+    tmp_path, monkeypatch, name, changed
+) -> None:
+    app_store, _, version_id, _ = _ready_source(tmp_path)
+    service = PredictionService(app_store)
+    _, first = service._run_definition(
+        version_id,
+        model_config_id="config-a",
+        model_manifest_digest="sha256:" + "a" * 64,
+    )
+
+    monkeypatch.setattr(prediction_service, name, changed, raising=False)
+    _, second = PredictionService(app_store)._run_definition(
+        version_id,
+        model_config_id="config-a",
+        model_manifest_digest="sha256:" + "a" * 64,
+    )
+
+    assert second.run_id != first.run_id
+
+
+def test_identical_run_intent_is_stable_across_service_restart(tmp_path) -> None:
+    app_store, _, version_id, _ = _ready_source(tmp_path)
+    arguments = {
+        "model_config_id": "config-a",
+        "model_manifest_digest": "sha256:" + "a" * 64,
+    }
+
+    _, first = PredictionService(app_store)._run_definition(version_id, **arguments)
+    _, restarted = PredictionService(app_store)._run_definition(version_id, **arguments)
+
+    assert restarted.run_id == first.run_id
+    assert restarted == first
+
+
+def test_legacy_branch_only_run_identity_is_rejected_without_rewrite(tmp_path) -> None:
+    app_store, run_store, version_id, source = _ready_source(tmp_path)
+    service = PredictionService(app_store)
+    _, current = service._run_definition(
+        version_id,
+        model_config_id="config-a",
+        model_manifest_digest="sha256:" + "a" * 64,
+    )
+    old_values = [
+        source.source_id,
+        source.canonical_document.canonical_hash,
+        source.target_versions,
+        MODEL_ID,
+        "redaction-reconstruction-json",
+        "prompt-v1",
+        {"temperature": 0},
+        "config-a",
+        "sha256:" + "a" * 64,
+    ]
+    encoded = json.dumps(
+        old_values, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    ).encode()
+    legacy = current.model_copy(
+        update={
+            "run_id": "run-" + sha256(encoded).hexdigest(),
+            "run_version": "run-v0.2",
+            "created_by": json.dumps(
+                {
+                    "model_config_id": "config-a",
+                    "model_manifest_digest": "sha256:" + "a" * 64,
+                    "service": "application-prediction-service-v0.2",
+                },
+                sort_keys=True,
+                separators=(",", ":"),
+            ),
+        }
+    )
+    run_store.enqueue(source.source_id, source.targets[0].target_id, legacy)
+
+    with pytest.raises(ValueError, match="legacy v0.2"):
+        service._stored_run(version_id)
+
+    stored = run_store.runs_for_source(
+        source.source_id, project_id=source.project_id
+    )
+    assert stored == (legacy,)
