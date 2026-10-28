@@ -325,7 +325,17 @@ def test_supervisor_popen_failure_closes_every_pipe_descriptor(
     model_store = tmp_path / "models"
     model_store.mkdir()
     descriptor = os.open(executable, os.O_RDONLY)
-    before = set(os.listdir("/dev/fd"))
+    created_pipes: list[int] = []
+    real_pipe = os.pipe
+
+    def tracked_pipe():
+        pair = real_pipe()
+        created_pipes.extend(pair)
+        return pair
+
+    monkeypatch.setattr(
+        "redaction_lab.application.inference_runtime.os.pipe", tracked_pipe
+    )
     monkeypatch.setattr(
         "redaction_lab.application.inference_runtime.subprocess.Popen",
         lambda *args, **kwargs: (_ for _ in ()).throw(OSError("synthetic failure")),
@@ -338,7 +348,9 @@ def test_supervisor_popen_failure_closes_every_pipe_descriptor(
     finally:
         os.close(descriptor)
 
-    assert len(os.listdir("/dev/fd")) == len(before) - 1
+    for pipe_descriptor in created_pipes:
+        with pytest.raises(OSError):
+            os.fstat(pipe_descriptor)
 
 
 def test_supervisor_handshake_exception_closes_pipe_and_reaps_process(
@@ -369,6 +381,17 @@ def test_supervisor_handshake_exception_closes_pipe_and_reaps_process(
             self.terminated = True
 
     supervisor = Supervisor()
+    created_pipes: list[int] = []
+    real_pipe = os.pipe
+
+    def tracked_pipe():
+        pair = real_pipe()
+        created_pipes.extend(pair)
+        return pair
+
+    monkeypatch.setattr(
+        "redaction_lab.application.inference_runtime.os.pipe", tracked_pipe
+    )
     monkeypatch.setattr(
         "redaction_lab.application.inference_runtime.subprocess.Popen",
         lambda *args, **kwargs: supervisor,
@@ -377,7 +400,6 @@ def test_supervisor_handshake_exception_closes_pipe_and_reaps_process(
         "redaction_lab.application.inference_runtime.select.select",
         lambda *args, **kwargs: (_ for _ in ()).throw(OSError("handshake failed")),
     )
-    before = set(os.listdir("/dev/fd"))
     try:
         with pytest.raises(InferenceRuntimeUnavailable, match="handshake"):
             InferenceRuntime._launch_supervisor(
@@ -387,7 +409,9 @@ def test_supervisor_handshake_exception_closes_pipe_and_reaps_process(
         os.close(descriptor)
 
     assert supervisor.terminated is True
-    assert len(os.listdir("/dev/fd")) == len(before) - 1
+    for pipe_descriptor in created_pipes:
+        with pytest.raises(OSError):
+            os.fstat(pipe_descriptor)
 
 
 def test_post_launch_identity_failure_kills_sigterm_resistant_child(
