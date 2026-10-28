@@ -6,6 +6,10 @@ from hashlib import sha256
 import json
 import os
 from pathlib import Path
+import shutil
+import subprocess
+import sys
+import time
 
 import pytest
 
@@ -100,8 +104,9 @@ def test_runtime_verifies_exact_executable_version_and_full_model_digest(
 
     monkeypatch.setattr("redaction_lab.application.inference_runtime.subprocess.run", fake_run)
     monkeypatch.setattr("redaction_lab.application.inference_runtime.build_opener", lambda *handlers: Opener())
-    def fake_start(self, executable_fd, model_store):
+    def fake_start(self, executable_fd, executable, model_store):
         observed["serve_fd"] = executable_fd
+        observed["serve_path"] = executable
         return process
 
     monkeypatch.setattr(InferenceRuntime, "_start_owned_runtime", fake_start)
@@ -115,6 +120,7 @@ def test_runtime_verifies_exact_executable_version_and_full_model_digest(
     assert observed["command"][0].startswith("/dev/fd/")
     assert observed["command"][1] == "--version"
     assert observed["command"][0] == f"/dev/fd/{observed['serve_fd']}"
+    assert observed["serve_path"] == Path(value["ollama_executable"])
     assert observed["kwargs"]["env"] == {"PATH": "/usr/bin:/bin"}
     assert observed["kwargs"]["pass_fds"]
     assert observed["urls"] == [
@@ -182,7 +188,7 @@ def test_owned_runtime_refuses_preexisting_loopback_listener(tmp_path, monkeypat
         lambda *args, **kwargs: Connection(),
     )
     with pytest.raises(InferenceRuntimeUnavailable, match="unowned"):
-        InferenceRuntime._start_owned_runtime(123, model_store)
+        InferenceRuntime._start_owned_runtime(123, executable, model_store)
 
 
 def test_owned_runtime_launches_only_pinned_binary_and_confined_model_store(
@@ -193,7 +199,20 @@ def test_owned_runtime_launches_only_pinned_binary_and_confined_model_store(
     model_store = tmp_path / "models"
     model_store.mkdir()
     observed = {}
-    process = object()
+    lifetime_read, lifetime_write = os.pipe()
+    status_read, status_write = os.pipe()
+
+    class Process:
+        pid = 123
+        returncode = 0
+
+        def poll(self):
+            return 0
+
+        def wait(self, timeout):
+            return 0
+
+    process = Process()
 
     def refused(*args, **kwargs):
         raise ConnectionRefusedError
@@ -206,16 +225,19 @@ def test_owned_runtime_launches_only_pinned_binary_and_confined_model_store(
     monkeypatch.setattr(
         "redaction_lab.application.inference_runtime.socket.create_connection", refused
     )
-    monkeypatch.setattr(
-        "redaction_lab.application.inference_runtime.subprocess.Popen", popen
-    )
-
     descriptor = os.open(executable, os.O_RDONLY)
     try:
-        assert InferenceRuntime._start_owned_runtime(descriptor, model_store) is process
+        monkeypatch.setattr(
+            "redaction_lab.application.inference_runtime.subprocess.Popen", popen
+        )
+        InferenceRuntime._supervisor_main(
+            lifetime_read, status_write, descriptor, executable, model_store
+        )
     finally:
+        os.close(lifetime_write)
+        os.close(status_read)
         os.close(descriptor)
-    assert observed["command"] == [f"/dev/fd/{descriptor}", "serve"]
+    assert observed["command"] == [str(executable), "serve"]
     assert observed["kwargs"]["env"] == {
         "PATH": "/usr/bin:/bin",
         "OLLAMA_HOST": "127.0.0.1:11434",
@@ -223,6 +245,75 @@ def test_owned_runtime_launches_only_pinned_binary_and_confined_model_store(
     }
     assert observed["kwargs"]["close_fds"] is True
     assert observed["kwargs"]["pass_fds"] == (descriptor,)
+
+
+def _process_exists(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    return True
+
+
+def _wait_for(predicate, timeout: float = 5) -> None:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if predicate():
+            return
+        time.sleep(0.02)
+    assert predicate()
+
+
+def _harmless_runtime(tmp_path: Path) -> tuple[Path, Path, Path]:
+    owned_pids = tmp_path / "owned.pids"
+    executable = tmp_path / "harmless-runtime"
+    shutil.copyfile("/usr/bin/yes", executable)
+    executable.chmod(0o700)
+    model_store = tmp_path / "models"
+    model_store.mkdir()
+    return executable, owned_pids, model_store
+
+
+def test_supervisor_reaps_owned_child_after_abrupt_application_exit(tmp_path) -> None:
+    executable, owned_pids_path, model_store = _harmless_runtime(tmp_path)
+    parent = subprocess.Popen(
+        [
+            sys.executable,
+            "-c",
+            (
+                "import os,sys; from pathlib import Path; "
+                "from redaction_lab.application.inference_runtime import InferenceRuntime; "
+                "fd=os.open(sys.argv[1],os.O_RDONLY); "
+                "owned=InferenceRuntime._launch_supervisor(fd,Path(sys.argv[1]),Path(sys.argv[2])); "
+                "Path(sys.argv[3]).write_text(f'{owned.pid},{owned.child_pid}'); "
+                "os._exit(0)"
+            ),
+            str(executable),
+            str(model_store),
+            str(owned_pids_path),
+        ],
+        env={"PATH": os.environ["PATH"], "PYTHONPATH": str(Path.cwd() / "src")},
+    )
+    assert parent.wait(timeout=5) == 0
+    _wait_for(owned_pids_path.exists)
+    supervisor_pid, child_pid = map(int, owned_pids_path.read_text().split(","))
+
+    _wait_for(lambda: not _process_exists(child_pid))
+    _wait_for(lambda: not _process_exists(supervisor_pid))
+
+
+def test_supervisor_start_failure_is_reaped_and_reported(tmp_path) -> None:
+    executable = tmp_path / "invalid-runtime"
+    executable.write_text("not an executable format")
+    executable.chmod(0o700)
+    model_store = tmp_path / "models"
+    model_store.mkdir()
+    descriptor = os.open(executable, os.O_RDONLY)
+    try:
+        with pytest.raises(InferenceRuntimeUnavailable, match="could not start"):
+            InferenceRuntime._launch_supervisor(descriptor, executable, model_store)
+    finally:
+        os.close(descriptor)
 
 
 def test_model_file_inventory_detects_blob_substitution(tmp_path) -> None:

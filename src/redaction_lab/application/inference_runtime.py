@@ -8,9 +8,12 @@ import json
 import os
 from pathlib import Path
 import re
+import select
+import signal
 import socket
 import stat
 import subprocess
+import sys
 import time
 from typing import Callable
 from urllib.error import HTTPError, URLError
@@ -25,12 +28,56 @@ class InferenceRuntimeUnavailable(RuntimeError):
     """The pinned local model runtime has not been independently qualified."""
 
 
+class _SupervisedProcess:
+    """Process-like handle whose pipe owns the supervisor and runtime lifetime."""
+
+    def __init__(
+        self,
+        supervisor: subprocess.Popen[bytes],
+        lifetime_fd: int,
+        child_pid: int,
+    ) -> None:
+        self._supervisor = supervisor
+        self._lifetime_fd = lifetime_fd
+        self.child_pid = child_pid
+
+    @property
+    def pid(self) -> int:
+        return self._supervisor.pid
+
+    def poll(self) -> int | None:
+        return self._supervisor.poll()
+
+    def terminate(self) -> None:
+        descriptor, self._lifetime_fd = self._lifetime_fd, -1
+        if descriptor >= 0:
+            try:
+                os.close(descriptor)
+            except OSError:
+                pass
+
+    def wait(self, timeout: float) -> int:
+        return self._supervisor.wait(timeout=timeout)
+
+    def kill(self) -> None:
+        self.terminate()
+        if self._supervisor.poll() is not None:
+            return
+        try:
+            if os.getpgid(self.pid) == self.pid:
+                os.killpg(self.pid, signal.SIGKILL)
+            else:
+                self._supervisor.kill()
+        except ProcessLookupError:
+            pass
+
+
 @dataclass
 class VerifiedInferenceRuntime:
     adapter: PredictionAdapter
     model_config_id: str
     model_manifest_digest: str
-    process: subprocess.Popen[bytes] | None = None
+    process: subprocess.Popen[bytes] | _SupervisedProcess | None = None
     executable_fd: int | None = None
 
     def close(self) -> None:
@@ -107,21 +154,33 @@ class InferenceRuntime:
             raise InferenceRuntimeUnavailable("model manifest identity mismatch")
 
     @staticmethod
-    def _start_owned_runtime(
-        executable_fd: int, model_store: Path
-    ) -> subprocess.Popen[bytes]:
+    def _supervisor_main(
+        lifetime_fd: int,
+        status_fd: int,
+        executable_fd: int,
+        executable: Path,
+        model_store: Path,
+    ) -> int:
+        stopping = False
+
+        def stop(_signum, _frame) -> None:  # type: ignore[no-untyped-def]
+            nonlocal stopping
+            stopping = True
+
+        signal.signal(signal.SIGTERM, stop)
+        signal.signal(signal.SIGINT, stop)
         try:
-            connection = socket.create_connection(("127.0.0.1", 11434), timeout=0.25)
-        except (ConnectionRefusedError, TimeoutError, OSError):
-            pass
-        else:
-            connection.close()
-            raise InferenceRuntimeUnavailable(
-                "refusing an unowned pre-existing model runtime"
+            descriptor_identity = InferenceRuntime._file_identity(
+                os.fstat(executable_fd)
             )
-        try:
-            return subprocess.Popen(
-                [f"/dev/fd/{executable_fd}", "serve"],
+            if (
+                executable.is_symlink()
+                or InferenceRuntime._file_identity(executable.lstat())
+                != descriptor_identity
+            ):
+                raise OSError("verified executable path changed")
+            child = subprocess.Popen(
+                [str(executable), "serve"],
                 stdin=subprocess.DEVNULL,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
@@ -133,8 +192,117 @@ class InferenceRuntime:
                     "OLLAMA_MODELS": str(model_store),
                 },
             )
+            if InferenceRuntime._file_identity(executable.lstat()) != descriptor_identity:
+                child.terminate()
+                child.wait(timeout=5)
+                raise OSError("verified executable path changed during launch")
+        except OSError:
+            try:
+                os.write(status_fd, b"ERROR\n")
+            except OSError:
+                pass
+            os.close(status_fd)
+            os.close(lifetime_fd)
+            return 1
+
+        try:
+            try:
+                os.write(status_fd, f"READY:{child.pid}\n".encode("ascii"))
+            except OSError:
+                stopping = True
+            os.close(status_fd)
+            while child.poll() is None and not stopping:
+                readable, _, _ = select.select([lifetime_fd], [], [], 0.1)
+                if readable and not os.read(lifetime_fd, 1):
+                    break
+        finally:
+            if child.poll() is None:
+                child.terminate()
+                try:
+                    child.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    child.kill()
+                    child.wait(timeout=5)
+            os.close(lifetime_fd)
+        return child.returncode or 0
+
+    @staticmethod
+    def _launch_supervisor(
+        executable_fd: int, executable: Path, model_store: Path
+    ) -> _SupervisedProcess:
+        lifetime_read, lifetime_write = os.pipe()
+        status_read, status_write = os.pipe()
+        supervisor: subprocess.Popen[bytes] | None = None
+        try:
+            supervisor = subprocess.Popen(
+                [
+                    sys.executable,
+                    "-m",
+                    "redaction_lab.application.inference_runtime",
+                    "--supervise",
+                    str(lifetime_read),
+                    str(status_write),
+                    str(executable_fd),
+                    str(executable),
+                    str(model_store),
+                ],
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                close_fds=True,
+                pass_fds=(lifetime_read, status_write, executable_fd),
+                start_new_session=True,
+                env={
+                    "PATH": "/usr/bin:/bin",
+                    "PYTHONPATH": str(Path(__file__).resolve().parents[2]),
+                },
+            )
         except OSError as error:
-            raise InferenceRuntimeUnavailable("could not start owned Ollama runtime") from error
+            os.close(lifetime_write)
+            raise InferenceRuntimeUnavailable(
+                "could not start owned Ollama supervisor"
+            ) from error
+        finally:
+            os.close(lifetime_read)
+            os.close(status_write)
+
+        try:
+            readable, _, _ = select.select([status_read], [], [], 5)
+            status = os.read(status_read, 64) if readable else b""
+        finally:
+            os.close(status_read)
+        try:
+            marker, child_value = status.rstrip(b"\n").split(b":", 1)
+            child_pid = int(child_value) if marker == b"READY" else 0
+        except (TypeError, ValueError):
+            child_pid = 0
+        owned = _SupervisedProcess(supervisor, lifetime_write, child_pid)
+        if child_pid <= 0:
+            owned.terminate()
+            try:
+                owned.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                owned.kill()
+                owned.wait(timeout=5)
+            raise InferenceRuntimeUnavailable("could not start owned Ollama runtime")
+        return owned
+
+    @staticmethod
+    def _start_owned_runtime(
+        executable_fd: int, executable: Path, model_store: Path
+    ) -> _SupervisedProcess:
+        try:
+            connection = socket.create_connection(("127.0.0.1", 11434), timeout=0.25)
+        except (ConnectionRefusedError, TimeoutError, OSError):
+            pass
+        else:
+            connection.close()
+            raise InferenceRuntimeUnavailable(
+                "refusing an unowned pre-existing model runtime"
+            )
+        return InferenceRuntime._launch_supervisor(
+            executable_fd, executable, model_store
+        )
 
     @staticmethod
     def _file_identity(info: os.stat_result) -> tuple[int, ...]:
@@ -373,7 +541,7 @@ class InferenceRuntime:
             os.close(executable_fd)
             raise InferenceRuntimeUnavailable("Ollama executable changed before launch")
         try:
-            process = self._start_owned_runtime(executable_fd, model_store)
+            process = self._start_owned_runtime(executable_fd, executable, model_store)
         except Exception:
             os.close(executable_fd)
             raise
@@ -434,3 +602,23 @@ class InferenceRuntime:
                     process.wait(timeout=5)
             os.close(executable_fd)
             raise
+
+
+def _main(arguments: list[str]) -> int:
+    if len(arguments) != 6 or arguments[0] != "--supervise":
+        return 2
+    try:
+        lifetime_fd, status_fd, executable_fd = map(int, arguments[1:4])
+    except ValueError:
+        return 2
+    return InferenceRuntime._supervisor_main(
+        lifetime_fd,
+        status_fd,
+        executable_fd,
+        Path(arguments[4]),
+        Path(arguments[5]),
+    )
+
+
+if __name__ == "__main__":
+    raise SystemExit(_main(sys.argv[1:]))
