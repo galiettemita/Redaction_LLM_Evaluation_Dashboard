@@ -554,14 +554,23 @@ def _loopback_response(
 @pytest.mark.parametrize(
     ("size", "expected"),
     [
-        (MAX_RESPONSE_BYTES, AttemptStatus.MALFORMED),
+        (MAX_RESPONSE_BYTES, AttemptStatus.SUCCEEDED),
         (MAX_RESPONSE_BYTES + 1, AttemptStatus.MALFORMED),
     ],
 )
 def test_real_stdlib_transport_bounds_and_classifies_provider_content(
     size: int, expected: AttemptStatus
 ) -> None:
-    body = b"x" * size
+    payload = {
+        "model": "local-model",
+        "response": json.dumps({"status": "prediction", "text": "guess"}),
+        "done": True,
+        "padding": "",
+    }
+    base = json.dumps(payload, separators=(",", ":")).encode()
+    payload["padding"] = "x" * (size - len(base))
+    body = json.dumps(payload, separators=(",", ":")).encode()
+    assert len(body) == size
     with _loopback_response(body) as (endpoint, finished):
         adapter = OllamaAdapter(
             endpoint=endpoint,
@@ -572,7 +581,9 @@ def test_real_stdlib_transport_bounds_and_classifies_provider_content(
         response = asyncio.run(adapter.predict(_manifest()))
 
         assert response.status is expected
-        assert response.prediction is None
+        assert response.prediction == (
+            "guess" if expected is AttemptStatus.SUCCEEDED else None
+        )
         assert response.response_hash == sha256(body).hexdigest()
         assert finished.wait(timeout=2)
 

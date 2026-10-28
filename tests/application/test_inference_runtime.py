@@ -316,6 +316,140 @@ def test_supervisor_start_failure_is_reaped_and_reported(tmp_path) -> None:
         os.close(descriptor)
 
 
+def test_supervisor_popen_failure_closes_every_pipe_descriptor(
+    tmp_path, monkeypatch
+) -> None:
+    executable = tmp_path / "runtime"
+    executable.write_bytes(b"synthetic")
+    executable.chmod(0o700)
+    model_store = tmp_path / "models"
+    model_store.mkdir()
+    descriptor = os.open(executable, os.O_RDONLY)
+    before = set(os.listdir("/dev/fd"))
+    monkeypatch.setattr(
+        "redaction_lab.application.inference_runtime.subprocess.Popen",
+        lambda *args, **kwargs: (_ for _ in ()).throw(OSError("synthetic failure")),
+    )
+    try:
+        with pytest.raises(InferenceRuntimeUnavailable, match="supervisor"):
+            InferenceRuntime._launch_supervisor(
+                descriptor, executable, model_store
+            )
+    finally:
+        os.close(descriptor)
+
+    assert len(os.listdir("/dev/fd")) == len(before) - 1
+
+
+def test_supervisor_handshake_exception_closes_pipe_and_reaps_process(
+    tmp_path, monkeypatch
+) -> None:
+    executable = tmp_path / "runtime"
+    executable.write_bytes(b"synthetic")
+    executable.chmod(0o700)
+    model_store = tmp_path / "models"
+    model_store.mkdir()
+    descriptor = os.open(executable, os.O_RDONLY)
+
+    class Supervisor:
+        pid = 321
+        terminated = False
+
+        def poll(self):
+            return 0 if self.terminated else None
+
+        def terminate(self):
+            self.terminated = True
+
+        def wait(self, timeout):
+            self.terminated = True
+            return 0
+
+        def kill(self):
+            self.terminated = True
+
+    supervisor = Supervisor()
+    monkeypatch.setattr(
+        "redaction_lab.application.inference_runtime.subprocess.Popen",
+        lambda *args, **kwargs: supervisor,
+    )
+    monkeypatch.setattr(
+        "redaction_lab.application.inference_runtime.select.select",
+        lambda *args, **kwargs: (_ for _ in ()).throw(OSError("handshake failed")),
+    )
+    before = set(os.listdir("/dev/fd"))
+    try:
+        with pytest.raises(InferenceRuntimeUnavailable, match="handshake"):
+            InferenceRuntime._launch_supervisor(
+                descriptor, executable, model_store
+            )
+    finally:
+        os.close(descriptor)
+
+    assert supervisor.terminated is True
+    assert len(os.listdir("/dev/fd")) == len(before) - 1
+
+
+def test_post_launch_identity_failure_kills_sigterm_resistant_child(
+    tmp_path, monkeypatch
+) -> None:
+    executable = tmp_path / "runtime"
+    executable.write_bytes(b"synthetic")
+    executable.chmod(0o700)
+    model_store = tmp_path / "models"
+    model_store.mkdir()
+    descriptor = os.open(executable, os.O_RDONLY)
+    lifetime_read, lifetime_write = os.pipe()
+    status_read, status_write = os.pipe()
+
+    class Child:
+        pid = 456
+        returncode = None
+        killed = False
+
+        def poll(self):
+            return -9 if self.killed else None
+
+        def terminate(self):
+            pass
+
+        def wait(self, timeout):
+            if not self.killed:
+                raise subprocess.TimeoutExpired("synthetic", timeout)
+            self.returncode = -9
+            return self.returncode
+
+        def kill(self):
+            self.killed = True
+
+    child = Child()
+    identities = iter(((1,), (1,), (2,)))
+    monkeypatch.setattr(
+        InferenceRuntime, "_file_identity", lambda info: next(identities)
+    )
+    monkeypatch.setattr(
+        "redaction_lab.application.inference_runtime.subprocess.Popen",
+        lambda *args, **kwargs: child,
+    )
+    try:
+        assert (
+            InferenceRuntime._supervisor_main(
+                lifetime_read,
+                status_write,
+                descriptor,
+                executable,
+                model_store,
+            )
+            == 1
+        )
+        assert child.killed is True
+        assert os.read(status_read, 16) == b"ERROR\n"
+    finally:
+        os.close(lifetime_write)
+        os.close(status_read)
+        os.close(descriptor)
+
+
 def test_model_file_inventory_detects_blob_substitution(tmp_path) -> None:
     _, value = _lock(tmp_path)
     model_store = Path(value["model_store"])

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import replace
 from datetime import UTC, datetime
 from hashlib import sha256
 import json
@@ -415,3 +416,43 @@ def test_legacy_branch_only_run_identity_is_rejected_without_rewrite(tmp_path) -
         source.source_id, project_id=source.project_id
     )
     assert stored == (legacy,)
+
+
+def test_run_identity_binds_canonical_and_ordered_target_provenance(
+    tmp_path, monkeypatch
+) -> None:
+    app_store, _, version_id, source = _ready_source(tmp_path)
+    service = PredictionService(app_store)
+    arguments = {
+        "model_config_id": "config-a",
+        "model_manifest_digest": "sha256:" + "a" * 64,
+    }
+    _, baseline = service._run_definition(version_id, **arguments)
+    canonical = source.canonical_document
+    changed_target = source.targets[0].model_copy(
+        update={"target_version": source.targets[0].target_version + "-next"}
+    )
+    variants = (
+        replace(
+            source,
+            canonical_document=canonical.model_copy(
+                update={"canonical_document_version_id": "canonical-changed"}
+            ),
+        ),
+        replace(
+            source,
+            canonical_document=canonical.model_copy(
+                update={"canonical_hash": "b" * 64}
+            ),
+        ),
+        replace(source, targets=tuple(reversed(source.targets))),
+        replace(source, targets=(changed_target, source.targets[1])),
+    )
+
+    observed = []
+    for variant in variants:
+        monkeypatch.setattr(service.runs, "source", lambda _source_id, value=variant: value)
+        _, changed = service._run_definition(version_id, **arguments)
+        observed.append(changed.run_id)
+
+    assert len(set(observed + [baseline.run_id])) == len(variants) + 1

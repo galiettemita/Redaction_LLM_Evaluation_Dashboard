@@ -28,6 +28,17 @@ class InferenceRuntimeUnavailable(RuntimeError):
     """The pinned local model runtime has not been independently qualified."""
 
 
+def _terminate_process(process) -> None:  # type: ignore[no-untyped-def]
+    if process.poll() is not None:
+        return
+    process.terminate()
+    try:
+        process.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait(timeout=5)
+
+
 class _SupervisedProcess:
     """Process-like handle whose pipe owns the supervisor and runtime lifetime."""
 
@@ -84,13 +95,8 @@ class VerifiedInferenceRuntime:
     def close(self) -> None:
         process, self.process = self.process, None
         descriptor, self.executable_fd = self.executable_fd, None
-        if process is not None and process.poll() is None:
-            process.terminate()
-            try:
-                process.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                process.kill()
-                process.wait(timeout=5)
+        if process is not None:
+            _terminate_process(process)
         if descriptor is not None:
             try:
                 os.close(descriptor)
@@ -129,6 +135,7 @@ class InferenceRuntime:
 
     @staticmethod
     def _json(opener, url: str) -> object:
+        child: subprocess.Popen[bytes] | None = None
         try:
             with opener.open(Request(url, method="GET"), timeout=5) as response:
                 raw = response.read(1_048_577)
@@ -194,10 +201,10 @@ class InferenceRuntime:
                 },
             )
             if InferenceRuntime._file_identity(executable.lstat()) != descriptor_identity:
-                child.terminate()
-                child.wait(timeout=5)
                 raise OSError("verified executable path changed during launch")
         except OSError:
+            if child is not None:
+                _terminate_process(child)
             try:
                 os.write(status_fd, b"ERROR\n")
             except OSError:
@@ -217,13 +224,7 @@ class InferenceRuntime:
                 if readable and not os.read(lifetime_fd, 1):
                     break
         finally:
-            if child.poll() is None:
-                child.terminate()
-                try:
-                    child.wait(timeout=5)
-                except subprocess.TimeoutExpired:
-                    child.kill()
-                    child.wait(timeout=5)
+            _terminate_process(child)
             os.close(lifetime_fd)
         return child.returncode or 0
 
@@ -256,10 +257,12 @@ class InferenceRuntime:
                 env={
                     "PATH": "/usr/bin:/bin",
                     "PYTHONPATH": str(Path(__file__).resolve().parents[2]),
+                    "PYTHONDONTWRITEBYTECODE": "1",
                 },
             )
         except OSError as error:
             os.close(lifetime_write)
+            os.close(status_read)
             raise InferenceRuntimeUnavailable(
                 "could not start owned Ollama supervisor"
             ) from error
@@ -267,9 +270,16 @@ class InferenceRuntime:
             os.close(lifetime_read)
             os.close(status_write)
 
+        owned = _SupervisedProcess(supervisor, lifetime_write, 0)
         try:
-            readable, _, _ = select.select([status_read], [], [], 5)
-            status = os.read(status_read, 64) if readable else b""
+            try:
+                readable, _, _ = select.select([status_read], [], [], 5)
+                status = os.read(status_read, 64) if readable else b""
+            except (OSError, ValueError) as error:
+                _terminate_process(owned)
+                raise InferenceRuntimeUnavailable(
+                    "owned Ollama supervisor handshake failed"
+                ) from error
         finally:
             os.close(status_read)
         try:
@@ -277,14 +287,9 @@ class InferenceRuntime:
             child_pid = int(child_value) if marker == b"READY" else 0
         except (TypeError, ValueError):
             child_pid = 0
-        owned = _SupervisedProcess(supervisor, lifetime_write, child_pid)
+        owned.child_pid = child_pid
         if child_pid <= 0:
-            owned.terminate()
-            try:
-                owned.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                owned.kill()
-                owned.wait(timeout=5)
+            _terminate_process(owned)
             raise InferenceRuntimeUnavailable("could not start owned Ollama runtime")
         return owned
 
@@ -596,13 +601,7 @@ class InferenceRuntime:
                 executable_fd=executable_fd,
             )
         except Exception:
-            if process.poll() is None:
-                process.terminate()
-                try:
-                    process.wait(timeout=5)
-                except subprocess.TimeoutExpired:
-                    process.kill()
-                    process.wait(timeout=5)
+            _terminate_process(process)
             os.close(executable_fd)
             raise
 
