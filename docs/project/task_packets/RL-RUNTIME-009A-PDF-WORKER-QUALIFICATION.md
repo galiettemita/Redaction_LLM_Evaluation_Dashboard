@@ -10,7 +10,7 @@ Qualify the existing isolated PDF-worker design on this Apple Silicon Mac using 
 
 ## Preflight and phased authority
 
-Phase 1 is read-only apart from this task record and its handoff: inventory hardware, disk, existing runtimes and code; verify exact official sources, versions, complete hashes/signatures, licenses, security advisories, architecture support, transitive Python wheel inventory, base/machine image provenance, SBOM tooling and estimated peak storage. No artifact acquisition or runtime execution occurs before that evidence is complete.
+Phase 1 is read-only apart from this task record and its handoff: inventory hardware, disk, existing runtimes and code; verify exact official sources, versions, complete hashes/signatures, licenses, security advisories, architecture support, transitive Python wheel inventory, base/machine image provenance, SBOM tooling and estimated peak storage. Official release assets may be downloaded into a task-specific temporary directory solely for byte-hash, code-signature/notarization and archive inspection; they must not be installed or executed and are removed after the retained verification evidence is recorded. No install or runtime execution occurs before that evidence is complete.
 
 If Phase 1 passes with a documented rollback reserve, Phase 2 may acquire/install only the frozen zero-cost Podman/Python-wheel/base-image artifacts, create the dedicated rootless no-volume machine, assemble the worker offline, and run synthetic-only adversarial qualification. Stop the affected phase for a password/credential request, paid term, missing integrity/license evidence, unsupported host, inadequate reserve, unresolved Critical security risk, or unexpected host sharing/network exposure.
 
