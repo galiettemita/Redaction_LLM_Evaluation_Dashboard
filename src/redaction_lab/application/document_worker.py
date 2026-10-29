@@ -22,10 +22,14 @@ class DocumentWorker:
         self.store = store
         self.artifacts = artifacts
 
-    def run_once(self, *, owner: str) -> bool:
+    def run_once(self, *, owner: str, expected_job_id: str | None = None) -> bool:
         isolated_worker = ApplicationPdfWorker()
         isolated_worker.ensure_available()
-        job = self.store.claim_next(owner=owner, now=datetime.now(UTC))
+        job = self.store.claim_next(
+            owner=owner,
+            now=datetime.now(UTC),
+            expected_job_id=expected_job_id,
+        )
         if job is None:
             return False
         version = self.store.get_version(job.version_id)

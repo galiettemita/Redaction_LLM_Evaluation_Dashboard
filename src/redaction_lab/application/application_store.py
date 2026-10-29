@@ -242,7 +242,13 @@ class ApplicationStore:
             created_at=datetime.fromisoformat(row["created_at"]),
         )
 
-    def claim_next(self, *, owner: str, now: datetime) -> StoredApplicationJob | None:
+    def claim_next(
+        self,
+        *,
+        owner: str,
+        now: datetime,
+        expected_job_id: str | None = None,
+    ) -> StoredApplicationJob | None:
         if not owner.strip():
             raise ValueError("worker owner must be nonblank")
         connection = self.connect()
@@ -259,6 +265,9 @@ class ApplicationStore:
                 "created_at, job_id LIMIT 1"
             ).fetchone()
             if row is None:
+                connection.commit()
+                return None
+            if expected_job_id is not None and row["job_id"] != expected_job_id:
                 connection.commit()
                 return None
             connection.execute(

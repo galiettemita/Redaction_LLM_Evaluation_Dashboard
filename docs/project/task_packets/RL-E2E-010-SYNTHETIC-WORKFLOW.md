@@ -19,12 +19,20 @@ R01-R12, DEC-001 through DEC-022, RL-OPS-002, API v0.2, PDF worker protocol `pdf
 Implementation is limited to the smallest required changes in:
 
 - `src/redaction_lab/application/application_store.py`
+- `src/redaction_lab/application/document_worker.py`
 - `src/redaction_lab/api/app.py`
 - `tests/application/test_application_store.py`
 - `tests/api/test_app.py`
 - new focused tests under `tests/e2e/`
 - `packaging/local/README.md` only if acceptance instructions need correction
 - this task record, its design/plan and one unique Lead/Backend handoff
+
+Independent review amendment: exact-candidate review of `f53681a` demonstrated
+that API preflight and the worker's later queue claim were separate operations,
+allowing a different job to be processed during a legal cross-instance
+interleaving. The owner-approved standing correction authority therefore extends
+this same grouped task to `document_worker.py`; no additional dependency, schema,
+contract or architecture change is authorized.
 
 Use the existing database and service architecture. No migration, new table, dependency, runtime/model/package lock, frontend source/bundle or public API shape change is authorized unless an independently demonstrated stop condition requires a separately recorded amendment.
 

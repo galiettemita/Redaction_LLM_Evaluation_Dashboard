@@ -199,7 +199,8 @@ class LocalApi:
                     )
                 try:
                     worked = DocumentWorker(self.store, self.artifacts).run_once(
-                        owner=f"local-api-{os.getpid()}"
+                        owner=f"local-api-{os.getpid()}",
+                        expected_job_id=job_id,
                     )
                 except (
                     RuntimeUnavailable,
