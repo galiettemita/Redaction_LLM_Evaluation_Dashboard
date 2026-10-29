@@ -1,3 +1,7 @@
+## E0069 — 2026-10-29 — macOS runtime two-fix planning packet
+
+Owner approved preparation/publication only of [RL-MVP-007D E0069 Correction 02 plan](task_packets/RL-MVP-007D-E0069-CORRECTION-02-PLAN.md), addressing QA's macOS `/dev/fd` version-attestation incompatibility and supervisor lifetime FD leak. Implementation/QA re-review requires a separate execution authorization. No code changes, test execution, model/download/runtime operations, paid calls, merge or deployment occurred in this coordination update.
+
 ## E0068 — 2026-10-27 — grouped Correction 01 execution authorized
 
 Owner approved code-only implementation of four QA fixes and exact addition of `src/redaction_lab/adapters/ollama.py` to file scope; packet [Correction 01 execution](task_packets/RL-MVP-007D-E0066-CORRECTION-01-EXECUTION.md). No application edits, tests, runtime operations, merge or deployment performed in coordination step.
