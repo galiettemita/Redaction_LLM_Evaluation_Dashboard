@@ -8,6 +8,8 @@ from hashlib import sha256
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import socket
+import subprocess
+import sys
 import threading
 from urllib.error import HTTPError, URLError
 from urllib.request import Request
@@ -15,8 +17,10 @@ from urllib.request import ProxyHandler
 
 import pytest
 
+import redaction_lab.adapters.ollama as ollama_module
 from redaction_lab.adapters.base import build_prediction_manifest
 from redaction_lab.adapters.ollama import (
+    MAX_REQUEST_BYTES,
     MAX_RESPONSE_BYTES,
     OllamaAdapter,
     _NoRedirectHandler,
@@ -159,8 +163,17 @@ def test_request_serialization_has_no_reference_or_cross_target_answer_channel()
     request = json.loads(prepared.body)
     serialized = prepared.body.decode("utf-8").lower()
 
-    assert set(request) == {"model", "options", "prompt", "stream"}
-    assert set(request["options"]) == {"temperature"}
+    assert set(request) == {
+        "model", "options", "prompt", "raw", "shift", "stream", "truncate"
+    }
+    assert request["raw"] is True
+    assert request["shift"] is False
+    assert request["truncate"] is False
+    assert request["options"] == {
+        "num_ctx": 32768,
+        "num_predict": 1024,
+        "temperature": 0.0,
+    }
     assert "reference" not in serialized
     assert "revealed" not in serialized
     assert "filename" not in serialized
@@ -170,6 +183,20 @@ def test_request_serialization_has_no_reference_or_cross_target_answer_channel()
     assert "hidden answer" not in serialized
     assert "[[target:target-001]]" in serialized
     assert "[[redacted:target-002]]" in serialized
+
+
+def test_request_rejects_rendered_prompt_that_cannot_fit_without_truncation() -> None:
+    manifest = _manifest().model_copy(
+        update={"canonical_redacted_text": "x" * 31_000 + "[[TARGET:target-001]]"}
+    )
+    adapter = OllamaAdapter(
+        endpoint="http://127.0.0.1:11434",
+        model_id="local-model",
+        model_config_id="local-model-config-v1",
+    )
+
+    with pytest.raises(ValueError, match="context"):
+        adapter.prepare(manifest)
 
 
 @pytest.mark.parametrize(
@@ -234,6 +261,36 @@ def test_constructor_rejects_public_transport_injection() -> None:
             model_config_id="config-v1",
             transport=lambda *_: None,
         )
+
+
+def test_transport_enforces_hard_subprocess_deadline(monkeypatch) -> None:
+    observed = {}
+
+    def timeout(command, **kwargs):
+        observed["command"] = command
+        observed["timeout"] = kwargs["timeout"]
+        raise subprocess.TimeoutExpired(command, kwargs["timeout"])
+
+    monkeypatch.setattr(ollama_module.subprocess, "run", timeout)
+    adapter = OllamaAdapter(
+        endpoint="http://127.0.0.1:11434",
+        model_id="local-model",
+        model_config_id="config-v1",
+        timeout_seconds=0.25,
+    )
+
+    with pytest.raises(TimeoutError):
+        asyncio.run(
+            adapter._stdlib_transport(
+                "http://127.0.0.1:11434/api/generate", b"{}", 0.25
+            )
+        )
+    assert observed["timeout"] == 0.25
+    assert observed["command"][:3] == [
+        sys.executable,
+        "-m",
+        "redaction_lab.adapters.ollama",
+    ]
 
 
 def test_strict_success_response_and_hashes_are_deterministic(
@@ -549,6 +606,81 @@ def _loopback_response(
         server.shutdown()
         server.server_close()
         thread.join(timeout=2)
+
+
+@contextmanager
+def _loopback_capture(body: bytes):
+    received: list[bytes] = []
+    finished = threading.Event()
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_POST(self):
+            received.append(
+                self.rfile.read(int(self.headers.get("Content-Length", "0")))
+            )
+            self.send_response(200)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            finished.set()
+
+        def log_message(self, *_args):
+            pass
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield f"http://127.0.0.1:{server.server_port}", received, finished
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+def test_real_stdlib_transport_delivers_complete_request_across_pipe_reads() -> None:
+    manifest = _manifest().model_copy(
+        update={"canonical_redacted_text": "x" * 28_000}
+    )
+    response_body = json.dumps(
+        {
+            "model": "local-model",
+            "response": json.dumps({"status": "prediction", "text": "guess"}),
+            "done": True,
+        },
+        separators=(",", ":"),
+    ).encode()
+    with _loopback_capture(response_body) as (endpoint, received, finished):
+        adapter = OllamaAdapter(
+            endpoint=endpoint,
+            model_id="local-model",
+            model_config_id="config-v1",
+        )
+        prepared = adapter.prepare(manifest)
+        assert len(prepared.body) > 16_384
+
+        response = asyncio.run(adapter.predict(manifest))
+
+        assert response.status is AttemptStatus.SUCCEEDED
+        assert response.request_hash == prepared.request_hash
+        assert finished.wait(timeout=2)
+        assert received == [prepared.body]
+
+
+def test_prepare_rejects_json_expansion_beyond_transport_request_bound() -> None:
+    manifest = _manifest().model_copy(
+        update={"canonical_redacted_text": "\x01" * 29_000}
+    )
+    adapter = OllamaAdapter(
+        endpoint="http://127.0.0.1:11434",
+        model_id="local-model",
+        model_config_id="config-v1",
+    )
+
+    with pytest.raises(ValueError, match="request exceeds"):
+        adapter.prepare(manifest)
+
+    assert MAX_REQUEST_BYTES == 131_072
 
 
 @pytest.mark.parametrize(

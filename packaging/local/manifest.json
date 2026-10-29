@@ -51,7 +51,8 @@
   },
   "model_runtime": {
     "lock_path": "packaging/model-runtime/runtime.lock",
-    "lock_sha256": "7c0f0d2fca54da78f8ab3c2175de2af0ab26d6e8b0b40492bea7a275cc65cad1",
+    "lock_sha256": "ad9e94f73623450cb7dd3a976958ab68f208906a1cc1b0ccfe0eb03d92065d8b",
+    "lock_qualified_on_reference_host": true,
     "runtime_qualified": false
   },
   "delivery_status": {

@@ -1,0 +1,84 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "serialNumber": "urn:uuid:7c1f2528-395c-4d1f-9f86-8a083ad1e9b0",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2026-10-29T18:14:00Z",
+    "component": {"type": "application", "name": "redaction-lab-local-model-runtime", "version": "0.40.13-qwen2.5-1.5b-q4_K_M"}
+  },
+  "components": [
+    {
+      "type": "application", "name": "ollama", "version": "0.40.13",
+      "licenses": [{"license": {"id": "MIT"}}],
+      "hashes": [{"alg": "SHA-256", "content": "270089e59e1d411ac4d0987154b4e95f48b29a81c9d274833c6b766d6df88300"}],
+      "properties": [
+        {"name": "redaction-lab:runtime-regular-files", "value": "45"},
+        {"name": "redaction-lab:runtime-symlinks", "value": "10"},
+        {"name": "redaction-lab:runtime-inventory", "value": "runtime.lock#runtime_files"}
+      ],
+      "externalReferences": [{"type": "distribution", "url": "https://github.com/ollama/ollama/releases/download/v0.40.13/ollama-darwin.tgz"}],
+      "bom-ref": "pkg:github/ollama/ollama@v0.40.13"
+    },
+    {
+      "type": "library", "name": "llama.cpp", "version": "ollama-0.40.13-bundled",
+      "licenses": [{"license": {"id": "MIT"}}],
+      "hashes": [{"alg": "SHA-256", "content": "00089aaa72646759fbaae9fa38ab0e47a984b40cf9e3d544dcea9db455d4e154"}],
+      "bom-ref": "pkg:generic/llama.cpp@ollama-0.40.13-bundled"
+    },
+    {
+      "type": "library", "name": "MLX", "version": "ollama-0.40.13-bundled",
+      "licenses": [{"license": {"id": "MIT"}}],
+      "hashes": [{"alg": "SHA-256", "content": "c895da0add930965474bfc4eabe3ade513aa7fa1636a5060e7c8d0491997a624"}],
+      "bom-ref": "pkg:generic/mlx@ollama-0.40.13-bundled"
+    },
+    {
+      "type": "library", "name": "MLX C", "version": "ollama-0.40.13-bundled",
+      "licenses": [{"license": {"id": "MIT"}}],
+      "hashes": [{"alg": "SHA-256", "content": "2c728c6ee96f39b7d98035f8cd03b0d38b0f2f6a7f49077f753aa0ee38354279"}],
+      "bom-ref": "pkg:generic/mlx-c@ollama-0.40.13-bundled"
+    },
+    {
+      "type": "library", "name": "XGrammar", "version": "ollama-0.40.13-bundled",
+      "licenses": [{"license": {"id": "Apache-2.0"}}],
+      "hashes": [{"alg": "SHA-256", "content": "076f147da1081d7f8b83af827a3a4410bc51a4453ae8bb544555c24e6580fc0c"}],
+      "bom-ref": "pkg:generic/xgrammar@ollama-0.40.13-bundled"
+    },
+    {
+      "type": "library", "name": "cpp-httplib", "version": "ollama-0.40.13-bundled",
+      "licenses": [{"license": {"id": "MIT"}}],
+      "properties": [{"name": "redaction-lab:license-file-sha256", "value": "4b45cbe16d7b71b89ae6127e26e0d90a029198ca5e958ad8e3d0b8bbed364d8b"}],
+      "bom-ref": "pkg:generic/cpp-httplib@ollama-0.40.13-bundled"
+    },
+    {
+      "type": "library", "name": "DLPack", "version": "ollama-0.40.13-bundled",
+      "licenses": [{"license": {"id": "Apache-2.0"}}],
+      "properties": [{"name": "redaction-lab:license-file-sha256", "value": "3e8f6bc39276a586d60c8c5aaece2ff989262181cf2b3d2a128db58f97a9300c"}],
+      "bom-ref": "pkg:generic/dlpack@ollama-0.40.13-bundled"
+    },
+    {
+      "type": "library", "name": "fmt", "version": "ollama-0.40.13-bundled",
+      "licenses": [{"license": {"id": "MIT"}}],
+      "properties": [{"name": "redaction-lab:license-file-sha256", "value": "07580f2a3b35709ce703d523f447b242f6dfec7582a8c0df102c7fa2849375f8"}],
+      "bom-ref": "pkg:generic/fmt@ollama-0.40.13-bundled"
+    },
+    {
+      "type": "library", "name": "picojson", "version": "ollama-0.40.13-bundled",
+      "licenses": [{"license": {"id": "BSD-2-Clause"}}],
+      "properties": [{"name": "redaction-lab:license-file-sha256", "value": "52a7da16781b4b899382c9ddfcf059235cdee73e2f45cfd7402c2ae9a2e9d28d"}],
+      "bom-ref": "pkg:generic/picojson@ollama-0.40.13-bundled"
+    },
+    {
+      "type": "machine-learning-model", "name": "qwen2.5:1.5b-instruct-q4_K_M", "version": "65ec06548149b04c096a120e4a6da9d4017ea809c91734ea5631e89f96ddc57b",
+      "licenses": [{"license": {"id": "Apache-2.0"}}],
+      "hashes": [{"alg": "SHA-256", "content": "183715c435899236895da3869489cc30ac241476b4971a20285b1a462818a5b4"}],
+      "properties": [
+        {"name": "redaction-lab:manifest-sha256", "value": "65ec06548149b04c096a120e4a6da9d4017ea809c91734ea5631e89f96ddc57b"},
+        {"name": "redaction-lab:config-sha256", "value": "377ac4d7aeefd5b870c9fccff9a6d4df36901d99fe3277c2f755bc401601ba1c"},
+        {"name": "redaction-lab:quantization", "value": "Q4_K_M"}
+      ],
+      "externalReferences": [{"type": "distribution", "url": "https://registry.ollama.ai/v2/library/qwen2.5/manifests/1.5b-instruct-q4_K_M"}],
+      "bom-ref": "pkg:ollama/qwen2.5@1.5b-instruct-q4_K_M"
+    }
+  ]
+}
