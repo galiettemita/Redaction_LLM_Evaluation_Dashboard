@@ -188,7 +188,8 @@ class LocalApi:
                 with self.store.connect() as connection:
                     next_row = connection.execute(
                         "SELECT job_id FROM application_jobs WHERE status='ACCEPTED' "
-                        "ORDER BY created_at, job_id LIMIT 1"
+                        "ORDER BY CASE role WHEN 'REDACTED' THEN 0 ELSE 1 END, "
+                        "created_at, job_id LIMIT 1"
                     ).fetchone()
                 if next_row is None or next_row["job_id"] != job_id:
                     raise HttpProblem(

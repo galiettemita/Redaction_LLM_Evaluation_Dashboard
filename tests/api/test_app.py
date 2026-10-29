@@ -12,6 +12,7 @@ from redaction_lab.api.app import LocalApi, create_app
 from redaction_lab.application.application_store import ApplicationStore, ProcessingStatus
 from redaction_lab.application.application_store import StoredDocumentVersion
 from redaction_lab.application.artifact_store import ArtifactStore
+from redaction_lab.application.document_worker import DocumentWorker
 from redaction_lab.application.upload_service import UploadService
 from redaction_lab.application.inference_runtime import InferenceRuntimeUnavailable
 
@@ -423,6 +424,82 @@ def test_missing_runtime_lock_returns_503_without_claiming_job(
     assert payload["status"] == "ACCEPTED"
     assert stored.status is ProcessingStatus.ACCEPTED
     assert stored.owner is None
+
+
+def test_older_optional_reference_does_not_block_next_redacted_process(
+    tmp_path: Path, monkeypatch
+) -> None:
+    app, store, artifacts = _app(tmp_path)
+    worker_calls: list[str] = []
+
+    def complete_next_redacted(worker, *, owner):
+        job = worker.store.claim_next(owner=owner, now=datetime.now(UTC))
+        assert job is not None
+        worker_calls.append(job.job_id)
+        worker.store.complete_job(
+            job.job_id,
+            owner=owner,
+            status=ProcessingStatus.UNSUPPORTED,
+            page_count=None,
+            source_id=None,
+            reason_code="SYNTHETIC_UNSUPPORTED",
+        )
+        return True
+
+    async def prediction_must_not_run(_version_id):
+        raise AssertionError("unsupported documents must not dispatch prediction")
+
+    monkeypatch.setattr(DocumentWorker, "run_once", complete_next_redacted)
+    monkeypatch.setattr(app.predictions, "run", prediction_must_not_run)
+    try:
+        _, _, first = _upload(
+            app,
+            redacted=b"%PDF-first-redacted",
+            reference=b"%PDF-first-reference",
+        )
+        first_status, _, first_result = _request(
+            app, "POST", f"/api/v1/jobs/{first['redacted']['job_id']}/process"
+        )
+        _, _, second = _upload(
+            app,
+            redacted=b"%PDF-second-redacted",
+            reference=b"%PDF-second-reference",
+        )
+
+        second_status, _, second_result = _request(
+            app, "POST", f"/api/v1/jobs/{second['redacted']['job_id']}/process"
+        )
+        replay_status, _, replay = _request(
+            app, "POST", f"/api/v1/jobs/{second['redacted']['job_id']}/process"
+        )
+        _, _, results = _request(
+            app, "GET", f"/api/v1/results/{second['redacted']['version_id']}"
+        )
+        with store.connect() as connection:
+            references = connection.execute(
+                "SELECT status, source_id FROM application_jobs "
+                "WHERE role='REFERENCE' ORDER BY created_at, job_id"
+            ).fetchall()
+    finally:
+        artifacts.close()
+
+    assert first_status == second_status == 200
+    assert first_result["status"] == second_result["status"] == "UNSUPPORTED"
+    assert worker_calls == [
+        first["redacted"]["job_id"],
+        second["redacted"]["job_id"],
+    ]
+    assert replay_status == 409
+    assert replay["error"]["code"] == "JOB_CONFLICT"
+    assert len(worker_calls) == 2
+    assert [tuple(row) for row in references] == [
+        ("ACCEPTED", None),
+        ("ACCEPTED", None),
+    ]
+    assert results["truth_status"] == "UNKNOWN"
+    assert results["verified_score"] is None
+    assert results["experimental_score"] is None
+    assert results["targets"] == []
 
 
 @pytest.mark.parametrize(
