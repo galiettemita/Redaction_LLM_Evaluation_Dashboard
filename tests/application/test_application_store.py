@@ -69,6 +69,45 @@ def test_one_processing_job_is_claimed_across_store_instances(tmp_path: Path) ->
     assert second.claim_next(owner="worker-b", now=datetime.now(UTC)) is None
 
 
+def test_accepted_reference_does_not_starve_later_redacted_work(
+    tmp_path: Path,
+) -> None:
+    store = _store(tmp_path)
+    first_redacted = store.register_upload(
+        project_id="project-a", role=DocumentRole.REDACTED,
+        artifact_key="sha256/aa/" + "a" * 64 + ".pdf",
+        sha256="a" * 64, byte_size=10,
+    )
+    first_reference = store.register_upload(
+        project_id="project-a", role=DocumentRole.REFERENCE,
+        artifact_key="sha256/bb/" + "b" * 64 + ".pdf",
+        sha256="b" * 64, byte_size=10,
+    )
+    claimed = store.claim_next(owner="worker-a", now=datetime.now(UTC))
+    assert claimed is not None and claimed.job_id == first_redacted.job_id
+    store.complete_job(
+        claimed.job_id, owner="worker-a", status=ProcessingStatus.UNSUPPORTED,
+        page_count=None, source_id=None, reason_code="SYNTHETIC_UNSUPPORTED",
+    )
+    second_redacted = store.register_upload(
+        project_id="project-b", role=DocumentRole.REDACTED,
+        artifact_key="sha256/cc/" + "c" * 64 + ".pdf",
+        sha256="c" * 64, byte_size=10,
+    )
+    store.register_upload(
+        project_id="project-b", role=DocumentRole.REFERENCE,
+        artifact_key="sha256/dd/" + "d" * 64 + ".pdf",
+        sha256="d" * 64, byte_size=10,
+    )
+
+    next_job = store.claim_next(owner="worker-b", now=datetime.now(UTC))
+
+    assert next_job is not None
+    assert next_job.job_id == second_redacted.job_id
+    assert next_job.role is DocumentRole.REDACTED
+    assert store.get_job(first_reference.job_id).status is ProcessingStatus.ACCEPTED
+
+
 def test_completion_reconciles_version_and_survives_reopen(tmp_path: Path) -> None:
     store = _store(tmp_path)
     upload = store.register_upload(

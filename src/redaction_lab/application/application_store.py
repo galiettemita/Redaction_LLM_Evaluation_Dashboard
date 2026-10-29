@@ -254,7 +254,9 @@ class ApplicationStore:
                 connection.commit()
                 return None
             row = connection.execute(
-                "SELECT job_id FROM application_jobs WHERE status = 'ACCEPTED' ORDER BY created_at, job_id LIMIT 1"
+                "SELECT job_id FROM application_jobs WHERE status = 'ACCEPTED' "
+                "ORDER BY CASE role WHEN 'REDACTED' THEN 0 ELSE 1 END, "
+                "created_at, job_id LIMIT 1"
             ).fetchone()
             if row is None:
                 connection.commit()
