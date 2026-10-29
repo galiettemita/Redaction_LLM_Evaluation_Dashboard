@@ -1,14 +1,22 @@
 {
   "schema": 1,
-  "runtime_verified": false,
+  "runtime_verified": true,
   "endpoint": "http://127.0.0.1:11434",
-  "ollama_executable": "/opt/redaction-lab/bin/ollama",
-  "ollama_executable_sha256": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
-  "model_store": "/opt/redaction-lab/models",
-  "model_files": {},
-  "ollama_version": "UNVERIFIED",
+  "ollama_executable": "runtime/model-runtime/ollama-0.40.13/ollama",
+  "ollama_executable_sha256": "sha256:270089e59e1d411ac4d0987154b4e95f48b29a81c9d274833c6b766d6df88300",
+  "model_store": "runtime/model-runtime/models",
+  "model_files": {
+    "blobs/sha256-183715c435899236895da3869489cc30ac241476b4971a20285b1a462818a5b4": "sha256:183715c435899236895da3869489cc30ac241476b4971a20285b1a462818a5b4",
+    "blobs/sha256-377ac4d7aeefd5b870c9fccff9a6d4df36901d99fe3277c2f755bc401601ba1c": "sha256:377ac4d7aeefd5b870c9fccff9a6d4df36901d99fe3277c2f755bc401601ba1c",
+    "blobs/sha256-66b9ea09bd5b7099cbb4fc820f31b575c0366fa439b08245566692c6784e281e": "sha256:66b9ea09bd5b7099cbb4fc820f31b575c0366fa439b08245566692c6784e281e",
+    "blobs/sha256-832dd9e00a68dd83b3c3fb9f5588dad7dcf337a0db50f7d9483f310cd292e92e": "sha256:832dd9e00a68dd83b3c3fb9f5588dad7dcf337a0db50f7d9483f310cd292e92e",
+    "blobs/sha256-eb4402837c7829a690fa845de4d7f3fd842c2adee476d5341da8a46ea9255175": "sha256:eb4402837c7829a690fa845de4d7f3fd842c2adee476d5341da8a46ea9255175",
+    "manifests/registry.ollama.ai/library/qwen2.5/1.5b-instruct-q4_K_M": "sha256:65ec06548149b04c096a120e4a6da9d4017ea809c91734ea5631e89f96ddc57b",
+    "metadata/sha256-183715c435899236895da3869489cc30ac241476b4971a20285b1a462818a5b4.json": "sha256:8adaa03833fda96f9d2b64880796dfe7a198bc75b328779d86ba48b4dd208c5c"
+  },
+  "ollama_version": "0.40.13",
   "model_id": "qwen2.5:1.5b-instruct-q4_K_M",
   "provider_model_id": "qwen2.5:1.5b-instruct-q4_K_M",
-  "model_config_id": "UNVERIFIED",
-  "model_manifest_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+  "model_config_id": "ollama-0.40.13-qwen2.5-1.5b-instruct-q4_K_M-config-377ac4d7aeef",
+  "model_manifest_digest": "sha256:65ec06548149b04c096a120e4a6da9d4017ea809c91734ea5631e89f96ddc57b"
 }

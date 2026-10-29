@@ -2,20 +2,21 @@
 
 > **RL-WEB-008 frontend candidate — BUILT FOR API v0.2.** The exact production
 > bundle is hash-bound in the local manifest and may launch in truthful
-> `DEGRADED` mode. PDF processing and model inference remain unavailable until
-> their separate runtime locks are qualified; this is not a complete recipient
+> `DEGRADED` mode. The PDF worker and local model locks are qualified only on
+> the reference host; neither runtime is bundled with this candidate. This is not a complete recipient
 > release or scientific validation.
 
 This candidate starts the merged Task 7B API on your own macOS Apple Silicon
 computer. It composes the verified API v0.2 frontend bundle on the same origin
-as the API. Only synthetic bundle fixtures have been tested here. PDF processing is unavailable because
-the PDF-worker runtime is unqualified; prediction and evaluation models are
-unavailable; accuracy remains unknown and numeric scores remain null.
+as the API. The PDF worker and model runtime have synthetic-only qualification
+evidence on the reference host, but are not bundled for a recipient. Accuracy
+remains unknown and numeric scores remain null.
 
 The manifest binds the reviewed v0.2 artifact under `web/dist` by exact paths,
 sizes, SHA-256 hashes and MIME types; arbitrary builds are not accepted. This package is neither a standalone
 installer nor evidence of clean recipient-device acceptance, runtime isolation,
-model availability or scientific validity.
+model availability on another host or scientific validity. Exact local model
+source, integrity, license and SBOM records are under `packaging/model-runtime`.
 
 ## Prerequisites and pins
 
@@ -28,8 +29,8 @@ compatible environment and are candidate reproducibility pins, not approval of a
 production stack or software license inventory. Preflight checks every listed
 version and imports the application from this package's `src` directory.
 
-No account, credentials, API keys, Node, Podman or model artifacts are needed at
-runtime. Scripts never install, download, build assets/images, create
+No account, credentials, API keys, Node, Podman or model artifacts are bundled or
+downloaded by this package. Scripts never install, download, build assets/images, create
 VMs or start Podman. No prerequisite installation is authorized under Task 7P.
 If an interpreter or dependency is missing or mismatched, stop and arrange a
 separately authorized prerequisite environment. Do not change pins just to bypass
@@ -111,13 +112,14 @@ automatic cleanup command is supplied here.
 Use only synthetic data within current authorization. The repository was public;
 never put private PDFs, datasets, credentials or raw model payloads into it.
 Keep package/source files trusted and unchanged while the service runs. The
-manifest pins the unchanged, unverified worker lock by SHA-256; changing or
-qualifying the lock requires a separately authorized, reviewed package. The
-API refuses PDF processing before claiming a job when that lock is unverified,
-returning 503 `RUNTIME_UNVERIFIED`. It also verifies a separate application-owned
-model-runtime lock and literal loopback Ollama identity before dispatch; this
-candidate's lock is deliberately unverified, so it fails with
-`MODEL_RUNTIME_UNVERIFIED`. Unknown truth and both scores remain null.
+manifest pins the reference-host-qualified worker and model locks by SHA-256;
+changing either lock requires a separately reviewed package. The API refuses
+PDF processing or model dispatch when the corresponding application-owned
+runtime is absent or differs, returning `RUNTIME_UNVERIFIED` or
+`MODEL_RUNTIME_UNVERIFIED`. The model lock uses application-root-relative paths
+and requires the exact signed executable, complete model-file inventory,
+literal-loopback API version, provider model name and manifest digest before
+dispatch. Unknown truth and both scores remain null.
 Refreshing, reading results, or restarting does not dispatch a paid run.
 
 ## Static asset boundary
@@ -160,8 +162,10 @@ an unsafe/invalid package manifest prevents launch entirely.
 - [x] Independent exact-candidate automated QA/security review passed.
 - [x] Genuine API v0.2 frontend build, reviewed hash-pinned integration and
       synthetic headless-Chrome browser workflow.
-- [ ] Offline prerequisite bundle, SBOM/license inventory and PDF runtime qualification.
-- [ ] Clean second-device recipient acceptance and authorized real models.
+- [x] Reference-host PDF worker and synthetic-only Ollama/model qualification.
+- [x] Exact local model source, integrity, license and CycloneDX SBOM records.
+- [ ] Offline prerequisite/runtime bundle and clean second-device recipient acceptance.
+- [ ] Human-approved scientific model roster, private-data use and scoring validation.
 
 Completed test execution and exact candidate SHAs are recorded in the unique
 Task 7CP Packaging handoff; these checks do not settle the pending gates above.

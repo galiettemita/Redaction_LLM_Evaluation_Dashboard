@@ -50,3 +50,13 @@ Host actions are limited to task-specific temporary downloads for verification; 
 Stop or retain `runtime_verified: false` for inadequate reserve; missing/changed source, digest, signature or license; privileged installation; pre-existing/unowned listener; runtime/model identity mismatch; parent-death/cleanup failure; required regression failure; or need for an out-of-scope contract/schema change.
 
 No private/restricted PDF or reference data, paid provider, commercial credential, benchmark/scientific validation, public deployment/distribution, clean-recipient claim, force push or destructive cleanup is authorized. Qualification on this host is not institutional permission or a release claim.
+
+## Qualification evidence (2026-10-29)
+
+- Official Ollama `v0.40.13` Darwin archive: 186,689,993 bytes, SHA-256 `bae29252232b9e1358cf5801a7d65a07442af18fb5467cb68c7fc3711f59c511`; GitHub-verified release commit `04088e7c9d41cba5d33bafbf788d87a465c79d5b`; valid hardened Developer ID signature from team `3MU9H2V9Y9`; MIT license.
+- Exact `qwen2.5:1.5b-instruct-q4_K_M` manifest SHA-256 `65ec06548149b04c096a120e4a6da9d4017ea809c91734ea5631e89f96ddc57b`; 986,048,512-byte model blob SHA-256 `183715c435899236895da3869489cc30ac241476b4971a20285b1a462818a5b4`; Apache-2.0 license.
+- Application-owned installed runtime/model footprint: 1,561,744 KiB. Free space after installation: 13,649,200 KiB, above the required 8 GiB reserve. Existing PDF-worker state remained intact.
+- Two repeated synthetic dispatches through the supervised application path succeeded with identical deterministic request hashes, exact provider identity and bounded token usage. A separate resource canary observed approximately 1.96 GiB model-runner RSS; its response was safely classified `MALFORMED` rather than persisted as a success.
+- Real Ollama parent-death canary reaped both supervisor and runtime and removed the loopback listener within the observed 100 ms polling bound. No listener or model process remained after cleanup.
+- Ollama 0.40.13 emits a deterministic 4,143-byte GGUF metadata cache on first tag inspection. It remained byte- and mtime-stable across restart and is included in the exact seven-file model-store lock; arbitrary extra files remain rejected.
+- This is reference-host, synthetic-only operational qualification. The package remains non-bundled, recipient acceptance remains not run, and no scientific roster, accuracy, private-data, scoring or distribution approval is implied.

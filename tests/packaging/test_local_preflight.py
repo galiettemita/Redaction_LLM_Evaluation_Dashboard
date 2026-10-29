@@ -101,7 +101,14 @@ def simulated_python(tmp_path, *, system="Darwin", machine="arm64", version="3.1
     return str(wrapper)
 
 
-def test_preflight_is_read_only_and_reports_verified_frontend_with_unqualified_runtime(package, tmp_path):
+def test_preflight_is_read_only_and_reports_host_qualified_nonbundled_model_runtime(package, tmp_path):
+    manifest = json.loads((package / "packaging/local/manifest.json").read_text())
+    model_lock = json.loads(
+        (package / manifest["model_runtime"]["lock_path"]).read_text()
+    )
+    assert model_lock["runtime_verified"] is True
+    assert manifest["model_runtime"]["lock_qualified_on_reference_host"] is True
+    assert manifest["model_runtime"]["runtime_qualified"] is False
     env = environment(tmp_path, REDACTION_LAB_PYTHON=simulated_python(tmp_path))
     result = run(package, "preflight.sh", env)
     assert result.returncode == 0, result.stderr

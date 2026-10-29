@@ -1,0 +1,31 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "serialNumber": "urn:uuid:7c1f2528-395c-4d1f-9f86-8a083ad1e9b0",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2026-10-29T18:14:00Z",
+    "component": {"type": "application", "name": "redaction-lab-local-model-runtime", "version": "0.40.13-qwen2.5-1.5b-q4_K_M"}
+  },
+  "components": [
+    {
+      "type": "application", "name": "ollama", "version": "0.40.13",
+      "licenses": [{"license": {"id": "MIT"}}],
+      "hashes": [{"alg": "SHA-256", "content": "270089e59e1d411ac4d0987154b4e95f48b29a81c9d274833c6b766d6df88300"}],
+      "externalReferences": [{"type": "distribution", "url": "https://github.com/ollama/ollama/releases/download/v0.40.13/ollama-darwin.tgz"}],
+      "bom-ref": "pkg:github/ollama/ollama@v0.40.13"
+    },
+    {
+      "type": "machine-learning-model", "name": "qwen2.5:1.5b-instruct-q4_K_M", "version": "65ec06548149b04c096a120e4a6da9d4017ea809c91734ea5631e89f96ddc57b",
+      "licenses": [{"license": {"id": "Apache-2.0"}}],
+      "hashes": [{"alg": "SHA-256", "content": "183715c435899236895da3869489cc30ac241476b4971a20285b1a462818a5b4"}],
+      "properties": [
+        {"name": "redaction-lab:manifest-sha256", "value": "65ec06548149b04c096a120e4a6da9d4017ea809c91734ea5631e89f96ddc57b"},
+        {"name": "redaction-lab:config-sha256", "value": "377ac4d7aeefd5b870c9fccff9a6d4df36901d99fe3277c2f755bc401601ba1c"},
+        {"name": "redaction-lab:quantization", "value": "Q4_K_M"}
+      ],
+      "externalReferences": [{"type": "distribution", "url": "https://registry.ollama.ai/v2/library/qwen2.5/manifests/1.5b-instruct-q4_K_M"}],
+      "bom-ref": "pkg:ollama/qwen2.5@1.5b-instruct-q4_K_M"
+    }
+  ]
+}

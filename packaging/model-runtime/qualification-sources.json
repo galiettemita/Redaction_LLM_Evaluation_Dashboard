@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "qualified_at_utc": "2026-10-29T18:14:00Z",
+  "platform": {"system": "Darwin", "machine": "arm64"},
+  "ollama": {
+    "version": "0.40.13",
+    "release_commit": "04088e7c9d41cba5d33bafbf788d87a465c79d5b",
+    "release_commit_signature_verified_by_github": true,
+    "archive_url": "https://github.com/ollama/ollama/releases/download/v0.40.13/ollama-darwin.tgz",
+    "archive_size": 186689993,
+    "archive_sha256": "bae29252232b9e1358cf5801a7d65a07442af18fb5467cb68c7fc3711f59c511",
+    "executable_sha256": "270089e59e1d411ac4d0987154b4e95f48b29a81c9d274833c6b766d6df88300",
+    "developer_id": "Developer ID Application: Infra Technologies, Inc (3MU9H2V9Y9)",
+    "codesign_verified": true,
+    "license": "MIT",
+    "license_url": "https://github.com/ollama/ollama/blob/v0.40.13/LICENSE",
+    "license_sha256": "5934ed2ce0d15154bcdb9c85203210abac0da4314af34081e36df4599f90b226",
+    "repository_security_advisories_open_count": 0
+  },
+  "model": {
+    "id": "qwen2.5:1.5b-instruct-q4_K_M",
+    "manifest_url": "https://registry.ollama.ai/v2/library/qwen2.5/manifests/1.5b-instruct-q4_K_M",
+    "manifest_size": 857,
+    "manifest_sha256": "65ec06548149b04c096a120e4a6da9d4017ea809c91734ea5631e89f96ddc57b",
+    "config_sha256": "377ac4d7aeefd5b870c9fccff9a6d4df36901d99fe3277c2f755bc401601ba1c",
+    "model_blob_sha256": "183715c435899236895da3869489cc30ac241476b4971a20285b1a462818a5b4",
+    "model_blob_size": 986048512,
+    "format": "GGUF", "family": "qwen2", "parameter_size": "1.5B", "quantization": "Q4_K_M",
+    "license": "Apache-2.0",
+    "license_blob_sha256": "832dd9e00a68dd83b3c3fb9f5588dad7dcf337a0db50f7d9483f310cd292e92e",
+    "license_url": "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct/blob/main/LICENSE"
+  },
+  "limits": {
+    "synthetic_only": true,
+    "scientific_model_roster_approved": false,
+    "accuracy_validated": false,
+    "private_or_restricted_data_authorized": false,
+    "public_distribution_authorized": false
+  }
+}

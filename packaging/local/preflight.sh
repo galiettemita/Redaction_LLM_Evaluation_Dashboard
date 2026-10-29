@@ -68,8 +68,10 @@ try:
     if hashlib.sha256(model_lock_bytes).hexdigest() != model["lock_sha256"]:
         fail("MODEL_RUNTIME_LOCK_MISMATCH", "Model runtime lock changed; a separately reviewed package is required")
     model_lock = json.loads(model_lock_bytes)
-    if model_lock.get("runtime_verified") is not False or model["runtime_qualified"] is not False:
-        fail("MODEL_RUNTIME_NOT_AUTHORIZED", "Unqualified model runtime cannot be distributed")
+    if (model_lock.get("runtime_verified") is not True
+            or model.get("lock_qualified_on_reference_host") is not True
+            or model["runtime_qualified"] is not False):
+        fail("MODEL_RUNTIME_NOT_AUTHORIZED", "The qualified model lock is not paired with this non-bundled candidate")
     delivery = manifest["delivery_status"]
     if delivery.get("candidate_distribution_status") != "DISTRIBUTABLE":
         fail("FRONTEND_BUILD_REQUIRED", "API v0.2 source is not paired with a verified v0.2 frontend bundle; candidate is non-distributable")

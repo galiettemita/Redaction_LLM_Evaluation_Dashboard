@@ -23,6 +23,11 @@ from redaction_lab.application.inference_runtime import (
 )
 
 
+@pytest.fixture(autouse=True)
+def application_runtime_root(tmp_path, monkeypatch):
+    monkeypatch.setattr(InferenceRuntime, "APPLICATION_ROOT", tmp_path, raising=False)
+
+
 class Response(BytesIO):
     def __enter__(self):
         return self
@@ -45,9 +50,9 @@ def _lock(tmp_path, **overrides):
         "schema": 1,
         "runtime_verified": True,
         "endpoint": "http://127.0.0.1:11434",
-        "ollama_executable": str(executable),
+        "ollama_executable": executable.name,
         "ollama_executable_sha256": "sha256:" + sha256(executable.read_bytes()).hexdigest(),
-        "model_store": str(model_store),
+        "model_store": model_store.name,
         "model_files": {
             model_file.name: "sha256:" + sha256(model_file.read_bytes()).hexdigest()
         },
@@ -63,8 +68,8 @@ def _lock(tmp_path, **overrides):
     return path, value
 
 
-def test_shipped_runtime_lock_fails_closed_without_starting_a_process() -> None:
-    with pytest.raises(InferenceRuntimeUnavailable, match="unverified"):
+def test_shipped_runtime_lock_fails_closed_when_application_runtime_is_absent() -> None:
+    with pytest.raises(InferenceRuntimeUnavailable, match="unavailable"):
         InferenceRuntime().verified()
 
 
@@ -93,15 +98,36 @@ def test_runtime_verifies_exact_executable_version_and_full_model_digest(
     def fake_run(command, **kwargs):
         observed["command"] = command
         observed["kwargs"] = kwargs
-        return type("Result", (), {"returncode": 0, "stdout": "ollama version 0.12.9\n", "stderr": ""})()
+        return type(
+            "Result",
+            (),
+            {
+                "returncode": 0,
+                "stdout": (
+                    "Warning: could not connect to a running Ollama instance\n"
+                    "Warning: client version is 0.12.9\n"
+                ),
+                "stderr": "",
+            },
+        )()
 
     class Opener:
         def open(self, request, timeout):
             observed.setdefault("urls", []).append(request.full_url)
+            observed.setdefault("timeouts", []).append(timeout)
             payload = (
                 {"version": value["ollama_version"]}
                 if request.full_url.endswith("/api/version")
-                else {"models": [{"name": value["provider_model_id"], "digest": value["model_manifest_digest"]}]}
+                else {
+                    "models": [
+                        {
+                            "name": value["provider_model_id"],
+                            "digest": str(value["model_manifest_digest"]).removeprefix(
+                                "sha256:"
+                            ),
+                        }
+                    ]
+                }
             )
             return Response(json.dumps(payload).encode())
 
@@ -120,15 +146,20 @@ def test_runtime_verifies_exact_executable_version_and_full_model_digest(
     assert adapter.model_id == value["model_id"]
     assert verified.model_manifest_digest == value["model_manifest_digest"]
     assert verified.model_config_id == value["model_config_id"]
-    assert observed["command"] == [value["ollama_executable"], "--version"]
+    assert observed["command"] == [str(tmp_path / value["ollama_executable"]), "--version"]
     assert not observed["command"][0].startswith("/dev/fd/")
-    assert observed["serve_path"] == Path(value["ollama_executable"])
-    assert observed["kwargs"]["env"] == {"PATH": "/usr/bin:/bin"}
+    assert observed["serve_path"] == tmp_path / value["ollama_executable"]
+    assert observed["kwargs"]["env"] == {
+        "PATH": "/usr/bin:/bin",
+        "HOME": str(tmp_path),
+        "OLLAMA_MODELS": str(tmp_path / value["model_store"]),
+    }
     assert observed["kwargs"]["pass_fds"]
     assert observed["urls"] == [
         "http://127.0.0.1:11434/api/version",
         "http://127.0.0.1:11434/api/tags",
     ]
+    assert observed["timeouts"] == [1, 1]
     verified.close()
     assert process.closed is True
 
@@ -137,7 +168,7 @@ def test_runtime_rejects_executable_path_replaced_before_version_execution(
     tmp_path, monkeypatch
 ) -> None:
     path, value = _lock(tmp_path)
-    executable = Path(value["ollama_executable"])
+    executable = tmp_path / str(value["ollama_executable"])
     monkeypatch.setattr(InferenceRuntime, "LOCK_PATH", path)
     real_open = InferenceRuntime._open_verified_executable
     version_called = False
@@ -170,7 +201,7 @@ def test_runtime_rejects_executable_path_replaced_during_version_execution(
     tmp_path, monkeypatch
 ) -> None:
     path, value = _lock(tmp_path)
-    executable = Path(value["ollama_executable"])
+    executable = tmp_path / str(value["ollama_executable"])
     monkeypatch.setattr(InferenceRuntime, "LOCK_PATH", path)
     observed_fd = -1
     runtime_started = False
@@ -296,6 +327,27 @@ def test_runtime_rejects_endpoint_digest_or_model_substitution_before_dispatch(
         InferenceRuntime().verified()
 
 
+@pytest.mark.parametrize(
+    "candidate",
+    ["/absolute/ollama", "../ollama", "runtime/../ollama", "runtime//ollama"],
+)
+def test_runtime_rejects_non_application_relative_locked_paths(candidate) -> None:
+    with pytest.raises(InferenceRuntimeUnavailable, match="application-relative"):
+        InferenceRuntime._resolve_locked_path(candidate)
+
+
+@pytest.mark.parametrize(
+    "stdout",
+    [
+        "ollama version 0.40.13\nsubstituted",
+        "Warning: client version is 0.40.13\n",
+        "Warning: could not connect to a running Ollama instance\nWarning: client version is 0.40.12\n",
+    ],
+)
+def test_runtime_rejects_ambiguous_or_mismatched_version_output(stdout) -> None:
+    assert InferenceRuntime._version_output_matches(stdout, "0.40.13") is False
+
+
 def test_runtime_bound_adapter_checks_identity_before_and_after_generation() -> None:
     calls = []
 
@@ -387,8 +439,10 @@ def test_owned_runtime_launches_only_pinned_binary_and_confined_model_store(
     assert observed["command"] == [str(executable), "serve"]
     assert observed["kwargs"]["env"] == {
         "PATH": "/usr/bin:/bin",
+        "HOME": str(tmp_path),
         "OLLAMA_HOST": "127.0.0.1:11434",
         "OLLAMA_MODELS": str(model_store),
+        "OLLAMA_NO_CLOUD": "true",
     }
     assert observed["kwargs"]["close_fds"] is True
     assert observed["kwargs"]["pass_fds"] == (descriptor,)
@@ -678,7 +732,7 @@ def test_post_launch_identity_failure_kills_sigterm_resistant_child(
 
 def test_model_file_inventory_detects_blob_substitution(tmp_path) -> None:
     _, value = _lock(tmp_path)
-    model_store = Path(value["model_store"])
+    model_store = tmp_path / str(value["model_store"])
     InferenceRuntime._assert_model_files(model_store, value)
     next(model_store.iterdir()).write_bytes(b"substituted")
     with pytest.raises(InferenceRuntimeUnavailable, match="digest mismatch"):
@@ -687,7 +741,7 @@ def test_model_file_inventory_detects_blob_substitution(tmp_path) -> None:
 
 def test_model_file_inventory_rejects_unlisted_payload(tmp_path) -> None:
     _, value = _lock(tmp_path)
-    model_store = Path(value["model_store"])
+    model_store = tmp_path / str(value["model_store"])
     (model_store / "unlisted-actual-model-blob").write_bytes(b"unlisted")
     with pytest.raises(InferenceRuntimeUnavailable, match="inventory is incomplete"):
         InferenceRuntime._assert_model_files(model_store, value)

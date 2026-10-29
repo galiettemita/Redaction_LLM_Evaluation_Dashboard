@@ -19,8 +19,9 @@ from typing import Callable
 from urllib.error import HTTPError, URLError
 from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
 
-from redaction_lab.adapters.ollama import OllamaAdapter
 from redaction_lab.adapters.base import PredictionAdapter, PredictionResponse
+from redaction_lab.adapters.ollama import OllamaAdapter
+from redaction_lab.application.paths import resolve_paths
 from redaction_lab.contracts import PredictionManifest
 
 
@@ -134,12 +135,36 @@ class InferenceRuntime:
     """Load only the install-owned lock; callers cannot supply trusted transports."""
 
     LOCK_PATH = Path(__file__).resolve().parents[3] / "packaging/model-runtime/runtime.lock"
+    APPLICATION_ROOT: Path | None = None
+
+    @classmethod
+    def _resolve_locked_path(cls, raw: object) -> Path:
+        if (
+            not isinstance(raw, str)
+            or re.fullmatch(r"(?:[A-Za-z0-9._-]+/)*[A-Za-z0-9._-]+", raw) is None
+            or any(part in {".", ".."} for part in raw.split("/"))
+        ):
+            raise InferenceRuntimeUnavailable("runtime path is not application-relative")
+        root = cls.APPLICATION_ROOT or resolve_paths().root
+        if not root.is_absolute():
+            raise InferenceRuntimeUnavailable("application root is unavailable")
+        return root / raw
 
     @staticmethod
-    def _json(opener, url: str) -> object:
+    def _version_output_matches(stdout: str, expected: str) -> bool:
+        return stdout.strip().splitlines() in (
+            [f"ollama version {expected}"],
+            [
+                "Warning: could not connect to a running Ollama instance",
+                f"Warning: client version is {expected}",
+            ],
+        )
+
+    @staticmethod
+    def _json(opener, url: str, *, timeout: float = 5) -> object:
         child: subprocess.Popen[bytes] | None = None
         try:
-            with opener.open(Request(url, method="GET"), timeout=5) as response:
+            with opener.open(Request(url, method="GET"), timeout=timeout) as response:
                 raw = response.read(1_048_577)
             if len(raw) > 1_048_576:
                 raise ValueError("runtime response exceeds limit")
@@ -148,17 +173,21 @@ class InferenceRuntime:
             raise InferenceRuntimeUnavailable("model runtime verification failed") from error
 
     @classmethod
-    def _assert_api_identity(cls, opener, value: dict[str, object]) -> None:
+    def _assert_api_identity(
+        cls, opener, value: dict[str, object], *, timeout: float = 5
+    ) -> None:
         endpoint = str(value["endpoint"])
-        version = cls._json(opener, endpoint + "/api/version")
-        tags = cls._json(opener, endpoint + "/api/tags")
+        version = cls._json(opener, endpoint + "/api/version", timeout=timeout)
+        tags = cls._json(opener, endpoint + "/api/tags", timeout=timeout)
         if not isinstance(version, dict) or version.get("version") != value["ollama_version"]:
             raise InferenceRuntimeUnavailable("Ollama API version mismatch")
         models = tags.get("models") if isinstance(tags, dict) else None
         if not isinstance(models, list) or not any(
             isinstance(model, dict)
             and model.get("name") == value["provider_model_id"]
-            and model.get("digest") == value["model_manifest_digest"]
+            and isinstance(model.get("digest"), str)
+            and re.fullmatch(r"[0-9a-f]{64}", model["digest"]) is not None
+            and "sha256:" + model["digest"] == value["model_manifest_digest"]
             for model in models
         ):
             raise InferenceRuntimeUnavailable("model manifest identity mismatch")
@@ -199,8 +228,10 @@ class InferenceRuntime:
                 pass_fds=(executable_fd,),
                 env={
                     "PATH": "/usr/bin:/bin",
+                    "HOME": str(model_store.parent),
                     "OLLAMA_HOST": "127.0.0.1:11434",
                     "OLLAMA_MODELS": str(model_store),
+                    "OLLAMA_NO_CLOUD": "true",
                 },
             )
             if InferenceRuntime._file_identity(executable.lstat()) != descriptor_identity:
@@ -525,10 +556,8 @@ class InferenceRuntime:
             raise InferenceRuntimeUnavailable("model manifest digest is not full SHA-256")
         if value["model_id"] != value["provider_model_id"]:
             raise InferenceRuntimeUnavailable("provider model identity mismatch")
-        executable = Path(value["ollama_executable"])
-        model_store = Path(value["model_store"])
-        if not model_store.is_absolute():
-            raise InferenceRuntimeUnavailable("locked model store is unavailable")
+        executable = self._resolve_locked_path(value["ollama_executable"])
+        model_store = self._resolve_locked_path(value["model_store"])
         self._audit_parent_directories(model_store)
         try:
             model_store_info = model_store.stat()
@@ -556,7 +585,11 @@ class InferenceRuntime:
                     capture_output=True,
                     text=True,
                     timeout=5,
-                    env={"PATH": "/usr/bin:/bin"},
+                    env={
+                        "PATH": "/usr/bin:/bin",
+                        "HOME": str(model_store.parent),
+                        "OLLAMA_MODELS": str(model_store),
+                    },
                     pass_fds=(executable_fd,),
                 )
             except (OSError, subprocess.SubprocessError) as error:
@@ -568,8 +601,9 @@ class InferenceRuntime:
             )
             if (
                 completed.returncode != 0
-                or completed.stdout.strip()
-                != f"ollama version {value['ollama_version']}"
+                or not self._version_output_matches(
+                    completed.stdout, str(value["ollama_version"])
+                )
             ):
                 raise InferenceRuntimeUnavailable("Ollama version mismatch")
             observed_digest, observed_identity = self._hash_descriptor(executable_fd)
@@ -607,12 +641,12 @@ class InferenceRuntime:
             raise
         opener = build_opener(ProxyHandler({}), _NoRedirect())
         try:
-            deadline = time.monotonic() + 5
+            deadline = time.monotonic() + 30
             while True:
                 if process.poll() is not None:
                     raise InferenceRuntimeUnavailable("owned Ollama runtime exited")
                 try:
-                    self._assert_api_identity(opener, value)
+                    self._assert_api_identity(opener, value, timeout=1)
                     break
                 except InferenceRuntimeUnavailable:
                     if time.monotonic() >= deadline:
