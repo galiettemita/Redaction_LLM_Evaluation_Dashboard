@@ -29,6 +29,7 @@ from redaction_lab.contracts import AttemptStatus, PredictionManifest, TokenUsag
 
 
 MAX_RESPONSE_BYTES = 1_048_576
+MAX_REQUEST_BYTES = 131_072
 MODEL_CONTEXT_TOKENS = 32_768
 MAX_OUTPUT_TOKENS = 1_024
 # A byte cannot encode more than one model token. This conservative bound also
@@ -118,6 +119,8 @@ class OllamaAdapter(PredictionAdapter):
         body = json.dumps(
             payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False
         ).encode("utf-8")
+        if len(body) > MAX_REQUEST_BYTES:
+            raise ValueError("rendered request exceeds the transport request bound")
         provenance = json.dumps(
             {
                 "body_sha256": sha256(body).hexdigest(),
@@ -376,8 +379,16 @@ def _main(arguments: list[str]) -> int:
         return 2
     if endpoint != base + "/api/generate":
         return 2
-    body = os.read(sys.stdin.fileno(), 131_073)
-    if len(body) > 131_072:
+    chunks: list[bytes] = []
+    remaining = MAX_REQUEST_BYTES + 1
+    while remaining:
+        chunk = os.read(sys.stdin.fileno(), min(64 * 1024, remaining))
+        if not chunk:
+            break
+        chunks.append(chunk)
+        remaining -= len(chunk)
+    body = b"".join(chunks)
+    if len(body) > MAX_REQUEST_BYTES:
         return 1
     request = Request(
         endpoint,
@@ -391,7 +402,9 @@ def _main(arguments: list[str]) -> int:
             result = response.read(MAX_RESPONSE_BYTES + 1)
     except (HTTPError, URLError, OSError, ValueError, TypeError):
         return 1
-    os.write(sys.stdout.fileno(), result)
+    written = 0
+    while written < len(result):
+        written += os.write(sys.stdout.fileno(), result[written:])
     return 0
 
 

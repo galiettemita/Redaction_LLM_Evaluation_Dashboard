@@ -54,13 +54,13 @@ def _terminate_process_group(process) -> None:  # type: ignore[no-untyped-def]
     while time.monotonic() < deadline:
         try:
             os.killpg(process.pid, 0)
-        except ProcessLookupError:
+        except (ProcessLookupError, PermissionError):
             break
         time.sleep(0.02)
     else:
         try:
             os.killpg(process.pid, signal.SIGKILL)
-        except ProcessLookupError:
+        except (ProcessLookupError, PermissionError):
             pass
     if process.poll() is None:
         try:
@@ -586,6 +586,14 @@ class InferenceRuntime:
         )
         root_descriptor = -1
         open_directories: list[tuple[int, str]] = []
+        retained_directories: list[
+            tuple[int, int, str, tuple[int, ...]]
+        ] = []
+        retained_files: list[tuple[int, str, tuple[int, ...]]] = []
+        retained_symlinks: list[
+            tuple[int, str, tuple[int, ...], str]
+        ] = []
+        retained_descriptors: list[int] = []
         try:
             root_path_before = root.lstat()
             root_descriptor = os.open(root, directory_flags)
@@ -598,83 +606,99 @@ class InferenceRuntime:
                 or root_before.st_mode & 0o022
             ):
                 raise InferenceRuntimeUnavailable(f"{label} is untrusted")
-            open_directories.append((os.dup(root_descriptor), ""))
+            retained_descriptors.append(root_descriptor)
+            open_directories.append((root_descriptor, ""))
             observed_files: dict[str, str] = {}
             observed_symlinks: dict[str, str] = {}
             visited = 0
             while open_directories:
                 directory_fd, prefix = open_directories.pop()
-                try:
-                    visited += 1
-                    if visited > 256:
-                        raise InferenceRuntimeUnavailable(
-                            f"{label} inventory is too large"
-                        )
-                    with os.scandir(directory_fd) as entries:
-                        for entry in entries:
-                            relative = prefix + entry.name
-                            info = entry.stat(follow_symlinks=False)
-                            if info.st_uid != os.geteuid():
-                                raise InferenceRuntimeUnavailable(
-                                    f"{label} entry is untrusted"
-                                )
-                            if stat.S_ISLNK(info.st_mode):
-                                target = os.readlink(entry.name, dir_fd=directory_fd)
-                                observed_symlinks[relative] = target
-                                continue
-                            if info.st_mode & 0o022:
-                                raise InferenceRuntimeUnavailable(
-                                    f"{label} entry is untrusted"
-                                )
-                            if stat.S_ISDIR(info.st_mode):
-                                child_fd = os.open(
-                                    entry.name, directory_flags, dir_fd=directory_fd
-                                )
-                                child_info = os.fstat(child_fd)
-                                if cls._file_identity(info) != cls._file_identity(child_info):
-                                    os.close(child_fd)
-                                    raise InferenceRuntimeUnavailable(
-                                        f"{label} changed during verification"
-                                    )
-                                open_directories.append(
-                                    (child_fd, relative + "/")
-                                )
-                                continue
-                            if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
-                                raise InferenceRuntimeUnavailable(
-                                    f"{label} entry is untrusted"
-                                )
-                            file_fd = os.open(
-                                entry.name,
-                                os.O_RDONLY | os.O_NOFOLLOW,
-                                dir_fd=directory_fd,
+                visited += 1
+                if visited > 256:
+                    raise InferenceRuntimeUnavailable(
+                        f"{label} inventory is too large"
+                    )
+                with os.scandir(directory_fd) as entries:
+                    for entry in entries:
+                        relative = prefix + entry.name
+                        info = entry.stat(follow_symlinks=False)
+                        if info.st_uid != os.geteuid():
+                            raise InferenceRuntimeUnavailable(
+                                f"{label} entry is untrusted"
                             )
-                            try:
-                                before = os.fstat(file_fd)
-                                if (
-                                    not stat.S_ISREG(before.st_mode)
-                                    or before.st_uid != os.geteuid()
-                                    or before.st_mode & 0o022
-                                    or before.st_nlink != 1
-                                    or cls._file_identity(before)
-                                    != cls._file_identity(info)
-                                ):
-                                    raise InferenceRuntimeUnavailable(
-                                        f"{label} entry is untrusted"
-                                    )
-                                digest = sha256()
-                                while chunk := os.read(file_fd, 1024 * 1024):
-                                    digest.update(chunk)
-                                after = os.fstat(file_fd)
-                            finally:
-                                os.close(file_fd)
-                            if cls._file_identity(before) != cls._file_identity(after):
+                        if stat.S_ISLNK(info.st_mode):
+                            target = os.readlink(entry.name, dir_fd=directory_fd)
+                            observed_symlinks[relative] = target
+                            retained_symlinks.append(
+                                (
+                                    directory_fd,
+                                    entry.name,
+                                    cls._file_identity(info),
+                                    target,
+                                )
+                            )
+                            continue
+                        if info.st_mode & 0o022:
+                            raise InferenceRuntimeUnavailable(
+                                f"{label} entry is untrusted"
+                            )
+                        if stat.S_ISDIR(info.st_mode):
+                            child_fd = os.open(
+                                entry.name, directory_flags, dir_fd=directory_fd
+                            )
+                            child_info = os.fstat(child_fd)
+                            if cls._file_identity(info) != cls._file_identity(child_info):
+                                os.close(child_fd)
                                 raise InferenceRuntimeUnavailable(
                                     f"{label} changed during verification"
                                 )
-                            observed_files[relative] = "sha256:" + digest.hexdigest()
-                finally:
-                    os.close(directory_fd)
+                            retained_descriptors.append(child_fd)
+                            retained_directories.append(
+                                (
+                                    child_fd,
+                                    directory_fd,
+                                    entry.name,
+                                    cls._file_identity(child_info),
+                                )
+                            )
+                            open_directories.append((child_fd, relative + "/"))
+                            continue
+                        if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+                            raise InferenceRuntimeUnavailable(
+                                f"{label} entry is untrusted"
+                            )
+                        file_fd = os.open(
+                            entry.name,
+                            os.O_RDONLY | os.O_NOFOLLOW,
+                            dir_fd=directory_fd,
+                        )
+                        try:
+                            before = os.fstat(file_fd)
+                            if (
+                                not stat.S_ISREG(before.st_mode)
+                                or before.st_uid != os.geteuid()
+                                or before.st_mode & 0o022
+                                or before.st_nlink != 1
+                                or cls._file_identity(before)
+                                != cls._file_identity(info)
+                            ):
+                                raise InferenceRuntimeUnavailable(
+                                    f"{label} entry is untrusted"
+                                )
+                            digest = sha256()
+                            while chunk := os.read(file_fd, 1024 * 1024):
+                                digest.update(chunk)
+                            after = os.fstat(file_fd)
+                        finally:
+                            os.close(file_fd)
+                        if cls._file_identity(before) != cls._file_identity(after):
+                            raise InferenceRuntimeUnavailable(
+                                f"{label} changed during verification"
+                            )
+                        retained_files.append(
+                            (directory_fd, entry.name, cls._file_identity(after))
+                        )
+                        observed_files[relative] = "sha256:" + digest.hexdigest()
 
             if (
                 set(observed_files) != set(expected_files)
@@ -683,6 +707,35 @@ class InferenceRuntime:
                 raise InferenceRuntimeUnavailable(f"{label} inventory is incomplete")
             if observed_files != expected_files or observed_symlinks != expected_symlinks:
                 raise InferenceRuntimeUnavailable(f"{label} digest mismatch")
+            for descriptor, parent_fd, name, identity in retained_directories:
+                if (
+                    cls._file_identity(os.fstat(descriptor)) != identity
+                    or cls._file_identity(
+                        os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+                    )
+                    != identity
+                ):
+                    raise InferenceRuntimeUnavailable(
+                        f"{label} changed during verification"
+                    )
+            for parent_fd, name, identity in retained_files:
+                if cls._file_identity(
+                    os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+                ) != identity:
+                    raise InferenceRuntimeUnavailable(
+                        f"{label} changed during verification"
+                    )
+            for parent_fd, name, identity, target in retained_symlinks:
+                if (
+                    cls._file_identity(
+                        os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+                    )
+                    != identity
+                    or os.readlink(name, dir_fd=parent_fd) != target
+                ):
+                    raise InferenceRuntimeUnavailable(
+                        f"{label} changed during verification"
+                    )
             root_after = os.fstat(root_descriptor)
             root_path_after = root.lstat()
             cls._audit_parent_directories(root)
@@ -696,12 +749,12 @@ class InferenceRuntime:
         except OSError as error:
             raise InferenceRuntimeUnavailable(f"{label} is untrusted") from error
         finally:
-            for descriptor, _ in open_directories:
+            for descriptor in reversed(retained_descriptors):
                 try:
                     os.close(descriptor)
                 except OSError:
                     pass
-            if root_descriptor >= 0:
+            if root_descriptor >= 0 and root_descriptor not in retained_descriptors:
                 os.close(root_descriptor)
 
     @classmethod

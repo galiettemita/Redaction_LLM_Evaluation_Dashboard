@@ -21,6 +21,7 @@ from redaction_lab.application.inference_runtime import (
     _RuntimeBoundAdapter,
     _SupervisedProcess,
     _terminate_process,
+    _terminate_process_group,
 )
 
 
@@ -561,6 +562,7 @@ def test_supervisor_reaps_descendant_when_direct_runtime_exits(tmp_path) -> None
         "import os, pathlib, subprocess\n"
         "child=subprocess.Popen(['/bin/sleep','30'])\n"
         "pathlib.Path(os.environ['OLLAMA_MODELS'],'descendant.pid').write_text(str(child.pid))\n"
+        "os._exit(0)\n"
     )
     executable.chmod(0o700)
     descriptor = os.open(executable, os.O_RDONLY)
@@ -577,6 +579,32 @@ def test_supervisor_reaps_descendant_when_direct_runtime_exits(tmp_path) -> None
         os.close(descriptor)
         if descendant_pid and _process_exists(descendant_pid):
             os.kill(descendant_pid, signal.SIGKILL)
+
+
+def test_process_group_cleanup_tolerates_disappearing_inaccessible_group(
+    monkeypatch,
+) -> None:
+    calls: list[int] = []
+
+    class ExitedLeader:
+        pid = 12345
+
+        @staticmethod
+        def poll():
+            return 0
+
+    def killpg(_pid, requested_signal):
+        calls.append(requested_signal)
+        if requested_signal == 0:
+            raise PermissionError("group no longer signalable")
+
+    monkeypatch.setattr(
+        "redaction_lab.application.inference_runtime.os.killpg", killpg
+    )
+
+    _terminate_process_group(ExitedLeader())
+
+    assert calls == [signal.SIGTERM, 0]
 
 
 def test_supervisor_kills_term_resistant_descendant_after_runtime_crash(tmp_path) -> None:
@@ -880,6 +908,126 @@ def test_model_file_inventory_rechecks_opened_file_mode(tmp_path, monkeypatch) -
     )
     with pytest.raises(InferenceRuntimeUnavailable, match="untrusted"):
         InferenceRuntime._assert_model_files(model_store, value)
+
+
+def test_model_inventory_rejects_detached_nested_directory_swap(
+    tmp_path, monkeypatch
+) -> None:
+    model_store = tmp_path / "models"
+    nested = model_store / "manifests" / "registry" / "library" / "model"
+    nested.mkdir(parents=True)
+    tag = nested / "tag"
+    tag.write_bytes(b"trusted manifest")
+    value = {
+        "model_files": {
+            "manifests/registry/library/model/tag":
+                "sha256:" + sha256(tag.read_bytes()).hexdigest()
+        }
+    }
+    original_identity = InferenceRuntime._file_identity(nested.stat())
+    detached = tmp_path / "detached-model"
+    real_scandir = os.scandir
+    changed = False
+
+    def swap_after_directory_open(path):
+        nonlocal changed
+        iterator = real_scandir(path)
+        if (
+            isinstance(path, int)
+            and not changed
+            and InferenceRuntime._file_identity(os.fstat(path)) == original_identity
+        ):
+            nested.rename(detached)
+            nested.mkdir()
+            (nested / "tag").write_bytes(b"untrusted replacement")
+            changed = True
+        return iterator
+
+    monkeypatch.setattr(
+        "redaction_lab.application.inference_runtime.os.scandir",
+        swap_after_directory_open,
+    )
+
+    with pytest.raises(InferenceRuntimeUnavailable, match="changed during verification"):
+        InferenceRuntime._assert_model_files(model_store, value)
+
+
+def test_model_inventory_rejects_file_path_replacement_after_hash(
+    tmp_path, monkeypatch
+) -> None:
+    _, value = _lock(tmp_path)
+    model_store = tmp_path / str(value["model_store"])
+    model_file = next(model_store.iterdir())
+    detached = tmp_path / "detached-model-file"
+    real_open = os.open
+    real_read = os.read
+    target_fd = -1
+    changed = False
+
+    def remember_file(path, flags, *args, **kwargs):
+        nonlocal target_fd
+        descriptor = real_open(path, flags, *args, **kwargs)
+        if path == model_file.name and not flags & getattr(os, "O_DIRECTORY", 0):
+            target_fd = descriptor
+        return descriptor
+
+    def replace_at_eof(descriptor, size):
+        nonlocal changed
+        chunk = real_read(descriptor, size)
+        if descriptor == target_fd and chunk == b"" and not changed:
+            model_file.rename(detached)
+            model_file.write_bytes(b"replacement")
+            changed = True
+        return chunk
+
+    monkeypatch.setattr(
+        "redaction_lab.application.inference_runtime.os.open", remember_file
+    )
+    monkeypatch.setattr(
+        "redaction_lab.application.inference_runtime.os.read", replace_at_eof
+    )
+
+    with pytest.raises(InferenceRuntimeUnavailable, match="changed during verification"):
+        InferenceRuntime._assert_model_files(model_store, value)
+
+
+def test_runtime_inventory_rejects_symlink_replacement_after_read(
+    tmp_path, monkeypatch
+) -> None:
+    runtime_payload = tmp_path / "runtime"
+    runtime_payload.mkdir()
+    first = runtime_payload / "first"
+    second = runtime_payload / "second"
+    alias = runtime_payload / "alias"
+    first.write_bytes(b"first")
+    second.write_bytes(b"second")
+    alias.symlink_to(first.name)
+    value = {
+        "runtime_files": {
+            first.name: "sha256:" + sha256(first.read_bytes()).hexdigest(),
+            second.name: "sha256:" + sha256(second.read_bytes()).hexdigest(),
+        },
+        "runtime_symlinks": {alias.name: first.name},
+    }
+    real_readlink = os.readlink
+    changed = False
+
+    def replace_after_read(path, *args, **kwargs):
+        nonlocal changed
+        target = real_readlink(path, *args, **kwargs)
+        if path == alias.name and not changed:
+            alias.unlink()
+            alias.symlink_to(second.name)
+            changed = True
+        return target
+
+    monkeypatch.setattr(
+        "redaction_lab.application.inference_runtime.os.readlink",
+        replace_after_read,
+    )
+
+    with pytest.raises(InferenceRuntimeUnavailable, match="changed during verification"):
+        InferenceRuntime._assert_runtime_files(runtime_payload, value)
 
 
 def test_runtime_payload_inventory_rejects_substituted_inference_helper(tmp_path) -> None:

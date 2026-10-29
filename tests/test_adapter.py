@@ -20,6 +20,7 @@ import pytest
 import redaction_lab.adapters.ollama as ollama_module
 from redaction_lab.adapters.base import build_prediction_manifest
 from redaction_lab.adapters.ollama import (
+    MAX_REQUEST_BYTES,
     MAX_RESPONSE_BYTES,
     OllamaAdapter,
     _NoRedirectHandler,
@@ -605,6 +606,81 @@ def _loopback_response(
         server.shutdown()
         server.server_close()
         thread.join(timeout=2)
+
+
+@contextmanager
+def _loopback_capture(body: bytes):
+    received: list[bytes] = []
+    finished = threading.Event()
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_POST(self):
+            received.append(
+                self.rfile.read(int(self.headers.get("Content-Length", "0")))
+            )
+            self.send_response(200)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            finished.set()
+
+        def log_message(self, *_args):
+            pass
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield f"http://127.0.0.1:{server.server_port}", received, finished
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+def test_real_stdlib_transport_delivers_complete_request_across_pipe_reads() -> None:
+    manifest = _manifest().model_copy(
+        update={"canonical_redacted_text": "x" * 28_000}
+    )
+    response_body = json.dumps(
+        {
+            "model": "local-model",
+            "response": json.dumps({"status": "prediction", "text": "guess"}),
+            "done": True,
+        },
+        separators=(",", ":"),
+    ).encode()
+    with _loopback_capture(response_body) as (endpoint, received, finished):
+        adapter = OllamaAdapter(
+            endpoint=endpoint,
+            model_id="local-model",
+            model_config_id="config-v1",
+        )
+        prepared = adapter.prepare(manifest)
+        assert len(prepared.body) > 16_384
+
+        response = asyncio.run(adapter.predict(manifest))
+
+        assert response.status is AttemptStatus.SUCCEEDED
+        assert response.request_hash == prepared.request_hash
+        assert finished.wait(timeout=2)
+        assert received == [prepared.body]
+
+
+def test_prepare_rejects_json_expansion_beyond_transport_request_bound() -> None:
+    manifest = _manifest().model_copy(
+        update={"canonical_redacted_text": "\x01" * 29_000}
+    )
+    adapter = OllamaAdapter(
+        endpoint="http://127.0.0.1:11434",
+        model_id="local-model",
+        model_config_id="config-v1",
+    )
+
+    with pytest.raises(ValueError, match="request exceeds"):
+        adapter.prepare(manifest)
+
+    assert MAX_REQUEST_BYTES == 131_072
 
 
 @pytest.mark.parametrize(
