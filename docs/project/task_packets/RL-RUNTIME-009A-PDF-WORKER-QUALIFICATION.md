@@ -1,7 +1,7 @@
 # RL-RUNTIME-009A — PDF worker feasibility and qualification
 
 Status: IMPLEMENTED_PENDING_INDEPENDENT_REVIEW under RL-OPS-002 standing engineering authority. Decision epoch E0071.
-Baseline: `34e4c06f8840d01ca5c5b99be778467835c79c28`.  
+Baseline: `34e4c06f8840d01ca5c5b99be778467835c79c28`.
 Accountable role: Backend / Infrastructure; Engineering Lead integrates after independent exact-candidate review.
 
 ## Objective
