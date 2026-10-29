@@ -1,3 +1,7 @@
+## E0071 — 2026-10-29 — Task 7D integrated and autonomous completion roadmap
+
+PR #7 merged the independently reviewed fail-closed Task 7D pathway at `9952d84afe1cf987a4626a1ebf980815fbc44a0a`; exact corrected implementation `11823200a17d8fca3a45885a2660b7da3d6f88ac`. Final independent whole-branch review reported 681 Python and 24 Node tests passing with no Critical/Important findings. Published [RL-PLAN-002](task_packets/RL-PLAN-002-AUTONOMOUS-COMPLETION.md) and the [dependency-ordered completion roadmap](plans/2026-10-29-autonomous-completion-roadmap.md). Package remains non-distributable and runtime/model/scientific/data/deployment gates remain open.
+
 ## E0070 — 2026-10-29 — standing Codex-led autonomous engineering
 
 Owner replaced repetitive per-task engineering approvals with [RL-OPS-002](task_packets/RL-OPS-002-AUTONOMOUS-ENGINEERING.md). Codex may create bounded task records and autonomously implement, test, independently review, correct, document, commit and normally integrate work inside confirmed product and safety boundaries. Scientific/institutional approval, paid resources, missing credentials, destructive external actions, product-scope changes and public deployment remain human gates. Published and activated the [two-file E0069 Correction 02 execution record](task_packets/RL-MVP-007D-E0070-CORRECTION-02-EXECUTION.md). Documentation-only governance change; no application tests run in this commit.
