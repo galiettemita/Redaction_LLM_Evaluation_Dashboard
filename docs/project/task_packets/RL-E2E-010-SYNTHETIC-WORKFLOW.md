@@ -1,7 +1,7 @@
 # RL-E2E-010 — Synthetic PDF-to-prediction workflow
 
-State: ACTIVE under RL-OPS-002 standing engineering authority. Decision epoch E0071.  
-Baseline: `0a91f16fa3a5239acd1f87a894eb781a860f2937`.  
+State: ACTIVE under RL-OPS-002 standing engineering authority. Decision epoch E0071.
+Baseline: `0a91f16fa3a5239acd1f87a894eb781a860f2937`.
 Accountable role: Codex Engineering Lead / Backend; integration requires independent exact-candidate automated review.
 
 ## Objective and non-goals
