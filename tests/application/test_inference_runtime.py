@@ -16,7 +16,10 @@ import pytest
 from redaction_lab.application.inference_runtime import (
     InferenceRuntime,
     InferenceRuntimeUnavailable,
+    VerifiedInferenceRuntime,
     _RuntimeBoundAdapter,
+    _SupervisedProcess,
+    _terminate_process,
 )
 
 
@@ -117,9 +120,8 @@ def test_runtime_verifies_exact_executable_version_and_full_model_digest(
     assert adapter.model_id == value["model_id"]
     assert verified.model_manifest_digest == value["model_manifest_digest"]
     assert verified.model_config_id == value["model_config_id"]
-    assert observed["command"][0].startswith("/dev/fd/")
-    assert observed["command"][1] == "--version"
-    assert observed["command"][0] == f"/dev/fd/{observed['serve_fd']}"
+    assert observed["command"] == [value["ollama_executable"], "--version"]
+    assert not observed["command"][0].startswith("/dev/fd/")
     assert observed["serve_path"] == Path(value["ollama_executable"])
     assert observed["kwargs"]["env"] == {"PATH": "/usr/bin:/bin"}
     assert observed["kwargs"]["pass_fds"]
@@ -129,6 +131,151 @@ def test_runtime_verifies_exact_executable_version_and_full_model_digest(
     ]
     verified.close()
     assert process.closed is True
+
+
+def test_runtime_rejects_executable_path_replaced_before_version_execution(
+    tmp_path, monkeypatch
+) -> None:
+    path, value = _lock(tmp_path)
+    executable = Path(value["ollama_executable"])
+    monkeypatch.setattr(InferenceRuntime, "LOCK_PATH", path)
+    real_open = InferenceRuntime._open_verified_executable
+    version_called = False
+
+    def replace_after_open(_runtime, candidate, expected):
+        descriptor, identity = real_open(candidate, expected)
+        candidate.rename(candidate.with_suffix(".verified"))
+        candidate.write_bytes(b"substituted executable")
+        candidate.chmod(0o700)
+        return descriptor, identity
+
+    def fake_run(*args, **kwargs):
+        nonlocal version_called
+        version_called = True
+        raise AssertionError("version command must not run for a substituted path")
+
+    monkeypatch.setattr(
+        InferenceRuntime, "_open_verified_executable", replace_after_open
+    )
+    monkeypatch.setattr(
+        "redaction_lab.application.inference_runtime.subprocess.run", fake_run
+    )
+
+    with pytest.raises(InferenceRuntimeUnavailable, match="changed before version"):
+        InferenceRuntime().verified()
+    assert version_called is False
+
+
+def test_runtime_rejects_executable_path_replaced_during_version_execution(
+    tmp_path, monkeypatch
+) -> None:
+    path, value = _lock(tmp_path)
+    executable = Path(value["ollama_executable"])
+    monkeypatch.setattr(InferenceRuntime, "LOCK_PATH", path)
+    observed_fd = -1
+    runtime_started = False
+
+    def fake_run(command, **kwargs):
+        nonlocal observed_fd
+        observed_fd = kwargs["pass_fds"][0]
+        executable.rename(executable.with_suffix(".verified"))
+        executable.write_bytes(b"substituted executable")
+        executable.chmod(0o700)
+        return type(
+            "Result",
+            (),
+            {
+                "returncode": 0,
+                "stdout": "ollama version 0.12.9\n",
+                "stderr": "",
+            },
+        )()
+
+    def fake_start(*args, **kwargs):
+        nonlocal runtime_started
+        runtime_started = True
+        raise AssertionError("runtime must not start for a substituted path")
+
+    monkeypatch.setattr(
+        "redaction_lab.application.inference_runtime.subprocess.run", fake_run
+    )
+    monkeypatch.setattr(InferenceRuntime, "_start_owned_runtime", fake_start)
+
+    with pytest.raises(InferenceRuntimeUnavailable, match="changed after version"):
+        InferenceRuntime().verified()
+    assert runtime_started is False
+    with pytest.raises(OSError):
+        os.fstat(observed_fd)
+
+
+def test_runtime_version_exception_closes_retained_descriptor(
+    tmp_path, monkeypatch
+) -> None:
+    path, _ = _lock(tmp_path)
+    monkeypatch.setattr(InferenceRuntime, "LOCK_PATH", path)
+    real_open = InferenceRuntime._open_verified_executable
+    observed_fd = -1
+    runtime_started = False
+
+    def record_descriptor(_runtime, candidate, expected):
+        nonlocal observed_fd
+        observed_fd, identity = real_open(candidate, expected)
+        return observed_fd, identity
+
+    def fail_version(*args, **kwargs):
+        raise subprocess.TimeoutExpired(args[0], 5)
+
+    def fake_start(*args, **kwargs):
+        nonlocal runtime_started
+        runtime_started = True
+        raise AssertionError("runtime must not start after version failure")
+
+    monkeypatch.setattr(
+        InferenceRuntime, "_open_verified_executable", record_descriptor
+    )
+    monkeypatch.setattr(
+        "redaction_lab.application.inference_runtime.subprocess.run", fail_version
+    )
+    monkeypatch.setattr(InferenceRuntime, "_start_owned_runtime", fake_start)
+
+    with pytest.raises(InferenceRuntimeUnavailable, match="verification failed"):
+        InferenceRuntime().verified()
+    assert runtime_started is False
+    with pytest.raises(OSError):
+        os.fstat(observed_fd)
+
+
+def test_repeated_cleanup_closes_lifetime_writer_when_supervisor_already_exited() -> None:
+    class ExitedSupervisor:
+        pid = 321
+
+        def poll(self):
+            return 0
+
+        def wait(self, timeout):
+            raise AssertionError("an exited supervisor must not be waited again")
+
+        def kill(self):
+            raise AssertionError("an exited supervisor must not be killed")
+
+    for _ in range(16):
+        lifetime_read, lifetime_write = os.pipe()
+        owned = _SupervisedProcess(ExitedSupervisor(), lifetime_write, 456)
+        runtime = VerifiedInferenceRuntime(
+            adapter=object(),
+            model_id="model-test",
+            model_config_id="config-test",
+            model_manifest_digest="sha256:" + "a" * 64,
+            process=owned,
+        )
+        try:
+            runtime.close()
+            runtime.close()
+            _terminate_process(owned)
+            with pytest.raises(OSError):
+                os.fstat(lifetime_write)
+        finally:
+            os.close(lifetime_read)
 
 
 @pytest.mark.parametrize(

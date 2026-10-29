@@ -29,6 +29,8 @@ class InferenceRuntimeUnavailable(RuntimeError):
 
 
 def _terminate_process(process) -> None:  # type: ignore[no-untyped-def]
+    if isinstance(process, _SupervisedProcess):
+        process.terminate()
     if process.poll() is not None:
         return
     process.terminate()
@@ -404,6 +406,22 @@ class InferenceRuntime:
                 os.close(descriptor)
             raise
 
+    @classmethod
+    def _assert_executable_path_identity(
+        cls, executable: Path, expected: tuple[int, ...], phase: str
+    ) -> None:
+        try:
+            observed = executable.lstat()
+        except OSError as error:
+            raise InferenceRuntimeUnavailable(
+                f"Ollama executable changed {phase}"
+            ) from error
+        if (
+            stat.S_ISLNK(observed.st_mode)
+            or cls._file_identity(observed) != expected
+        ):
+            raise InferenceRuntimeUnavailable(f"Ollama executable changed {phase}")
+
     @staticmethod
     def _assert_model_files(model_store: Path, value: dict[str, object]) -> None:
         files = value.get("model_files")
@@ -527,25 +545,43 @@ class InferenceRuntime:
             executable, executable_digest
         )
         try:
-            completed = subprocess.run(
-                [f"/dev/fd/{executable_fd}", "--version"],
-                check=False,
-                capture_output=True,
-                text=True,
-                timeout=5,
-                env={"PATH": "/usr/bin:/bin"},
-                pass_fds=(executable_fd,),
+            self._assert_executable_path_identity(
+                executable, executable_identity, "before version execution"
             )
-        except (OSError, subprocess.SubprocessError) as error:
+            try:
+                completed = subprocess.run(
+                    [str(executable), "--version"],
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                    env={"PATH": "/usr/bin:/bin"},
+                    pass_fds=(executable_fd,),
+                )
+            except (OSError, subprocess.SubprocessError) as error:
+                raise InferenceRuntimeUnavailable(
+                    "Ollama executable verification failed"
+                ) from error
+            self._assert_executable_path_identity(
+                executable, executable_identity, "after version execution"
+            )
+            if (
+                completed.returncode != 0
+                or completed.stdout.strip()
+                != f"ollama version {value['ollama_version']}"
+            ):
+                raise InferenceRuntimeUnavailable("Ollama version mismatch")
+            observed_digest, observed_identity = self._hash_descriptor(executable_fd)
+            if (
+                observed_digest != executable_digest
+                or observed_identity != executable_identity
+            ):
+                raise InferenceRuntimeUnavailable(
+                    "Ollama executable changed before launch"
+                )
+        except Exception:
             os.close(executable_fd)
-            raise InferenceRuntimeUnavailable("Ollama executable verification failed") from error
-        if completed.returncode != 0 or completed.stdout.strip() != f"ollama version {value['ollama_version']}":
-            os.close(executable_fd)
-            raise InferenceRuntimeUnavailable("Ollama version mismatch")
-        observed_digest, observed_identity = self._hash_descriptor(executable_fd)
-        if observed_digest != executable_digest or observed_identity != executable_identity:
-            os.close(executable_fd)
-            raise InferenceRuntimeUnavailable("Ollama executable changed before launch")
+            raise
         try:
             process = self._start_owned_runtime(executable_fd, executable, model_store)
         except Exception:
