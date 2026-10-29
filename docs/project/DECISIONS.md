@@ -1,6 +1,6 @@
 # Decision register
 
-Baseline: [MASTER_SPEC.md](MASTER_SPEC.md), imported 2026-10-06. Epoch E0070.
+Baseline: [MASTER_SPEC.md](MASTER_SPEC.md), imported 2026-10-06. Epoch E0071.
 Product decision IDs `DEC-...` are distinct from the source PDF's open-decision IDs `D01`-`D10`.
 
 ## Authority
@@ -153,3 +153,7 @@ Owner approved preparation/publication of [RL-MVP-007D E0069 Correction 02 plan]
 On 2026-10-29 the product owner replaced repeated per-task engineering approvals with [RL-OPS-002](task_packets/RL-OPS-002-AUTONOMOUS-ENGINEERING.md). Codex may create bounded task records and autonomously plan, implement, test, independently review, correct, document, commit and normally integrate work within confirmed product and safety boundaries. This standing authority activates [E0069 Correction 02 execution](task_packets/RL-MVP-007D-E0070-CORRECTION-02-EXECUTION.md) without a separate repair approval.
 
 This is an engineering-process authorization, not a scientific or institutional approval. Paid resources without budget, missing credentials, legal/data permission, destructive external actions, unresolved critical security risk, confirmed product-scope changes, public deployment/distribution, and human scoring/benchmark/release validation remain nondelegable gates. DEC-001 through DEC-022 and UNKNOWN/null, reference-isolation, provenance and immutable-record requirements remain controlling.
+
+## E0071 — Task 7D code integrated; operational qualification remains open
+
+Under RL-OPS-002, independently reviewed Task 7D branch `8f508158f453bae6a4e97a64ea43325de2bbebdb` merged through PR #7 as `9952d84afe1cf987a4626a1ebf980815fbc44a0a`. Exact corrected implementation is `11823200a17d8fca3a45885a2660b7da3d6f88ac`. This establishes only the fail-closed code pathway and API v0.2 source. Frontend v0.2 build/binding, PDF/model runtime qualification, real inference, recipient acceptance, scientific validation, private-data use and deployment/distribution remain separate gates. The dependency order is recorded in [the autonomous completion roadmap](plans/2026-10-29-autonomous-completion-roadmap.md).

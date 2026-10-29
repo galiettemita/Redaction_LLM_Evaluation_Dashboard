@@ -1,6 +1,6 @@
 # Current state
 
-Updated: 2026-10-29 (America/New_York). Coordination epoch: **E0070**.
+Updated: 2026-10-29 (America/New_York). Coordination epoch: **E0071**.
 Integration branch: `main`. Canonical writer: **Lead/Architect**, within the owner's approved scope.
 Resolve the actual HEAD with GitHub; do not infer a current SHA from this file's timestamp.
 
@@ -110,3 +110,5 @@ E0068: Owner approved [Correction 01 code-only execution](task_packets/RL-MVP-00
 E0069: Owner approved publication only of [RL-MVP-007D two-fix Correction 02 plan](task_packets/RL-MVP-007D-E0069-CORRECTION-02-PLAN.md). QA CHANGES_REQUESTED on exact `f244d1337e51dd188cd2253f3845c5a3d243e144` for macOS `/dev/fd` version-command incompatibility and lifetime-pipe FD leakage after supervisor exit. Research independent handoff not verified. Proposed scope only `application/inference_runtime.py` and its existing test file plus unique Backend handoff. **Implementation NOT AUTHORIZED / NOT STARTED**. Continue runtime, model, inference, install, spending, merge and deployment holds.
 
 E0070: Owner established [Codex-led standing autonomous engineering authority](task_packets/RL-OPS-002-AUTONOMOUS-ENGINEERING.md). Bounded routine implementation, tests, automated independent review, corrections, documentation, commits and normal protected integration no longer require repeated owner prompts. The [two-file Correction 02 execution record](task_packets/RL-MVP-007D-E0070-CORRECTION-02-EXECUTION.md) is ACTIVE. Nondelegable scientific, institutional/data, paid-resource, credential, destructive-action, product-scope and public-deployment gates remain unchanged.
+
+E0071: PR #7 integrated the complete fail-closed Task 7D code pathway at `9952d84afe1cf987a4626a1ebf980815fbc44a0a`; exact corrected implementation `11823200a17d8fca3a45885a2660b7da3d6f88ac`, published head `8f508158f453bae6a4e97a64ea43325de2bbebdb`. Independent whole-branch automated QA/security PASS: 681 Python and 24 Node tests, lock/compile/diff checks, no Critical/Important findings. This is code integration only: package remains non-distributable, frontend v0.2/PDF worker/model runtime are unqualified, inference unavailable, scores null and scientific/data/deployment gates open. See the [completion roadmap](plans/2026-10-29-autonomous-completion-roadmap.md).

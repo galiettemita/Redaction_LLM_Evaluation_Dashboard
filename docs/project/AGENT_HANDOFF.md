@@ -4,6 +4,8 @@ This file is the Lead-maintained routing/index record. Each specialist writes a 
 
 ## Initial inbox
 
+| E0071 / Task 7D integration and completion roadmap | Codex Engineering Lead -> next bounded tasks | MERGED CODE; ROADMAP ACTIVE | PR #7 merged at `9952d84`; corrected implementation `1182320`, whole-branch automated QA/security PASS. Package still fails closed: v0.2 frontend, PDF worker and model runtime are unqualified; no inference/scientific validation. Follow [RL-PLAN-002](task_packets/RL-PLAN-002-AUTONOMOUS-COMPLETION.md) and [roadmap](plans/2026-10-29-autonomous-completion-roadmap.md), beginning with RL-WEB-008. |
+
 | E0070 / RL-OPS-002 autonomous engineering | Owner -> Codex Engineering Lead / all roles | OWNER AUTHORIZED; ACTIVE | [Standing engineering record](task_packets/RL-OPS-002-AUTONOMOUS-ENGINEERING.md): Codex creates bounded tasks and runs implementation/review/correction/integration without repeated owner prompts. Human scientific, institutional/data, cost, credential, destructive-action, product-scope and public-deployment gates remain. [Correction 02 execution](task_packets/RL-MVP-007D-E0070-CORRECTION-02-EXECUTION.md) is the immediate active task. |
 
 | E0069 / RL-MVP-007D two-fix Correction 02 plan | Lead -> Backend/Codex, QA/Security, Research | OWNER APPROVED PACKET PUBLICATION ONLY; EXECUTION NOT AUTHORIZED | [Planning packet](task_packets/RL-MVP-007D-E0069-CORRECTION-02-PLAN.md): audited macOS version execution + unconditional lifetime-FD cleanup, two existing files plus handoff. Codex may read/assess scope; request separate execution approval. Fresh exact-SHA QA/Research required after correction; no installs/runtime/inference/merge. |
