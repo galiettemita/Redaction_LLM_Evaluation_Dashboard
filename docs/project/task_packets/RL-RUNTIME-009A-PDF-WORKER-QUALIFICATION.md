@@ -23,6 +23,8 @@ Source/package changes are limited to:
 - `packaging/pdf-worker/runtime.lock`
 - `packaging/pdf-worker/README.md`
 - `packaging/pdf-worker/containers.conf`
+- `pyproject.toml`
+- `uv.lock`
 - `scripts/build-pdf-worker.sh`
 - `scripts/verify-pdf-worker.sh`
 - `src/redaction_lab/application/isolation.py`
@@ -34,6 +36,8 @@ Source/package changes are limited to:
 - `tests/application/test_document_worker.py`
 
 New qualification artifacts may be added only under `packaging/pdf-worker/` for an SBOM, license/source inventory, and integrity manifest. One unique `docs/project/handoffs/RL-RUNTIME-009A-backend-<UTC>-<SHA>.md` is authorized. This task record may be updated with observed evidence. No database schema, API contract, prediction/reference contract, frontend, scoring, model-runtime, or shared canonical-state file is in scope.
+
+The project dependency declaration and generated lock are included narrowly because Phase 1 found published hostile-file parsing vulnerabilities in the previously locked Pillow `12.3.0` and pypdf `6.20.0`. They may be refreshed only to current compatible fixed releases, with regenerated hash locks and full regression evidence; no unrelated dependency or project-metadata change is permitted.
 
 Host actions are limited to zero-cost verified Podman installation if no privileged credential is required, dedicated rootless machine create/start/stop, exact image acquisition/build/inspect, offline/no-mount disposable canaries, and cleanup of task-created temporary/container state. Never delete unrelated user data or broaden host access.
 

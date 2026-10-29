@@ -36,3 +36,12 @@ def test_scripts_are_offline_and_never_embed_user_paths_or_credentials() -> None
     assert "--pull=never" in text
     assert "/Users/galiettemita" not in text
     assert "TOKEN=" not in text and "PASSWORD=" not in text
+
+
+def test_worker_lock_excludes_known_vulnerable_pdf_parser_versions() -> None:
+    requirements = (ROOT / "packaging/pdf-worker/requirements.lock").read_text()
+
+    assert "pillow==13.0.0" in requirements
+    assert "pypdf==6.21.4" in requirements
+    assert "pillow==12.3.0" not in requirements
+    assert "pypdf==6.20.0" not in requirements
