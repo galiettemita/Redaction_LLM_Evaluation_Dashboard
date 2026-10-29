@@ -14,7 +14,7 @@ test('build dependencies and scripts are exact and install scripts are disabled'
     '@types/react': '19.2.2',
     '@types/react-dom': '19.2.2',
     typescript: '5.9.3',
-    vite: '7.3.5',
+    vite: '7.3.7',
   });
   assert.deepEqual(packageJson.overrides, { esbuild: '0.27.2' });
   assert.equal(packageJson.scripts.typecheck, 'tsc --noEmit');

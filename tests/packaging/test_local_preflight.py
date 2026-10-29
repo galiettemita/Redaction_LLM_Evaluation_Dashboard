@@ -20,9 +20,9 @@ LOCAL = ROOT / "packaging" / "local"
 HTTP = build_opener(ProxyHandler({}))
 CHROME = Path("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")
 GENUINE_ASSETS = {
-    "/": ("web/dist/index.html", "1a638c34649d4fc727a446b7f06f0103562af019bfc58b8d554514cbc8d09367"),
-    "/assets/index-Dr7D93Wo.css": ("web/dist/assets/index-Dr7D93Wo.css", "5e85c428f8aea611a729cccad5194870a956bb5b794f7d1f8ba6895ae7a867bd"),
-    "/assets/index-D4KVD8ty.js": ("web/dist/assets/index-D4KVD8ty.js", "a088437a22f246a85be596cc2d34eddd5c6e4993e83085b2ad2975744aa8d4dc"),
+    "/": ("web/dist/index.html", "ec263a9100e23363eab5ff019f14c87a83133ff4a3f56b6400242856e539076e"),
+    "/assets/index-cs0q5swb.css": ("web/dist/assets/index-cs0q5swb.css", "f9558242c5506edadbfb433d023544e9ed93642dbfde2629217e100845b55706"),
+    "/assets/index-aQq_IaFa.js": ("web/dist/assets/index-aQq_IaFa.js", "cafc2c373b5e3210a462c16eb67f818d669a7322e8d3a8ac2c9d9f48f72142cc"),
 }
 
 
@@ -52,12 +52,6 @@ def package(tmp_path):
     for name in ("src", "packaging"):
         shutil.copytree(ROOT / name, root / name)
     shutil.copytree(ROOT / "web/dist", root / "web/dist")
-    # Exercise the pre-existing launcher checks with a synthetic authorization;
-    # the committed E0066 manifest deliberately remains non-distributable.
-    manifest_path = root / "packaging/local/manifest.json"
-    manifest = json.loads(manifest_path.read_text())
-    manifest["delivery_status"]["candidate_distribution_status"] = "DISTRIBUTABLE"
-    manifest_path.write_text(json.dumps(manifest))
     return root
 
 
@@ -119,7 +113,7 @@ def test_preflight_is_read_only_and_reports_verified_frontend_with_unqualified_r
     assert not Path(env["REDACTION_LAB_HOME"]).exists()
 
 
-def test_committed_code_only_candidate_refuses_distribution(package, tmp_path):
+def test_non_distributable_manifest_refuses_launch(package, tmp_path):
     manifest_path = package / "packaging/local/manifest.json"
     manifest = json.loads(manifest_path.read_text())
     manifest["delivery_status"]["candidate_distribution_status"] = "NOT_BUILT_NON_DISTRIBUTABLE"
@@ -366,7 +360,8 @@ def test_existing_chrome_cli_renders_the_genuine_same_origin_application(package
         assert browser.returncode == 0, browser.stderr
         assert "<title>Redaction Lab — local document workspace</title>" in browser.stdout
         assert "Every passage. Clear uncertainty." in browser.stdout
-        assert "The local service response does not match API contract v0.1." in browser.stdout
+        assert 'id="runtime-title">Local service connected</h2>' in browser.stdout
+        assert "Unqualified work fails closed without a substitute prediction." in browser.stdout
         assert "No verified or experimental score is available." in browser.stdout
         assert 'id="demo-title">Experimental text-only demo</h2>' in browser.stdout
         assert "Plausible guesses are not proven correct." in browser.stdout

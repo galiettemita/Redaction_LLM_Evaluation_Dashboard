@@ -1,26 +1,19 @@
 # Local website and API package
 
-> **E0066 code-only candidate — NOT BUILT / NON-DISTRIBUTABLE.** API and
-> frontend source target contract v0.2, but the committed verified bundle still
-> targets v0.1. Preflight therefore exits with `FRONTEND_BUILD_REQUIRED`; do not
-> launch, deliver, or use this branch as a recipient package. A separately
-> authorized Gate B must rebuild the frontend, update its manifest hashes, stage
-> verified offline runtime artifacts, and repeat the clean-device checks.
+> **RL-WEB-008 frontend candidate — BUILT FOR API v0.2.** The exact production
+> bundle is hash-bound in the local manifest and may launch in truthful
+> `DEGRADED` mode. PDF processing and model inference remain unavailable until
+> their separate runtime locks are qualified; this is not a complete recipient
+> release or scientific validation.
 
 This candidate starts the merged Task 7B API on your own macOS Apple Silicon
-computer. It can compose a verified frontend bundle on the same origin as the
-API. This branch has no genuine approved build; the frontend build is blocked
-pending the Vite dependency amendment. Only synthetic bundle fixtures have been
-tested here. PDF processing is unavailable because
+computer. It composes the verified API v0.2 frontend bundle on the same origin
+as the API. Only synthetic bundle fixtures have been tested here. PDF processing is unavailable because
 the PDF-worker runtime is unqualified; prediction and evaluation models are
 unavailable; accuracy remains unknown and numeric scores remain null.
 
-The manifest retains the previous v0.1 bundle only as a hash-bound historical
-artifact and records `delivery_status.frontend_available: false`. Preflight
-refuses to launch it beside the v0.2 API. A future approved integration must place the exact
-Frontend artifact under `web/dist` and update the manifest inventory with its
-reviewed paths, sizes, SHA-256 hashes and MIME types; arbitrary builds are not
-accepted. This package is neither a standalone
+The manifest binds the reviewed v0.2 artifact under `web/dist` by exact paths,
+sizes, SHA-256 hashes and MIME types; arbitrary builds are not accepted. This package is neither a standalone
 installer nor evidence of clean recipient-device acceptance, runtime isolation,
 model availability or scientific validity.
 
@@ -65,10 +58,9 @@ these scripts require no internet connection.
    sh packaging/local/launch.sh --check
    ```
 
-   This code-only branch exits nonzero with `FRONTEND_BUILD_REQUIRED`. After an
-   approved rebuild and manifest review, exit 0 with `state: DEGRADED` means the API prerequisites matched.
+   Exit 0 with `state: DEGRADED` means the API prerequisites and exact frontend bundle matched.
    `frontend_available: true` is emitted only after exact bundle verification;
-   this branch reports false without a genuine artifact. It does not
+   a changed or missing bundle reports false. It does not
    mean PDF processing works. Error codes identify incompatible platform/Python,
    missing or mismatched dependencies, unsafe storage, or a changed worker lock.
    Preflight creates no data directory or database and makes no runtime calls.
@@ -165,9 +157,9 @@ an unsafe/invalid package manifest prevents launch entirely.
 - [x] Synthetic static GET/HEAD, exact bytes/MIME/length, security headers and
       routing/framing/confinement checks pass with a frozen fixture inventory.
 - [x] Frontend verification fails closed and preserves API-only diagnostics.
-- [ ] Independent exact-candidate QA/security review and owner merge authorization.
-- [ ] Genuine frontend build, reviewed hash-pinned integration and browser workflow
-      (BLOCKED pending Frontend dependency amendment/build).
+- [x] Independent exact-candidate automated QA/security review passed.
+- [x] Genuine API v0.2 frontend build, reviewed hash-pinned integration and
+      synthetic headless-Chrome browser workflow.
 - [ ] Offline prerequisite bundle, SBOM/license inventory and PDF runtime qualification.
 - [ ] Clean second-device recipient acceptance and authorized real models.
 
