@@ -172,6 +172,7 @@ class InferenceRuntime:
         model_store: Path,
     ) -> int:
         stopping = False
+        child: subprocess.Popen[bytes] | None = None
 
         def stop(_signum, _frame) -> None:  # type: ignore[no-untyped-def]
             nonlocal stopping

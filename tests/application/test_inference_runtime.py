@@ -504,6 +504,57 @@ def test_supervisor_popen_failure_closes_every_pipe_descriptor(
             os.fstat(pipe_descriptor)
 
 
+@pytest.mark.parametrize("failure", ["invalid_descriptor", "popen"])
+def test_supervisor_startup_error_reports_failure_and_closes_owned_descriptors(
+    tmp_path, monkeypatch, failure
+) -> None:
+    executable = tmp_path / "runtime"
+    executable.write_bytes(b"synthetic")
+    executable.chmod(0o700)
+    model_store = tmp_path / "models"
+    model_store.mkdir()
+    executable_fd = (
+        -1 if failure == "invalid_descriptor" else os.open(executable, os.O_RDONLY)
+    )
+    lifetime_read, lifetime_write = os.pipe()
+    status_read, status_write = os.pipe()
+    if failure == "popen":
+        monkeypatch.setattr(
+            "redaction_lab.application.inference_runtime.subprocess.Popen",
+            lambda *args, **kwargs: (_ for _ in ()).throw(
+                OSError("synthetic spawn failure")
+            ),
+        )
+    try:
+        assert (
+            InferenceRuntime._supervisor_main(
+                lifetime_read,
+                status_write,
+                executable_fd,
+                executable,
+                model_store,
+            )
+            == 1
+        )
+        assert os.read(status_read, 16) == b"ERROR\n"
+        for owned_descriptor in (lifetime_read, status_write):
+            with pytest.raises(OSError):
+                os.fstat(owned_descriptor)
+    finally:
+        for descriptor in (
+            lifetime_read,
+            lifetime_write,
+            status_read,
+            status_write,
+            executable_fd,
+        ):
+            if descriptor >= 0:
+                try:
+                    os.close(descriptor)
+                except OSError:
+                    pass
+
+
 def test_supervisor_handshake_exception_closes_pipe_and_reaps_process(
     tmp_path, monkeypatch
 ) -> None:
