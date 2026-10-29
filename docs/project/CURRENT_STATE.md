@@ -1,12 +1,12 @@
 # Current state
 
-Updated: 2026-10-11 (America/New_York). Coordination epoch: **E0069**.
+Updated: 2026-10-29 (America/New_York). Coordination epoch: **E0070**.
 Integration branch: `main`. Canonical writer: **Lead/Architect**, within the owner's approved scope.
 Resolve the actual HEAD with GitHub; do not infer a current SHA from this file's timestamp.
 
 ## Read this first
 
-**Stage:** S1 / October 12 MVP implementation. **Execution boundary:** RL-MVP-001, RL-MVP-002 and RL-MVP-003 are merged. RL-MVP-004 has been owner-authorized and MERGED following Correction 01 independent QA and Research PASS; Task 5 is owner-approved for a research-only proposal on an isolated Research branch; Task 6 is owner-approved for bounded synthetic/mock-only implementation under [RL-MVP-006 packet](task_packets/RL-MVP-006-EVALUATOR-SUMMARIES.md); Task 7 implementation remains unapproved; owner selected portable local self-hosting for Task 7 planning, requiring independently runnable installation on another recipient computer; Task 6 integrated after owner approval and independent QA/Research scoped PASS; Task 7+ remains unapproved.
+**Stage:** portable local product engineering. **Execution boundary:** [RL-OPS-002](task_packets/RL-OPS-002-AUTONOMOUS-ENGINEERING.md) grants Codex standing authority for bounded engineering, automated review, corrections and normal integration within confirmed product/safety boundaries. Human scientific, institutional/data, paid-resource, credential, destructive-action, product-scope and public-deployment gates remain.
 **Product implementation:** RL-MVP-001 merged in PR #1 (`ba60aaa8`); RL-MVP-002 merged in PR #2 (`35281fb9`); RL-MVP-003 merged in PR #3 (`733ae024`).
 **Scoring validity:** not established. **Deployment:** none established here.
 **Active background agents / scheduler:** none installed by this setup.
@@ -108,3 +108,5 @@ E0067: Backend E0066 code candidate `e6669c2234dbb683225b40e3642551092628e6aa` p
 E0068: Owner approved [Correction 01 code-only execution](task_packets/RL-MVP-007D-E0066-CORRECTION-01-EXECUTION.md), adding only `src/redaction_lab/adapters/ollama.py` to strict six source/test paths plus one Backend handoff. Codex may perform grouped four-defect TDD repair on existing isolated E0066 branch; implementation NOT YET EXECUTED under E0068. Exact-SHA independent QA/security and Research review required; no merge, runtime installs, PDFs, real inference, spending or deployment. Existing `e6669c2` remains CHANGES_REQUESTED.
 
 E0069: Owner approved publication only of [RL-MVP-007D two-fix Correction 02 plan](task_packets/RL-MVP-007D-E0069-CORRECTION-02-PLAN.md). QA CHANGES_REQUESTED on exact `f244d1337e51dd188cd2253f3845c5a3d243e144` for macOS `/dev/fd` version-command incompatibility and lifetime-pipe FD leakage after supervisor exit. Research independent handoff not verified. Proposed scope only `application/inference_runtime.py` and its existing test file plus unique Backend handoff. **Implementation NOT AUTHORIZED / NOT STARTED**. Continue runtime, model, inference, install, spending, merge and deployment holds.
+
+E0070: Owner established [Codex-led standing autonomous engineering authority](task_packets/RL-OPS-002-AUTONOMOUS-ENGINEERING.md). Bounded routine implementation, tests, automated independent review, corrections, documentation, commits and normal protected integration no longer require repeated owner prompts. The [two-file Correction 02 execution record](task_packets/RL-MVP-007D-E0070-CORRECTION-02-EXECUTION.md) is ACTIVE. Nondelegable scientific, institutional/data, paid-resource, credential, destructive-action, product-scope and public-deployment gates remain unchanged.
