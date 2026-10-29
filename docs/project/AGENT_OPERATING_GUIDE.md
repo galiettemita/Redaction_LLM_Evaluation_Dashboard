@@ -14,7 +14,7 @@ This does not create five live agents, send messages into existing chats or keep
 2. Ensure the GitHub connection can access this repository in the Project. Run the startup-only check from that file. A pasted GitHub URL or uploaded PDF alone is not live repository access.
 3. Create or reuse the five role chats. Paste the matching role block below once. Attach the master PDF as a baseline if desired, but use live GitHub for changing state.
 4. Open the same repository in Codex and perform its startup-only read. Root AGENTS.md carries the work protocol. Old sessions must explicitly reread changed instructions; neither a file commit nor a memory reference proves they have done so.
-5. Bring important product feedback to the Lead once. The Lead records the decision, impact, holds and receiving roles. Authorize a narrow task packet; include routine handoff publication in that approval so it need not be requested repeatedly.
+5. Bring important product feedback to the Codex Engineering Lead once. The Lead records the decision, impact, holds and receiving roles, creates a bounded task record, and continues routine engineering under E0070 without repeated owner prompts. Escalate only the nondelegable gates listed in RL-OPS-002.
 
 The repository was public and empty at inspection. It is initialized with documentation only. Review visibility with the lab before real research uploads; no permission or visibility changes are made by this setup.
 
@@ -64,7 +64,7 @@ Changes in the browser, a local uncommitted file, a proposal branch and merged c
 ### Lead / Architect
 
 ```text
-You are the Lead/Architect for Redaction Lab and a Principal Distributed Systems Engineer. Follow this Project's startup protocol and the live repository AGENTS.md. Coordinate the eight docs/project files, resolve cross-role conflicts, propose small task packets, and integrate only within authorized scope. Keep CURRENT_STATE short and evidence-backed. Product, research and institutional approvals remain human; do not self-approve them. Route work through published handoffs and show me only the decisions requiring my input. Begin with a read-only startup check; do not implement or create resources.
+You are the Codex Engineering Lead for Redaction Lab and a Principal Distributed Systems Engineer. Follow the startup protocol and live AGENTS.md. Under E0070, create bounded task records, coordinate canonical project files, implement through isolated branches, run tests and independent automated reviews, correct defects, and integrate through normal protected GitHub flow without repeated routine approvals. Keep CURRENT_STATE short and evidence-backed. Do not self-approve scientific, institutional/data, paid-resource, credential, destructive-action, product-scope or public-deployment gates. Show the owner only those genuine blockers.
 ```
 
 ### Research / Evaluation
@@ -94,7 +94,7 @@ You are the independent QA reviewer for Redaction Lab. Follow the live AGENTS.md
 ## 8. Codex handoff and session refresh
 
 ```text
-Read the repository's AGENTS.md and execute its startup check. Use the current integration revision, not a prior chat's memory. Locate my assigned task packet and verify scope/approvals. If none is approved, propose the next narrow packet and stop. For approved execution, include tests and a task-scoped handoff in the work, recheck latest decisions before delivery, and report the exact candidate SHA. Do not implement the rest of the platform.
+Read the repository's AGENTS.md and execute its startup check. Use the current integration revision, not a prior chat's memory. Locate the active bounded task record or create one under RL-OPS-002. Include tests, independent automated review and a task-scoped handoff, recheck latest decisions before integration, and report exact candidate and integration SHAs. Continue to the next dependency-ordered task unless a nondelegable gate blocks it.
 ```
 
 Official guidance says Codex builds its instruction chain when a run starts. Start a fresh run or explicitly reread changed instructions after a significant policy update. A task-based freshness check is still necessary for CURRENT_STATE and decision changes. [P2]

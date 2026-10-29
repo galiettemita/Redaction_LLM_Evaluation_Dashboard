@@ -14,6 +14,8 @@ Keep the startup acknowledgment to one line: `Role | task | baseline SHA | decis
 
 ## Authority and scope
 
+- Effective E0070, the product owner grants Codex standing engineering authority to plan, implement, test, independently review, correct, document, commit, and integrate bounded work needed for the confirmed product scope. Codex records each work package before consequential writes and does not need a separate owner approval for routine engineering or correction cycles.
+- Standing engineering authority does not approve paid resources, private or institutionally restricted data, missing credentials, destructive external actions, public deployment/distribution, changes to confirmed product scope, or scientific/benchmark/release claims requiring designated human approval. Stop only the affected work at those gates and continue safe independent work.
 - Preserve confirmed requirements R01-R12 and decisions DEC-001 through DEC-022. Proposed architecture, interfaces, scoring and thresholds remain proposed until their designated human approvals are recorded.
 - The redacted PDF is required for prediction; the reference file is optional for prediction. Verified scoring additionally requires fully revealed, readable, reliably aligned reference text for that exact target.
 - Partial, missing, unreadable or uncertain truth means null score / unknown accuracy, not zero. Text targets only; no image, table or whole-page reconstruction. Ordinary multipage viewing is allowed. Provide redaction, document and model score levels.
@@ -25,9 +27,9 @@ Keep the startup acknowledgment to one line: `Role | task | baseline SHA | decis
 
 ## Task and write protocol
 
-Work only on a task packet with an owner, file scope, acceptance evidence and stop condition. The setup request authorizes documentation initialization only; it is not standing permission for future code, paid calls, migrations, deployments or merges. Routine handoff writing can be included once in each approved task scope to avoid repeat approval requests.
+Work only on a bounded task record with an accountable agent, file/action scope, acceptance evidence and stop condition. Under E0070, Codex may create and activate that record when the work remains inside confirmed product and safety boundaries; routine engineering no longer waits for separate owner approval. Task records do not expand the nondelegable gates above. Include routine handoff writing and normal reviewed integration in the task scope when applicable.
 
-Lead/Architect is the single integration writer for the eight shared project files, under the owner's authorized scope. Specialists propose changes on their task branch or in a unique handoff. They do not independently rewrite canonical state on `main`. An agent role is not a human approval identity.
+Codex acting as Engineering Lead is the single integration writer for the eight shared project files and maintains them as engineering state changes. Specialists and automated reviewers propose changes on task branches or in unique handoffs; they do not independently rewrite canonical state on `main`. An agent role is not a human scientific or institutional approval identity.
 
 Use one isolated branch/worktree per writing task. Before publishing, refresh HEAD and reconcile overlap. Use current blob SHAs or an expected-head lease for API writes; use normal non-force Git pushes. A stale-head rejection requires rereading and reconciliation, not a blind retry. Keep a related decision, state and handoff update in one commit where possible. Never force-push or overwrite another writer's work.
 

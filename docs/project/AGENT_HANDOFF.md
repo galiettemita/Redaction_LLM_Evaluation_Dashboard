@@ -4,6 +4,8 @@ This file is the Lead-maintained routing/index record. Each specialist writes a 
 
 ## Initial inbox
 
+| E0070 / RL-OPS-002 autonomous engineering | Owner -> Codex Engineering Lead / all roles | OWNER AUTHORIZED; ACTIVE | [Standing engineering record](task_packets/RL-OPS-002-AUTONOMOUS-ENGINEERING.md): Codex creates bounded tasks and runs implementation/review/correction/integration without repeated owner prompts. Human scientific, institutional/data, cost, credential, destructive-action, product-scope and public-deployment gates remain. [Correction 02 execution](task_packets/RL-MVP-007D-E0070-CORRECTION-02-EXECUTION.md) is the immediate active task. |
+
 | E0069 / RL-MVP-007D two-fix Correction 02 plan | Lead -> Backend/Codex, QA/Security, Research | OWNER APPROVED PACKET PUBLICATION ONLY; EXECUTION NOT AUTHORIZED | [Planning packet](task_packets/RL-MVP-007D-E0069-CORRECTION-02-PLAN.md): audited macOS version execution + unconditional lifetime-FD cleanup, two existing files plus handoff. Codex may read/assess scope; request separate execution approval. Fresh exact-SHA QA/Research required after correction; no installs/runtime/inference/merge. |
 
 | E0068 / RL-MVP-007D Correction 01 execution | Lead -> Backend/Codex, QA/security, Research | OWNER APPROVED CODE-ONLY; NOT IMPLEMENTED | [Execution amendment](task_packets/RL-MVP-007D-E0066-CORRECTION-01-EXECUTION.md): four grouped QA fixes, exactly three source and three test paths including newly authorized `adapters/ollama.py`, one handoff. Fresh exact-SHA QA/Research, separate merge gate. No runtime/install/inference/deploy. |
