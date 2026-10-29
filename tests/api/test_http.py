@@ -313,6 +313,6 @@ def test_json_response_adds_version_and_no_cache_headers() -> None:
         "Content-Length": str(len(body)),
         "Cache-Control": "no-store",
         "X-Content-Type-Options": "nosniff",
-        "X-Redaction-Lab-API": "0.1",
+        "X-Redaction-Lab-API": "0.2",
     }
     assert json.loads(body) == {"ok": True}

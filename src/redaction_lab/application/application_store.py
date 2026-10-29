@@ -47,6 +47,7 @@ class StoredDocumentVersion:
     page_count: int | None
     processing_state: ProcessingStatus
     source_id: str | None
+    created_at: datetime
 
 
 @dataclass(frozen=True)
@@ -238,6 +239,7 @@ class ApplicationStore:
             artifact_key=row["artifact_key"], sha256=row["sha256"], byte_size=row["byte_size"],
             page_count=row["page_count"], processing_state=ProcessingStatus(row["processing_state"]),
             source_id=row["source_id"],
+            created_at=datetime.fromisoformat(row["created_at"]),
         )
 
     def claim_next(self, *, owner: str, now: datetime) -> StoredApplicationJob | None:

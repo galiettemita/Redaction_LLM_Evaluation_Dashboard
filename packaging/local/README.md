@@ -1,4 +1,11 @@
-# Local website and API demo package
+# Local website and API package
+
+> **E0066 code-only candidate — NOT BUILT / NON-DISTRIBUTABLE.** API and
+> frontend source target contract v0.2, but the committed verified bundle still
+> targets v0.1. Preflight therefore exits with `FRONTEND_BUILD_REQUIRED`; do not
+> launch, deliver, or use this branch as a recipient package. A separately
+> authorized Gate B must rebuild the frontend, update its manifest hashes, stage
+> verified offline runtime artifacts, and repeat the clean-device checks.
 
 This candidate starts the merged Task 7B API on your own macOS Apple Silicon
 computer. It can compose a verified frontend bundle on the same origin as the
@@ -8,10 +15,9 @@ tested here. PDF processing is unavailable because
 the PDF-worker runtime is unqualified; prediction and evaluation models are
 unavailable; accuracy remains unknown and numeric scores remain null.
 
-The manifest deliberately has `frontend.assets: null` and
-`delivery_status.frontend_available: false`. Until a separately reviewed genuine
-build is pinned, `/` returns 503 `FRONTEND_UNAVAILABLE` and `/api/v1/health`
-remains an API diagnostic. A future approved integration must place the exact
+The manifest retains the previous v0.1 bundle only as a hash-bound historical
+artifact and records `delivery_status.frontend_available: false`. Preflight
+refuses to launch it beside the v0.2 API. A future approved integration must place the exact
 Frontend artifact under `web/dist` and update the manifest inventory with its
 reviewed paths, sizes, SHA-256 hashes and MIME types; arbitrary builds are not
 accepted. This package is neither a standalone
@@ -59,7 +65,8 @@ these scripts require no internet connection.
    sh packaging/local/launch.sh --check
    ```
 
-   Exit 0 with `state: DEGRADED` means the API prerequisites matched.
+   This code-only branch exits nonzero with `FRONTEND_BUILD_REQUIRED`. After an
+   approved rebuild and manifest review, exit 0 with `state: DEGRADED` means the API prerequisites matched.
    `frontend_available: true` is emitted only after exact bundle verification;
    this branch reports false without a genuine artifact. It does not
    mean PDF processing works. Error codes identify incompatible platform/Python,
@@ -75,7 +82,7 @@ these scripts require no internet connection.
    `http://127.0.0.1:8765/` into your browser's address bar and press **Return**.
    If it prints `FRONTEND_UNAVAILABLE`, use
    `http://127.0.0.1:8765/api/v1/health` for the API diagnostic. Expect API
-   version `0.1`, `mode: local`, `state: DEGRADED` and
+   version `0.2`, `mode: local`, `state: DEGRADED` and
    `runtime_qualified: false`. Use `127.0.0.1`; `localhost`, another host, IPv6 or
    cross-origin requests are rejected. No browser is opened automatically.
    Frontend availability never changes the API's degraded runtime status.
@@ -114,10 +121,12 @@ never put private PDFs, datasets, credentials or raw model payloads into it.
 Keep package/source files trusted and unchanged while the service runs. The
 manifest pins the unchanged, unverified worker lock by SHA-256; changing or
 qualifying the lock requires a separately authorized, reviewed package. The
-existing API refuses processing before claiming a job when that lock is
-unverified, returning 503 `RUNTIME_UNVERIFIED`; uploads remain accepted with
-unknown truth, empty targets and null scores. Refreshing, reading health or
-restarting does not dispatch a paid run. No inference path is connected.
+API refuses PDF processing before claiming a job when that lock is unverified,
+returning 503 `RUNTIME_UNVERIFIED`. It also verifies a separate application-owned
+model-runtime lock and literal loopback Ollama identity before dispatch; this
+candidate's lock is deliberately unverified, so it fails with
+`MODEL_RUNTIME_UNVERIFIED`. Unknown truth and both scores remain null.
+Refreshing, reading results, or restarting does not dispatch a paid run.
 
 ## Static asset boundary
 

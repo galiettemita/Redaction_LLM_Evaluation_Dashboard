@@ -9,6 +9,13 @@ Task 7A tests the protocol and command construction with mocks only. It does not
 install Podman, create a VM, pull or build an image, or claim that isolation has
 been verified on this computer.
 
+`requirements.lock` is generated from the frozen project lock and requires
+hash verification. The image build is deliberately offline: a separately
+verified `packaging/pdf-worker/wheelhouse/` must contain every matching wheel
+before qualification. That wheelhouse is not present in this code-only
+candidate, so the image remains unbuildable and `runtime_verified` remains
+`false` until Gate B acquisition, license review, canaries, and digest capture.
+
 Those injectable mocks are explicitly non-authoritative probes: they cannot be
 supplied to the application document worker and cannot persist Task 4 sources or
 mark document jobs ready. Production composition reads only the install-owned

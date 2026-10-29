@@ -1,9 +1,10 @@
-"""WSGI orchestration for the frozen Redaction Lab local API v0.1."""
+"""WSGI orchestration for the backwards-compatible local API v0.2."""
 
 from __future__ import annotations
 
 import os
 import re
+import asyncio
 from hashlib import sha256
 from json import JSONDecodeError
 from threading import Lock
@@ -26,6 +27,8 @@ from redaction_lab.application.application_store import (
 from redaction_lab.application.artifact_store import ArtifactIntegrityError
 from redaction_lab.application.document_worker import DocumentWorker
 from redaction_lab.application.isolation import RuntimeUnavailable
+from redaction_lab.application.inference_runtime import InferenceRuntimeUnavailable
+from redaction_lab.application.prediction_service import PredictionService
 from redaction_lab.application.upload_service import UploadService
 from redaction_lab.contracts import DocumentRole
 
@@ -51,6 +54,7 @@ class LocalApi:
         self.uploads = uploads
         self.store = uploads.store
         self.artifacts = uploads.artifacts
+        self.predictions = PredictionService(self.store)
         self._orchestration_lock = Lock()
 
     @staticmethod
@@ -96,11 +100,14 @@ class LocalApi:
         }
 
     @staticmethod
-    def _result_payload(version: StoredDocumentVersion) -> dict[str, object]:
+    def _result_payload(
+        version: StoredDocumentVersion,
+        targets: tuple[dict[str, object], ...] = (),
+    ) -> dict[str, object]:
         return {
             "version_id": version.version_id,
             "status": _RESULT_STATUS[version.processing_state],
-            "targets": [],
+            "targets": list(targets),
             "summaries": {"target": None, "document": None, "model": None},
             "score_status": "NONE",
             "verified_score": None,
@@ -173,50 +180,66 @@ class LocalApi:
     def _process(self, job_id: str) -> tuple[int, dict[str, object]]:
         with self._orchestration_lock:
             job = self.store.get_job(job_id)
-            if job.status is not ProcessingStatus.ACCEPTED:
+            if job.status is ProcessingStatus.READY:
+                current = job
+            elif job.status is not ProcessingStatus.ACCEPTED:
                 raise HttpProblem(409, "JOB_CONFLICT", "Job is not accepted work")
-            with self.store.connect() as connection:
-                next_row = connection.execute(
-                    "SELECT job_id FROM application_jobs WHERE status='ACCEPTED' "
-                    "ORDER BY created_at, job_id LIMIT 1"
-                ).fetchone()
-            if next_row is None or next_row["job_id"] != job_id:
-                raise HttpProblem(
-                    409,
-                    "JOB_CONFLICT",
-                    "An earlier document job must be processed first",
-                )
-            try:
-                worked = DocumentWorker(self.store, self.artifacts).run_once(
-                    owner=f"local-api-{os.getpid()}"
-                )
-            except (
-                RuntimeUnavailable,
-                OSError,
-                JSONDecodeError,
-                KeyError,
-                TypeError,
-                ValueError,
-            ):
-                current = self.store.get_job(job_id)
-                if (
-                    current.status is not ProcessingStatus.ACCEPTED
-                    or current.owner is not None
+            else:
+                with self.store.connect() as connection:
+                    next_row = connection.execute(
+                        "SELECT job_id FROM application_jobs WHERE status='ACCEPTED' "
+                        "ORDER BY created_at, job_id LIMIT 1"
+                    ).fetchone()
+                if next_row is None or next_row["job_id"] != job_id:
+                    raise HttpProblem(
+                        409,
+                        "JOB_CONFLICT",
+                        "An earlier document job must be processed first",
+                    )
+                try:
+                    worked = DocumentWorker(self.store, self.artifacts).run_once(
+                        owner=f"local-api-{os.getpid()}"
+                    )
+                except (
+                    RuntimeUnavailable,
+                    OSError,
+                    JSONDecodeError,
+                    KeyError,
+                    TypeError,
+                    ValueError,
                 ):
-                    raise
-                return 503, {
-                    "error": {
-                        "code": "RUNTIME_UNVERIFIED",
-                        "message": (
-                            "PDF processing runtime is not qualified on this installation"
-                        ),
-                    },
-                    "job_id": current.job_id,
-                    "status": current.status.value,
-                }
-            if not worked:
-                raise HttpProblem(409, "JOB_CONFLICT", "Another job is processing")
-            return 200, self._job_payload(self.store.get_job(job_id))
+                    current = self.store.get_job(job_id)
+                    if (
+                        current.status is not ProcessingStatus.ACCEPTED
+                        or current.owner is not None
+                    ):
+                        raise
+                    return 503, {
+                        "error": {
+                            "code": "RUNTIME_UNVERIFIED",
+                            "message": (
+                                "PDF processing runtime is not qualified on this installation"
+                            ),
+                        },
+                        "job_id": current.job_id,
+                        "status": current.status.value,
+                    }
+                if not worked:
+                    raise HttpProblem(409, "JOB_CONFLICT", "Another job is processing")
+                current = self.store.get_job(job_id)
+            if current.status is ProcessingStatus.READY and current.role is DocumentRole.REDACTED:
+                try:
+                    asyncio.run(self.predictions.run(current.version_id))
+                except InferenceRuntimeUnavailable:
+                    return 503, {
+                        "error": {
+                            "code": "MODEL_RUNTIME_UNVERIFIED",
+                            "message": "Model inference runtime is not qualified on this installation",
+                        },
+                        "job_id": current.job_id,
+                        "status": current.status.value,
+                    }
+            return 200, self._job_payload(current)
 
     def _dispatch(
         self, environment: Mapping[str, object]
@@ -225,7 +248,7 @@ class LocalApi:
         path = str(environment.get("PATH_INFO", ""))
         if method == "GET" and path == "/api/v1/health":
             return 200, {
-                "api_version": "0.1",
+                "api_version": "0.2",
                 "state": "DEGRADED",
                 "runtime_qualified": False,
                 "mode": "local",
@@ -258,7 +281,12 @@ class LocalApi:
                     "RESULTS_UNAVAILABLE",
                     "Results are available only for redacted documents",
                 )
-            return 200, self._result_payload(version)
+            targets = (
+                self.predictions.results(version.version_id)
+                if version.processing_state is ProcessingStatus.READY
+                else ()
+            )
+            return 200, self._result_payload(version, targets)
         raise HttpProblem(404, "NOT_FOUND", "Resource was not found")
 
     def __call__(self, environment: Mapping[str, object], start_response: StartResponse):

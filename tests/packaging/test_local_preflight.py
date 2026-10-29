@@ -52,6 +52,12 @@ def package(tmp_path):
     for name in ("src", "packaging"):
         shutil.copytree(ROOT / name, root / name)
     shutil.copytree(ROOT / "web/dist", root / "web/dist")
+    # Exercise the pre-existing launcher checks with a synthetic authorization;
+    # the committed E0066 manifest deliberately remains non-distributable.
+    manifest_path = root / "packaging/local/manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    manifest["delivery_status"]["candidate_distribution_status"] = "DISTRIBUTABLE"
+    manifest_path.write_text(json.dumps(manifest))
     return root
 
 
@@ -74,6 +80,7 @@ def simulated_python(tmp_path, *, system="Darwin", machine="arm64", version="3.1
     # Simulate external interpreter/platform/installed metadata, then execute the
     # real shell script's Python payload. All validation and path code stay real.
     wrapper = tmp_path / "test-python"
+    pins = json.loads((LOCAL / "manifest.json").read_text())["dependency_pins"]
     wrapper.write_text(
         f"#!{sys.executable}\n"
         "import sys, platform, importlib.metadata, builtins\n"
@@ -85,7 +92,8 @@ def simulated_python(tmp_path, *, system="Darwin", machine="arm64", version="3.1
         "def version(name):\n"
         f"    if name == {missing!r}: raise importlib.metadata.PackageNotFoundError(name)\n"
         f"    if name == {wrong!r}: return '0.0.0'\n"
-        "    return original(name)\n"
+        f"    pins = {pins!r}\n"
+        "    return pins[name] if name in pins else original(name)\n"
         "importlib.metadata.version = version\n"
         "original_import = builtins.__import__\n"
         "def guarded_import(name, *args, **kwargs):\n"
@@ -109,6 +117,17 @@ def test_preflight_is_read_only_and_reports_verified_frontend_with_unqualified_r
     assert report["host"] == "127.0.0.1"
     assert report["frontend_available"] is True
     assert not Path(env["REDACTION_LAB_HOME"]).exists()
+
+
+def test_committed_code_only_candidate_refuses_distribution(package, tmp_path):
+    manifest_path = package / "packaging/local/manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    manifest["delivery_status"]["candidate_distribution_status"] = "NOT_BUILT_NON_DISTRIBUTABLE"
+    manifest_path.write_text(json.dumps(manifest))
+    result = run(package, "launch.sh", environment(tmp_path, REDACTION_LAB_PYTHON=simulated_python(tmp_path)), "--check")
+    assert result.returncode != 0
+    assert json.loads(result.stdout)["error"]["code"] == "FRONTEND_BUILD_REQUIRED"
+    assert not (tmp_path / "local state").exists()
 
 
 def test_preflight_only_reports_frontend_after_exact_bundle_verification(package, tmp_path):
@@ -194,7 +213,8 @@ def test_preflight_rejects_state_inside_checkout_and_symlinks(package, tmp_path)
     link = tmp_path / "state-link"
     link.symlink_to(target, target_is_directory=True)
     for location in (package / "private-data", link, Path.home()):
-        result = run(package, "preflight.sh", environment(tmp_path, REDACTION_LAB_HOME=str(location)))
+        result = run(package, "preflight.sh", environment(
+            tmp_path, REDACTION_LAB_HOME=str(location), REDACTION_LAB_PYTHON=simulated_python(tmp_path)))
         assert result.returncode != 0
         assert json.loads(result.stdout)["error"]["code"] == "UNSAFE_DATA_HOME"
 
@@ -204,9 +224,22 @@ def test_preflight_rejects_changed_runtime_lock_before_launch(package, tmp_path)
     content = json.loads(lock.read_text())
     content["runtime_verified"] = True
     lock.write_text(json.dumps(content))
-    result = run(package, "launch.sh", environment(tmp_path), "--check")
+    result = run(package, "launch.sh", environment(
+        tmp_path, REDACTION_LAB_PYTHON=simulated_python(tmp_path)), "--check")
     assert result.returncode != 0
     assert json.loads(result.stdout)["error"]["code"] == "RUNTIME_LOCK_MISMATCH"
+    assert not (tmp_path / "local state").exists()
+
+
+def test_preflight_rejects_changed_model_runtime_lock_before_launch(package, tmp_path):
+    lock = package / "packaging/model-runtime/runtime.lock"
+    content = json.loads(lock.read_text())
+    content["runtime_verified"] = True
+    lock.write_text(json.dumps(content))
+    result = run(package, "launch.sh", environment(
+        tmp_path, REDACTION_LAB_PYTHON=simulated_python(tmp_path)), "--check")
+    assert result.returncode != 0
+    assert json.loads(result.stdout)["error"]["code"] == "MODEL_RUNTIME_LOCK_MISMATCH"
     assert not (tmp_path / "local state").exists()
 
 
@@ -244,7 +277,7 @@ def test_synthetic_loopback_api_upload_fail_closed_and_restart(package, tmp_path
     with socket.socket() as reservation:
         reservation.bind(("127.0.0.1", 0))
         port = reservation.getsockname()[1]
-    env = environment(tmp_path, REDACTION_LAB_PORT=str(port))
+    env = environment(tmp_path, REDACTION_LAB_PORT=str(port), REDACTION_LAB_PYTHON=simulated_python(tmp_path))
     process, base, health = start(package, env)
     try:
         for path, body in assets.items():
@@ -273,7 +306,7 @@ def test_synthetic_loopback_api_upload_fail_closed_and_restart(package, tmp_path
                 connection.sendall(raw)
                 reply = connection.recv(4096)
                 assert reply.split(b"\r\n")[0].split()[1] == b"400"
-        assert health == {"api_version": "0.1", "state": "DEGRADED", "runtime_qualified": False, "mode": "local"}
+        assert health == {"api_version": "0.2", "state": "DEGRADED", "runtime_qualified": False, "mode": "local"}
         status, _ = request(base + "/api/v1/health", headers={"Host": "localhost"})
         assert status == 400
         status, _ = request(base + "/api/v1/health", headers={"Origin": "https://example.org"})
@@ -321,7 +354,7 @@ def test_existing_chrome_cli_renders_the_genuine_same_origin_application(package
     with socket.socket() as reservation:
         reservation.bind(("127.0.0.1", 0))
         port = reservation.getsockname()[1]
-    env = environment(tmp_path, REDACTION_LAB_PORT=str(port))
+    env = environment(tmp_path, REDACTION_LAB_PORT=str(port), REDACTION_LAB_PYTHON=simulated_python(tmp_path))
     process, base, _ = start(package, env)
     try:
         browser = subprocess.run([
@@ -333,7 +366,7 @@ def test_existing_chrome_cli_renders_the_genuine_same_origin_application(package
         assert browser.returncode == 0, browser.stderr
         assert "<title>Redaction Lab — local document workspace</title>" in browser.stdout
         assert "Every passage. Clear uncertainty." in browser.stdout
-        assert "Document processing unavailable" in browser.stdout
+        assert "The local service response does not match API contract v0.1." in browser.stdout
         assert "No verified or experimental score is available." in browser.stdout
         assert 'id="demo-title">Experimental text-only demo</h2>' in browser.stdout
         assert "Plausible guesses are not proven correct." in browser.stdout
@@ -354,7 +387,8 @@ def test_occupied_port_rejects_launch_before_creating_state(package, tmp_path):
     with socket.socket() as occupied:
         occupied.bind(("127.0.0.1", 0))
         occupied.listen()
-        env = environment(tmp_path, REDACTION_LAB_PORT=str(occupied.getsockname()[1]))
+        env = environment(tmp_path, REDACTION_LAB_PORT=str(occupied.getsockname()[1]),
+                          REDACTION_LAB_PYTHON=simulated_python(tmp_path))
         result = run(package, "launch.sh", env)
     assert result.returncode != 0
     assert "STARTUP_FAILED" in result.stderr

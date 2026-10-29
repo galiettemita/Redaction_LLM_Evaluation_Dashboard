@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "package_version": "0.1.0-local-website-demo",
-  "api_version": "0.1",
+  "package_version": "0.2.0-e0066-code-only",
+  "api_version": "0.2",
   "supported_platform": {"system": "Darwin", "machine": "arm64"},
   "python_version": "3.12.14",
   "host": "127.0.0.1",
@@ -48,8 +48,16 @@
     "lock_sha256": "aec1716357b99cffe877bcfff0a2610ad5932da4a5fa9326cdf9d86ff6e8996a",
     "runtime_qualified": false
   },
+  "model_runtime": {
+    "lock_path": "packaging/model-runtime/runtime.lock",
+    "lock_sha256": "7c0f0d2fca54da78f8ab3c2175de2af0ab26d6e8b0b40492bea7a275cc65cad1",
+    "runtime_qualified": false
+  },
   "delivery_status": {
-    "frontend_available": true,
+    "candidate_distribution_status": "NOT_BUILT_NON_DISTRIBUTABLE",
+    "frontend_available": false,
+    "frontend_source_api_version": "0.2",
+    "frontend_bundle_api_version": "0.1",
     "offline_prerequisite_bundle_available": false,
     "recipient_acceptance": "NOT_RUN",
     "inference_available": false,
