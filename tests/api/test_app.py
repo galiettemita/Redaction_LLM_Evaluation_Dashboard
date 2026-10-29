@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from hashlib import sha256
 from io import BytesIO
 import json
 from pathlib import Path
@@ -12,8 +13,16 @@ from redaction_lab.api.app import LocalApi, create_app
 from redaction_lab.application.application_store import ApplicationStore, ProcessingStatus
 from redaction_lab.application.application_store import StoredDocumentVersion
 from redaction_lab.application.artifact_store import ArtifactStore
+from redaction_lab.application.document_worker import DocumentWorker
+from redaction_lab.application.isolation import WorkerObservation
 from redaction_lab.application.upload_service import UploadService
 from redaction_lab.application.inference_runtime import InferenceRuntimeUnavailable
+from redaction_lab.application.worker_protocol import (
+    WORKER_PROTOCOL_VERSION,
+    WorkerResponse,
+    WorkerStatus,
+)
+from redaction_lab.contracts import DocumentRole
 
 
 def _app(tmp_path: Path):
@@ -28,13 +37,14 @@ def _multipart(
     reference: bytes | None = None,
     *,
     redacted: bytes = b"%PDF-redacted-api",
+    project_id: str = "project-api",
 ) -> tuple[bytes, str]:
     boundary = "api-app-test-boundary"
     parts = [
         (
             f"--{boundary}\r\n"
             'Content-Disposition: form-data; name="project_id"\r\n\r\n'
-            "project-api\r\n"
+            f"{project_id}\r\n"
         ).encode(),
         (
             f"--{boundary}\r\n"
@@ -95,8 +105,11 @@ def _upload(
     *,
     reference: bytes | None = None,
     redacted: bytes = b"%PDF-redacted-api",
+    project_id: str = "project-api",
 ):
-    body, content_type = _multipart(reference, redacted=redacted)
+    body, content_type = _multipart(
+        reference, redacted=redacted, project_id=project_id
+    )
     return _request(
         app,
         "POST",
@@ -423,6 +436,177 @@ def test_missing_runtime_lock_returns_503_without_claiming_job(
     assert payload["status"] == "ACCEPTED"
     assert stored.status is ProcessingStatus.ACCEPTED
     assert stored.owner is None
+
+
+def test_older_optional_reference_does_not_block_next_redacted_process(
+    tmp_path: Path, monkeypatch
+) -> None:
+    app, store, artifacts = _app(tmp_path)
+    worker_calls: list[str] = []
+
+    def complete_next_redacted(worker, *, owner, expected_job_id):
+        job = worker.store.claim_next(
+            owner=owner,
+            now=datetime.now(UTC),
+            expected_job_id=expected_job_id,
+        )
+        assert job is not None
+        worker_calls.append(job.job_id)
+        worker.store.complete_job(
+            job.job_id,
+            owner=owner,
+            status=ProcessingStatus.UNSUPPORTED,
+            page_count=None,
+            source_id=None,
+            reason_code="SYNTHETIC_UNSUPPORTED",
+        )
+        return True
+
+    async def prediction_must_not_run(_version_id):
+        raise AssertionError("unsupported documents must not dispatch prediction")
+
+    monkeypatch.setattr(DocumentWorker, "run_once", complete_next_redacted)
+    monkeypatch.setattr(app.predictions, "run", prediction_must_not_run)
+    try:
+        _, _, first = _upload(
+            app,
+            redacted=b"%PDF-first-redacted",
+            reference=b"%PDF-first-reference",
+        )
+        first_status, _, first_result = _request(
+            app, "POST", f"/api/v1/jobs/{first['redacted']['job_id']}/process"
+        )
+        _, _, second = _upload(
+            app,
+            redacted=b"%PDF-second-redacted",
+            reference=b"%PDF-second-reference",
+        )
+
+        second_status, _, second_result = _request(
+            app, "POST", f"/api/v1/jobs/{second['redacted']['job_id']}/process"
+        )
+        replay_status, _, replay = _request(
+            app, "POST", f"/api/v1/jobs/{second['redacted']['job_id']}/process"
+        )
+        _, _, results = _request(
+            app, "GET", f"/api/v1/results/{second['redacted']['version_id']}"
+        )
+        with store.connect() as connection:
+            references = connection.execute(
+                "SELECT status, source_id FROM application_jobs "
+                "WHERE role='REFERENCE' ORDER BY created_at, job_id"
+            ).fetchall()
+    finally:
+        artifacts.close()
+
+    assert first_status == second_status == 200
+    assert first_result["status"] == second_result["status"] == "UNSUPPORTED"
+    assert worker_calls == [
+        first["redacted"]["job_id"],
+        second["redacted"]["job_id"],
+    ]
+    assert replay_status == 409
+    assert replay["error"]["code"] == "JOB_CONFLICT"
+    assert len(worker_calls) == 2
+    assert [tuple(row) for row in references] == [
+        ("ACCEPTED", None),
+        ("ACCEPTED", None),
+    ]
+    assert results["truth_status"] == "UNKNOWN"
+    assert results["verified_score"] is None
+    assert results["experimental_score"] is None
+    assert results["targets"] == []
+
+
+def test_process_race_never_claims_a_different_project_job(
+    tmp_path: Path, monkeypatch
+) -> None:
+    app_a, store_a, artifacts_a = _app(tmp_path)
+    artifacts_b = ArtifactStore(tmp_path / "artifacts", tmp_path / "temporary")
+    store_b = ApplicationStore(
+        tmp_path / "application.sqlite3", backup_directory=tmp_path / "backups"
+    )
+    app_b = create_app(UploadService(artifacts_b, store_b))
+
+    class UnsupportedWorker:
+        @staticmethod
+        def ensure_available() -> None:
+            return None
+
+        @staticmethod
+        def process(pdf_bytes: bytes, *, project_id: str, role: DocumentRole):
+            return WorkerObservation(
+                response=WorkerResponse(
+                    protocol_version=WORKER_PROTOCOL_VERSION,
+                    request_nonce="a" * 32,
+                    project_id=project_id,
+                    role=role,
+                    input_sha256=sha256(pdf_bytes).hexdigest(),
+                    status=WorkerStatus.UNSUPPORTED,
+                    page_count=0,
+                    reason_code="SYNTHETIC_UNSUPPORTED",
+                ),
+                image_digest="sha256:" + "b" * 64,
+            )
+
+    original_run_once = DocumentWorker.run_once
+    interleaved = False
+
+    def run_after_other_api_completes_requested_job(
+        worker, *, owner, expected_job_id=None
+    ):
+        nonlocal interleaved
+        if not interleaved:
+            claimed = app_b.store.claim_next(owner="api-b", now=datetime.now(UTC))
+            assert claimed is not None
+            app_b.store.complete_job(
+                claimed.job_id,
+                owner="api-b",
+                status=ProcessingStatus.UNSUPPORTED,
+                page_count=None,
+                source_id=None,
+                reason_code="INTERLEAVED_COMPLETION",
+            )
+            interleaved = True
+        options = (
+            {"expected_job_id": expected_job_id}
+            if expected_job_id is not None
+            else {}
+        )
+        return original_run_once(worker, owner=owner, **options)
+
+    monkeypatch.setattr(
+        "redaction_lab.application.document_worker.ApplicationPdfWorker",
+        UnsupportedWorker,
+    )
+    monkeypatch.setattr(
+        DocumentWorker, "run_once", run_after_other_api_completes_requested_job
+    )
+    try:
+        _, _, first = _upload(
+            app_a, project_id="project-a", redacted=b"%PDF-project-a"
+        )
+        _, _, second = _upload(
+            app_a, project_id="project-b", redacted=b"%PDF-project-b"
+        )
+
+        status, _, response = _request(
+            app_a, "POST", f"/api/v1/jobs/{first['redacted']['job_id']}/process"
+        )
+        first_job = store_a.get_job(first["redacted"]["job_id"])
+        second_job = store_a.get_job(second["redacted"]["job_id"])
+    finally:
+        artifacts_b.close()
+        artifacts_a.close()
+
+    assert interleaved is True
+    assert status == 409
+    assert response["error"]["code"] == "JOB_CONFLICT"
+    assert first_job.status is ProcessingStatus.UNSUPPORTED
+    assert first_job.reason_code == "INTERLEAVED_COMPLETION"
+    assert second_job.status is ProcessingStatus.ACCEPTED
+    assert second_job.owner is None
+    assert second_job.reason_code is None
 
 
 @pytest.mark.parametrize(
