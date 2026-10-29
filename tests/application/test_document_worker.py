@@ -16,12 +16,19 @@ from redaction_lab.application.isolation import (
 from redaction_lab.application.upload_service import UploadService
 from redaction_lab.contracts import DocumentRole
 from redaction_lab.fixtures import make_synthetic_pair
-def test_unverified_runtime_leaves_redacted_job_accepted_and_task4_unchanged(tmp_path: Path) -> None:
+def test_unverified_runtime_leaves_redacted_job_accepted_and_task4_unchanged(
+    tmp_path: Path, monkeypatch
+) -> None:
     redacted, _ = make_synthetic_pair("two_boxes", tmp_path / "fixture")
     artifacts = ArtifactStore(tmp_path / "artifacts", tmp_path / "temporary")
     app_store = ApplicationStore(tmp_path / "app.sqlite3", backup_directory=tmp_path / "backups")
     accepted = UploadService(artifacts, app_store).accept(
         project_id="project", role=DocumentRole.REDACTED, chunks=[redacted.read_bytes()]
+    )
+    lock = tmp_path / "unverified-runtime.lock"
+    lock.write_text('{"runtime_verified": false}')
+    monkeypatch.setattr(
+        "redaction_lab.application.isolation._INSTALL_RUNTIME_LOCK", lock
     )
 
     with pytest.raises(RuntimeUnavailable, match="unverified"):
@@ -52,12 +59,19 @@ def test_caller_worker_injection_is_rejected_and_cannot_mark_reference_ready(tmp
 
     policy = RuntimePolicy(
         executable="/not/podman", machine_name="probe",
+        executable_sha256="sha256:" + "a" * 64,
+        executable_version="6.1.4",
         image_digest="sha256:" + "1" * 64,
+        runtime_root="/not/runtime",
+        containers_conf="/not/runtime/containers.conf",
     )
 
     class ForgedRunner:
         def inspect(self, policy):
-            return RuntimeInspection(True, "probe", True, (), policy.image_digest)
+            return RuntimeInspection(
+                True, "probe", True, (), policy.image_digest,
+                policy.executable_sha256, policy.executable_version,
+            )
 
         def run(self, command, *, input_bytes, timeout_seconds):
             return 0, b"{}", b""

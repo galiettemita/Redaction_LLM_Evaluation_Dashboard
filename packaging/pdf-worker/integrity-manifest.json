@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-10-29T17:55:00Z",
+  "architecture": "linux/arm64",
+  "artifacts": {
+    "podman_installer": {"size":76099040,"sha256":"48f675622f66233ca2116e67fdab41ed9dbcc25b48b78a8e6ef0be6549031d22"},
+    "podman_executable": {"sha256":"9603079ca32a9fa88f0aa2b3f9e41c9365d7db2dc19c75857a1ec40aee6e5837"},
+    "podman_machine_image": {"size":937980979,"sha256":"633971788fcfe7df04f49da53f06c98b28933c5df2f684d57c2f9831411cac77"},
+    "base_image_manifest": {"sha256":"5642cb13b1fc85462dec7ad9d954623a57fe1e65981e1508dff894942eaa8694"},
+    "worker_image_id": {"size":170248815,"sha256":"7a78eaf7ef812d354f0abe13f40c6c0a4e3684d94f72002245c5249249bf293b"},
+    "worker_image_manifest": {"sha256":"cc9988ec0166c840e4d04eb115757aa8d3f7a193355c600725217e20f3115aba"}
+  },
+  "wheelhouse": [
+    {"name":"annotated_types-0.8.0-py3-none-any.whl","size":13427,"sha256":"f072f4d804ea359e4eaf198b1af7a8b0943881a87f31bb764f8bf219bb9419e0"},
+    {"name":"cffi-2.1.1-cp312-cp312-musllinux_1_2_aarch64.whl","size":225232,"sha256":"208f941bb9d18e768138677f0a6d2ce01f590df56043dda1df1535ac57c88517"},
+    {"name":"charset_normalizer-3.5.2-cp312-cp312-musllinux_1_2_aarch64.whl","size":248482,"sha256":"ae4f5fea5b8b8ccff88238cc8569303e5ee95efae67fa62922a311397a71f346"},
+    {"name":"cryptography-50.0.2-cp311-abi3-musllinux_1_2_aarch64.whl","size":4870819,"sha256":"25784ce8b9621c90c643efb9e1e2162ab3b0224cae446ad5e70e7fcb1ce18b51"},
+    {"name":"pdfminer_six-20260107-py3-none-any.whl","size":6592252,"sha256":"366585ba97e80dffa8f00cebe303d2f381884d8637af4ce422f1df3ef38111a9"},
+    {"name":"pdfplumber-0.11.10-py3-none-any.whl","size":60047,"sha256":"7741ea81bf165b474b153e6789d10d18e06b6ddcf3ec84289c3ef2fed6802580"},
+    {"name":"pillow-13.0.0-cp312-cp312-musllinux_1_2_aarch64.whl","size":6618042,"sha256":"4bd024d567eca931b668978d672dba914d4b8e2628e2c3073a2ad178de8a2620"},
+    {"name":"pycparser-3.11-py3-none-any.whl","size":51178,"sha256":"51d5a8ba2be0bbe440b99d2112604c95bbbc3c2748a64260186c541e1729cd80"},
+    {"name":"pydantic-2.14.0-py3-none-any.whl","size":487109,"sha256":"15fab1bea6f1dc5003b54fc2ecab230c1fd1dbade2acd4addc52d81e32416d4b"},
+    {"name":"pydantic_core-2.50.0-cp312-cp312-musllinux_1_1_aarch64.whl","size":2279176,"sha256":"1751e92d56fbb623b937d73985e500b1a2b1053e56f718a6c564660d99bb9cb0"},
+    {"name":"pypdf-6.21.4-py3-none-any.whl","size":410430,"sha256":"33e4fb41ca352810eb4e9838aa0d82d6888a5f8bf682f43e99cce5faa666255c"},
+    {"name":"pypdfium2-5.14.0-py3-none-musllinux_1_2_aarch64.whl","size":5058436,"sha256":"382de7fe20d32c42993a274d7b6c555a5623a97570dfc1d2f5e0a16fe0d5d482"},
+    {"name":"reportlab-4.5.1-py3-none-any.whl","size":1957812,"sha256":"06fce8cb56c83307cfa4909cdf4e6a2ddbb44e5d6ef4d2edca896d7e9769f091"},
+    {"name":"typing_extensions-4.16.0-py3-none-any.whl","size":45571,"sha256":"481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8"},
+    {"name":"typing_inspection-0.4.4-py3-none-any.whl","size":14750,"sha256":"65b8397ba37ccbce054456aaccddfc91e6e3083c92824df348d96ca832f3f147"}
+  ]
+}

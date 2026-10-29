@@ -59,8 +59,10 @@ try:
     if hashlib.sha256(lock_bytes).hexdigest() != worker["lock_sha256"]:
         fail("RUNTIME_LOCK_MISMATCH", "Worker lock changed; a separately reviewed package is required")
     lock = json.loads(lock_bytes)
-    if lock.get("runtime_verified") is not False or worker["runtime_qualified"] is not False:
-        fail("RUNTIME_NOT_AUTHORIZED", "This candidate permits only the unqualified API demo")
+    if (lock.get("runtime_verified") is not True
+            or worker.get("lock_qualified_on_reference_host") is not True
+            or worker["runtime_qualified"] is not False):
+        fail("RUNTIME_NOT_AUTHORIZED", "The qualified PDF lock is not paired with this non-bundled candidate")
     model = manifest["model_runtime"]
     model_lock_bytes = (root / model["lock_path"]).read_bytes()
     if hashlib.sha256(model_lock_bytes).hexdigest() != model["lock_sha256"]:
