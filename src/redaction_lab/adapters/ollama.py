@@ -7,6 +7,10 @@ from datetime import UTC, datetime
 import errno
 from hashlib import sha256
 import json
+import os
+from pathlib import Path
+import subprocess
+import sys
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
 from urllib.request import (
@@ -25,6 +29,11 @@ from redaction_lab.contracts import AttemptStatus, PredictionManifest, TokenUsag
 
 
 MAX_RESPONSE_BYTES = 1_048_576
+MODEL_CONTEXT_TOKENS = 32_768
+MAX_OUTPUT_TOKENS = 1_024
+# A byte cannot encode more than one model token. This conservative bound also
+# leaves room for the fixed instruction prefix and requested output tokens.
+MAX_PROMPT_BYTES = 30_000
 
 
 class _NoRedirectHandler(HTTPRedirectHandler):
@@ -92,11 +101,19 @@ class OllamaAdapter(PredictionAdapter):
         options: dict[str, float] = {}
         if manifest.settings.temperature is not None:
             options["temperature"] = manifest.settings.temperature
+        options["num_ctx"] = MODEL_CONTEXT_TOKENS
+        options["num_predict"] = MAX_OUTPUT_TOKENS
+        prompt_bytes = prompt.encode("utf-8")
+        if len(prompt_bytes) > MAX_PROMPT_BYTES:
+            raise ValueError("rendered prompt exceeds the no-truncation context bound")
         payload = {
             "model": manifest.model_id,
             "options": options,
             "prompt": prompt,
+            "raw": True,
+            "shift": False,
             "stream": False,
+            "truncate": False,
         }
         body = json.dumps(
             payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False
@@ -123,15 +140,31 @@ class OllamaAdapter(PredictionAdapter):
         self, endpoint: str, body: bytes, timeout: float
     ) -> bytes:
         def send() -> bytes:
-            request = Request(
+            command = [
+                sys.executable,
+                "-m",
+                "redaction_lab.adapters.ollama",
+                "--generate",
                 endpoint,
-                data=body,
-                headers={"Content-Type": "application/json"},
-                method="POST",
-            )
-            with self._opener.open(request, timeout=timeout) as response:
-                result = response.read(MAX_RESPONSE_BYTES + 1)
-            return result
+            ]
+            try:
+                completed = subprocess.run(
+                    command,
+                    input=body,
+                    capture_output=True,
+                    check=False,
+                    timeout=timeout,
+                    env={
+                        "PATH": "/usr/bin:/bin",
+                        "PYTHONPATH": str(Path(__file__).resolve().parents[2]),
+                        "PYTHONDONTWRITEBYTECODE": "1",
+                    },
+                )
+            except subprocess.TimeoutExpired as error:
+                raise TimeoutError("model request timed out") from error
+            if completed.returncode != 0:
+                raise OSError("model request failed")
+            return completed.stdout
 
         return await asyncio.to_thread(send)
 
@@ -330,3 +363,37 @@ class OllamaAdapter(PredictionAdapter):
             ),
             provider_model_id=returned_model,
         )
+
+
+def _main(arguments: list[str]) -> int:
+    if len(arguments) != 2 or arguments[0] != "--generate":
+        return 2
+    endpoint = arguments[1]
+    parsed = urlsplit(endpoint)
+    try:
+        base = _validated_endpoint(f"{parsed.scheme}://{parsed.netloc}")
+    except ValueError:
+        return 2
+    if endpoint != base + "/api/generate":
+        return 2
+    body = os.read(sys.stdin.fileno(), 131_073)
+    if len(body) > 131_072:
+        return 1
+    request = Request(
+        endpoint,
+        data=body,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    opener = build_opener(ProxyHandler({}), _NoRedirectHandler())
+    try:
+        with opener.open(request, timeout=60) as response:
+            result = response.read(MAX_RESPONSE_BYTES + 1)
+    except (HTTPError, URLError, OSError, ValueError, TypeError):
+        return 1
+    os.write(sys.stdout.fileno(), result)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(_main(sys.argv[1:]))

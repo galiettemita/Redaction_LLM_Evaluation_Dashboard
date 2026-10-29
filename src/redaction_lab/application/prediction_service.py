@@ -22,16 +22,19 @@ from redaction_lab.worker import run_job_once
 MODEL_ID = "qwen2.5:1.5b-instruct-q4_K_M"
 PROMPT_ID = "redaction-reconstruction-json"
 PROMPT_VERSION = "prompt-v1"
-RUN_VERSION = "run-v0.3"
+RUN_VERSION = "run-v0.4"
 EXPERIMENT_CONDITION = "redacted-document-only"
-COMMON_CONTEXT_BUDGET = 131_072
+COMMON_CONTEXT_BUDGET = 29_000
 CONTEXT_POLICY = "common-full-document"
 SETTINGS = {"temperature": 0}
 ATTEMPT_POLICY = "one-frozen-attempt"
 TOOL_PERMISSIONS: tuple[str, ...] = ()
 BUDGET_LABEL = "zero-cost-local-experimental"
-SERVICE_ID = "application-prediction-service-v0.3"
-LEGACY_SERVICE_ID = "application-prediction-service-v0.2"
+SERVICE_ID = "application-prediction-service-v0.4"
+LEGACY_SERVICE_IDENTITIES = {
+    ("run-v0.2", "application-prediction-service-v0.2"),
+    ("run-v0.3", "application-prediction-service-v0.3"),
+}
 
 
 def _identity(prefix: str, values: object) -> str:
@@ -156,9 +159,9 @@ class PredictionService:
         except json.JSONDecodeError:
             return False
         return (
-            run.run_version == "run-v0.2"
-            and isinstance(identity, dict)
-            and identity.get("service") == LEGACY_SERVICE_ID
+            isinstance(identity, dict)
+            and (run.run_version, identity.get("service"))
+            in LEGACY_SERVICE_IDENTITIES
         )
 
     def _stored_run(self, version_id: str) -> tuple[str, RunDefinition | None]:
@@ -177,7 +180,7 @@ class PredictionService:
             version.source_id, project_id=version.project_id
         ):
             if self._is_legacy_service_run(run):
-                raise ValueError("legacy v0.2 run identity is unsupported")
+                raise ValueError("legacy prediction run identity is unsupported")
             identity = self._runtime_identity(run)
             if identity is None:
                 continue
@@ -187,10 +190,10 @@ class PredictionService:
                 model_manifest_digest=identity[2],
             )
             if run != expected:
-                raise ValueError("stored v0.3 run identity is inconsistent")
+                raise ValueError("stored v0.4 run identity is inconsistent")
             candidates.append(run)
         if len(candidates) > 1:
-            raise ValueError("document has multiple v0.3 prediction runs")
+            raise ValueError("document has multiple v0.4 prediction runs")
         return version.source_id, candidates[0] if candidates else None
 
     async def run(self, version_id: str) -> tuple[str, ...]:

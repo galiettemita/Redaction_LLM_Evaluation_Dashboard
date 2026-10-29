@@ -119,7 +119,9 @@ runtime is absent or differs, returning `RUNTIME_UNVERIFIED` or
 `MODEL_RUNTIME_UNVERIFIED`. The model lock uses application-root-relative paths
 and requires the exact signed executable, complete model-file inventory,
 literal-loopback API version, provider model name and manifest digest before
-dispatch. Unknown truth and both scores remain null.
+dispatch. The qualified profile uses a raw prompt, 32,768-token context,
+1,024-token output ceiling, conservative 30,000-byte rendered-prompt bound and
+explicitly disables truncation/context shifting. Unknown truth and both scores remain null.
 Refreshing, reading results, or restarting does not dispatch a paid run.
 
 ## Static asset boundary
@@ -159,7 +161,8 @@ an unsafe/invalid package manifest prevents launch entirely.
 - [x] Synthetic static GET/HEAD, exact bytes/MIME/length, security headers and
       routing/framing/confinement checks pass with a frozen fixture inventory.
 - [x] Frontend verification fails closed and preserves API-only diagnostics.
-- [x] Independent exact-candidate automated QA/security review passed.
+- [x] RL-WEB-008 frontend exact-candidate automated QA/security review passed.
+- [ ] Current Task 9B correction exact-candidate independent review.
 - [x] Genuine API v0.2 frontend build, reviewed hash-pinned integration and
       synthetic headless-Chrome browser workflow.
 - [x] Reference-host PDF worker and synthetic-only Ollama/model qualification.

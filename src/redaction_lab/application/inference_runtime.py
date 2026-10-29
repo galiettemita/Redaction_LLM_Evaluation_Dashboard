@@ -42,6 +42,34 @@ def _terminate_process(process) -> None:  # type: ignore[no-untyped-def]
         process.wait(timeout=5)
 
 
+def _terminate_process_group(process) -> None:  # type: ignore[no-untyped-def]
+    """Terminate the runtime's isolated group even if its leader already exited."""
+
+    try:
+        os.killpg(process.pid, signal.SIGTERM)
+    except ProcessLookupError:
+        _terminate_process(process)
+        return
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        try:
+            os.killpg(process.pid, 0)
+        except ProcessLookupError:
+            break
+        time.sleep(0.02)
+    else:
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+    if process.poll() is None:
+        try:
+            process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait(timeout=5)
+
+
 class _SupervisedProcess:
     """Process-like handle whose pipe owns the supervisor and runtime lifetime."""
 
@@ -75,6 +103,11 @@ class _SupervisedProcess:
 
     def kill(self) -> None:
         self.terminate()
+        if self.child_pid > 0:
+            try:
+                os.killpg(self.child_pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
         if self._supervisor.poll() is not None:
             return
         try:
@@ -162,7 +195,6 @@ class InferenceRuntime:
 
     @staticmethod
     def _json(opener, url: str, *, timeout: float = 5) -> object:
-        child: subprocess.Popen[bytes] | None = None
         try:
             with opener.open(Request(url, method="GET"), timeout=timeout) as response:
                 raw = response.read(1_048_577)
@@ -179,6 +211,12 @@ class InferenceRuntime:
         endpoint = str(value["endpoint"])
         version = cls._json(opener, endpoint + "/api/version", timeout=timeout)
         tags = cls._json(opener, endpoint + "/api/tags", timeout=timeout)
+        cls._validate_api_identity(version, tags, value)
+
+    @staticmethod
+    def _validate_api_identity(
+        version: object, tags: object, value: dict[str, object]
+    ) -> None:
         if not isinstance(version, dict) or version.get("version") != value["ollama_version"]:
             raise InferenceRuntimeUnavailable("Ollama API version mismatch")
         models = tags.get("models") if isinstance(tags, dict) else None
@@ -191,6 +229,46 @@ class InferenceRuntime:
             for model in models
         ):
             raise InferenceRuntimeUnavailable("model manifest identity mismatch")
+
+    @classmethod
+    def _probe_api_identity(
+        cls, value: dict[str, object], *, timeout: float
+    ) -> None:
+        endpoint = str(value["endpoint"])
+        if endpoint != "http://127.0.0.1:11434" or timeout <= 0:
+            raise InferenceRuntimeUnavailable("model runtime probe is invalid")
+        command = [
+            sys.executable,
+            "-m",
+            "redaction_lab.application.inference_runtime",
+            "--probe",
+            endpoint,
+        ]
+        try:
+            completed = subprocess.run(
+                command,
+                check=False,
+                capture_output=True,
+                timeout=timeout,
+                env={
+                    "PATH": "/usr/bin:/bin",
+                    "PYTHONPATH": str(Path(__file__).resolve().parents[2]),
+                    "PYTHONDONTWRITEBYTECODE": "1",
+                },
+            )
+        except subprocess.TimeoutExpired as error:
+            raise InferenceRuntimeUnavailable("model runtime probe timed out") from error
+        except OSError as error:
+            raise InferenceRuntimeUnavailable("model runtime probe failed") from error
+        if completed.returncode != 0 or len(completed.stdout) > 2_097_152:
+            raise InferenceRuntimeUnavailable("model runtime probe failed")
+        try:
+            payload = json.loads(completed.stdout.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as error:
+            raise InferenceRuntimeUnavailable("model runtime probe failed") from error
+        if not isinstance(payload, dict) or set(payload) != {"tags", "version"}:
+            raise InferenceRuntimeUnavailable("model runtime probe failed")
+        cls._validate_api_identity(payload["version"], payload["tags"], value)
 
     @staticmethod
     def _supervisor_main(
@@ -226,6 +304,8 @@ class InferenceRuntime:
                 stderr=subprocess.DEVNULL,
                 close_fds=True,
                 pass_fds=(executable_fd,),
+                cwd=str(executable.parent),
+                start_new_session=True,
                 env={
                     "PATH": "/usr/bin:/bin",
                     "HOME": str(model_store.parent),
@@ -238,7 +318,7 @@ class InferenceRuntime:
                 raise OSError("verified executable path changed during launch")
         except OSError:
             if child is not None:
-                _terminate_process(child)
+                _terminate_process_group(child)
             try:
                 os.write(status_fd, b"ERROR\n")
             except OSError:
@@ -258,7 +338,7 @@ class InferenceRuntime:
                 if readable and not os.read(lifetime_fd, 1):
                     break
         finally:
-            _terminate_process(child)
+            _terminate_process_group(child)
             os.close(lifetime_fd)
         return child.returncode or 0
 
@@ -455,73 +535,193 @@ class InferenceRuntime:
             raise InferenceRuntimeUnavailable(f"Ollama executable changed {phase}")
 
     @staticmethod
-    def _assert_model_files(model_store: Path, value: dict[str, object]) -> None:
-        files = value.get("model_files")
-        if not isinstance(files, dict) or not 1 <= len(files) <= 128:
-            raise InferenceRuntimeUnavailable("model file inventory is incomplete")
-        expected_files: dict[str, str] = {}
-        for relative, expected in files.items():
+    def _inventory_map(
+        value: dict[str, object], key: str, *, required: bool, limit: int
+    ) -> dict[str, str]:
+        raw = value.get(key)
+        if not isinstance(raw, dict) or (required and not raw) or len(raw) > limit:
+            raise InferenceRuntimeUnavailable("runtime file inventory is incomplete")
+        result: dict[str, str] = {}
+        for relative, expected in raw.items():
             if (
                 not isinstance(relative, str)
                 or re.fullmatch(r"(?:[A-Za-z0-9._-]+/)*[A-Za-z0-9._-]+", relative)
                 is None
+                or any(part in {".", ".."} for part in relative.split("/"))
                 or not isinstance(expected, str)
-                or re.fullmatch(r"sha256:[0-9a-f]{64}", expected) is None
+            ):
+                raise InferenceRuntimeUnavailable("runtime file inventory is invalid")
+            result[relative] = expected
+        return result
+
+    @classmethod
+    def _assert_file_inventory(
+        cls,
+        root: Path,
+        expected_files: dict[str, str],
+        expected_symlinks: dict[str, str],
+        *,
+        label: str,
+    ) -> None:
+        for expected in expected_files.values():
+            if (
+                re.fullmatch(r"sha256:[0-9a-f]{64}", expected) is None
                 or expected.endswith("0" * 64)
             ):
-                raise InferenceRuntimeUnavailable("model file inventory is invalid")
-            expected_files[relative] = expected
+                raise InferenceRuntimeUnavailable(f"{label} inventory is invalid")
+        for target in expected_symlinks.values():
+            if (
+                re.fullmatch(r"(?:[A-Za-z0-9._-]+/)*[A-Za-z0-9._-]+", target)
+                is None
+                or any(part in {".", ".."} for part in target.split("/"))
+            ):
+                raise InferenceRuntimeUnavailable(f"{label} inventory is invalid")
 
-        observed_files: dict[str, Path] = {}
-        directories: list[tuple[Path, str]] = [(model_store, "")]
-        visited = 0
-        while directories:
-            directory, prefix = directories.pop()
-            visited += 1
-            if visited > 256:
-                raise InferenceRuntimeUnavailable("model store inventory is too large")
-            try:
-                entries = tuple(os.scandir(directory))
-            except OSError as error:
-                raise InferenceRuntimeUnavailable("model store is unavailable") from error
-            for entry in entries:
-                relative = prefix + entry.name
+        cls._audit_parent_directories(root)
+        directory_flags = (
+            os.O_RDONLY
+            | getattr(os, "O_DIRECTORY", 0)
+            | os.O_NOFOLLOW
+            | getattr(os, "O_CLOEXEC", 0)
+        )
+        root_descriptor = -1
+        open_directories: list[tuple[int, str]] = []
+        try:
+            root_path_before = root.lstat()
+            root_descriptor = os.open(root, directory_flags)
+            root_before = os.fstat(root_descriptor)
+            if (
+                stat.S_ISLNK(root_path_before.st_mode)
+                or not stat.S_ISDIR(root_before.st_mode)
+                or cls._file_identity(root_path_before) != cls._file_identity(root_before)
+                or root_before.st_uid != os.geteuid()
+                or root_before.st_mode & 0o022
+            ):
+                raise InferenceRuntimeUnavailable(f"{label} is untrusted")
+            open_directories.append((os.dup(root_descriptor), ""))
+            observed_files: dict[str, str] = {}
+            observed_symlinks: dict[str, str] = {}
+            visited = 0
+            while open_directories:
+                directory_fd, prefix = open_directories.pop()
                 try:
-                    info = entry.stat(follow_symlinks=False)
-                except OSError as error:
-                    raise InferenceRuntimeUnavailable("model file is unavailable") from error
-                if entry.is_symlink() or info.st_uid != os.geteuid() or info.st_mode & 0o022:
-                    raise InferenceRuntimeUnavailable("model store entry is untrusted")
-                if stat.S_ISDIR(info.st_mode):
-                    directories.append((Path(entry.path), relative + "/"))
-                elif stat.S_ISREG(info.st_mode) and info.st_nlink == 1:
-                    observed_files[relative] = Path(entry.path)
-                else:
-                    raise InferenceRuntimeUnavailable("model store entry is untrusted")
-
-        if set(observed_files) != set(expected_files):
-            raise InferenceRuntimeUnavailable("model file inventory is incomplete")
-        for relative, candidate in observed_files.items():
-            try:
-                descriptor = os.open(candidate, os.O_RDONLY | os.O_NOFOLLOW)
-                try:
-                    before = os.fstat(descriptor)
-                    observed = sha256()
-                    while chunk := os.read(descriptor, 1024 * 1024):
-                        observed.update(chunk)
-                    after = os.fstat(descriptor)
+                    visited += 1
+                    if visited > 256:
+                        raise InferenceRuntimeUnavailable(
+                            f"{label} inventory is too large"
+                        )
+                    with os.scandir(directory_fd) as entries:
+                        for entry in entries:
+                            relative = prefix + entry.name
+                            info = entry.stat(follow_symlinks=False)
+                            if info.st_uid != os.geteuid():
+                                raise InferenceRuntimeUnavailable(
+                                    f"{label} entry is untrusted"
+                                )
+                            if stat.S_ISLNK(info.st_mode):
+                                target = os.readlink(entry.name, dir_fd=directory_fd)
+                                observed_symlinks[relative] = target
+                                continue
+                            if info.st_mode & 0o022:
+                                raise InferenceRuntimeUnavailable(
+                                    f"{label} entry is untrusted"
+                                )
+                            if stat.S_ISDIR(info.st_mode):
+                                child_fd = os.open(
+                                    entry.name, directory_flags, dir_fd=directory_fd
+                                )
+                                child_info = os.fstat(child_fd)
+                                if cls._file_identity(info) != cls._file_identity(child_info):
+                                    os.close(child_fd)
+                                    raise InferenceRuntimeUnavailable(
+                                        f"{label} changed during verification"
+                                    )
+                                open_directories.append(
+                                    (child_fd, relative + "/")
+                                )
+                                continue
+                            if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+                                raise InferenceRuntimeUnavailable(
+                                    f"{label} entry is untrusted"
+                                )
+                            file_fd = os.open(
+                                entry.name,
+                                os.O_RDONLY | os.O_NOFOLLOW,
+                                dir_fd=directory_fd,
+                            )
+                            try:
+                                before = os.fstat(file_fd)
+                                if (
+                                    not stat.S_ISREG(before.st_mode)
+                                    or before.st_uid != os.geteuid()
+                                    or before.st_mode & 0o022
+                                    or before.st_nlink != 1
+                                    or cls._file_identity(before)
+                                    != cls._file_identity(info)
+                                ):
+                                    raise InferenceRuntimeUnavailable(
+                                        f"{label} entry is untrusted"
+                                    )
+                                digest = sha256()
+                                while chunk := os.read(file_fd, 1024 * 1024):
+                                    digest.update(chunk)
+                                after = os.fstat(file_fd)
+                            finally:
+                                os.close(file_fd)
+                            if cls._file_identity(before) != cls._file_identity(after):
+                                raise InferenceRuntimeUnavailable(
+                                    f"{label} changed during verification"
+                                )
+                            observed_files[relative] = "sha256:" + digest.hexdigest()
                 finally:
+                    os.close(directory_fd)
+
+            if (
+                set(observed_files) != set(expected_files)
+                or set(observed_symlinks) != set(expected_symlinks)
+            ):
+                raise InferenceRuntimeUnavailable(f"{label} inventory is incomplete")
+            if observed_files != expected_files or observed_symlinks != expected_symlinks:
+                raise InferenceRuntimeUnavailable(f"{label} digest mismatch")
+            root_after = os.fstat(root_descriptor)
+            root_path_after = root.lstat()
+            cls._audit_parent_directories(root)
+            if (
+                cls._file_identity(root_before) != cls._file_identity(root_after)
+                or cls._file_identity(root_before) != cls._file_identity(root_path_after)
+            ):
+                raise InferenceRuntimeUnavailable(f"{label} changed during verification")
+        except InferenceRuntimeUnavailable:
+            raise
+        except OSError as error:
+            raise InferenceRuntimeUnavailable(f"{label} is untrusted") from error
+        finally:
+            for descriptor, _ in open_directories:
+                try:
                     os.close(descriptor)
-            except OSError as error:
-                raise InferenceRuntimeUnavailable("model file is unavailable") from error
-            identity = lambda info: (
-                info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns,
-                info.st_ctime_ns, info.st_mode, info.st_uid, info.st_nlink,
-            )
-            if identity(before) != identity(after):
-                raise InferenceRuntimeUnavailable("model file changed during verification")
-            if "sha256:" + observed.hexdigest() != expected_files[relative]:
-                raise InferenceRuntimeUnavailable("model file digest mismatch")
+                except OSError:
+                    pass
+            if root_descriptor >= 0:
+                os.close(root_descriptor)
+
+    @classmethod
+    def _assert_model_files(cls, model_store: Path, value: dict[str, object]) -> None:
+        files = cls._inventory_map(value, "model_files", required=True, limit=128)
+        cls._assert_file_inventory(
+            model_store, files, {}, label="model store"
+        )
+
+    @classmethod
+    def _assert_runtime_files(
+        cls, runtime_payload: Path, value: dict[str, object]
+    ) -> None:
+        files = cls._inventory_map(value, "runtime_files", required=True, limit=128)
+        symlinks = cls._inventory_map(
+            value, "runtime_symlinks", required=False, limit=32
+        )
+        cls._assert_file_inventory(
+            runtime_payload, files, symlinks, label="runtime payload"
+        )
 
     def verified(self) -> VerifiedInferenceRuntime:
         value = self._read_lock(self.LOCK_PATH)
@@ -535,6 +735,7 @@ class InferenceRuntime:
         strings = (
             "ollama_executable",
             "ollama_executable_sha256",
+            "runtime_payload",
             "model_store",
             "model_id",
             "provider_model_id",
@@ -556,7 +757,11 @@ class InferenceRuntime:
             raise InferenceRuntimeUnavailable("model manifest digest is not full SHA-256")
         if value["model_id"] != value["provider_model_id"]:
             raise InferenceRuntimeUnavailable("provider model identity mismatch")
-        executable = self._resolve_locked_path(value["ollama_executable"])
+        runtime_payload = self._resolve_locked_path(value["runtime_payload"])
+        executable_relative = str(value["ollama_executable"])
+        if "/" in executable_relative:
+            raise InferenceRuntimeUnavailable("Ollama executable path is invalid")
+        executable = runtime_payload / executable_relative
         model_store = self._resolve_locked_path(value["model_store"])
         self._audit_parent_directories(model_store)
         try:
@@ -570,6 +775,7 @@ class InferenceRuntime:
             or model_store_info.st_mode & 0o022
         ):
             raise InferenceRuntimeUnavailable("locked model store is untrusted")
+        self._assert_runtime_files(runtime_payload, value)
         self._assert_model_files(model_store, value)
         executable_fd, executable_identity = self._open_verified_executable(
             executable, executable_digest
@@ -585,10 +791,12 @@ class InferenceRuntime:
                     capture_output=True,
                     text=True,
                     timeout=5,
+                    cwd=str(runtime_payload),
                     env={
                         "PATH": "/usr/bin:/bin",
                         "HOME": str(model_store.parent),
                         "OLLAMA_MODELS": str(model_store),
+                        "OLLAMA_NO_CLOUD": "true",
                     },
                     pass_fds=(executable_fd,),
                 )
@@ -614,6 +822,7 @@ class InferenceRuntime:
                 raise InferenceRuntimeUnavailable(
                     "Ollama executable changed before launch"
                 )
+            self._assert_runtime_files(runtime_payload, value)
         except Exception:
             os.close(executable_fd)
             raise
@@ -623,6 +832,7 @@ class InferenceRuntime:
             os.close(executable_fd)
             raise
         try:
+            self._assert_runtime_files(runtime_payload, value)
             observed_digest, observed_identity = self._hash_descriptor(executable_fd)
             if observed_digest != executable_digest or observed_identity != executable_identity:
                 raise InferenceRuntimeUnavailable("Ollama executable changed during launch")
@@ -639,14 +849,22 @@ class InferenceRuntime:
                 executable_fd=executable_fd,
             ).close()
             raise
-        opener = build_opener(ProxyHandler({}), _NoRedirect())
         try:
             deadline = time.monotonic() + 30
             while True:
                 if process.poll() is not None:
                     raise InferenceRuntimeUnavailable("owned Ollama runtime exited")
                 try:
-                    self._assert_api_identity(opener, value, timeout=1)
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        raise InferenceRuntimeUnavailable(
+                            "model runtime readiness timed out"
+                        )
+                    self._probe_api_identity(value, timeout=min(1, remaining))
+                    if time.monotonic() > deadline:
+                        raise InferenceRuntimeUnavailable(
+                            "model runtime readiness timed out"
+                        )
                     break
                 except InferenceRuntimeUnavailable:
                     if time.monotonic() >= deadline:
@@ -660,8 +878,9 @@ class InferenceRuntime:
             def assert_runtime() -> None:
                 if process.poll() is not None:
                     raise InferenceRuntimeUnavailable("owned Ollama runtime exited")
+                self._assert_runtime_files(runtime_payload, value)
                 self._assert_model_files(model_store, value)
-                self._assert_api_identity(opener, value)
+                self._probe_api_identity(value, timeout=5)
 
             return VerifiedInferenceRuntime(
                 adapter=_RuntimeBoundAdapter(adapter, assert_runtime),
@@ -678,6 +897,29 @@ class InferenceRuntime:
 
 
 def _main(arguments: list[str]) -> int:
+    if len(arguments) == 2 and arguments[0] == "--probe":
+        endpoint = arguments[1]
+        if endpoint != "http://127.0.0.1:11434":
+            return 2
+        opener = build_opener(ProxyHandler({}), _NoRedirect())
+        try:
+            payload = {
+                "version": InferenceRuntime._json(
+                    opener, endpoint + "/api/version", timeout=5
+                ),
+                "tags": InferenceRuntime._json(
+                    opener, endpoint + "/api/tags", timeout=5
+                ),
+            }
+        except InferenceRuntimeUnavailable:
+            return 1
+        encoded = json.dumps(
+            payload, sort_keys=True, separators=(",", ":")
+        ).encode("utf-8")
+        if len(encoded) > 2_097_152:
+            return 1
+        os.write(sys.stdout.fileno(), encoded)
+        return 0
     if len(arguments) != 6 or arguments[0] != "--supervise":
         return 2
     try:

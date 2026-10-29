@@ -7,6 +7,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import signal
 import subprocess
 import sys
 import time
@@ -37,7 +38,9 @@ class Response(BytesIO):
 
 
 def _lock(tmp_path, **overrides):
-    executable = tmp_path / "ollama"
+    runtime_payload = tmp_path / "runtime"
+    runtime_payload.mkdir()
+    executable = runtime_payload / "ollama"
     executable.write_text("synthetic executable placeholder")
     executable.chmod(0o700)
     model_store = tmp_path / "models"
@@ -51,6 +54,11 @@ def _lock(tmp_path, **overrides):
         "runtime_verified": True,
         "endpoint": "http://127.0.0.1:11434",
         "ollama_executable": executable.name,
+        "runtime_payload": runtime_payload.name,
+        "runtime_files": {
+            executable.name: "sha256:" + sha256(executable.read_bytes()).hexdigest()
+        },
+        "runtime_symlinks": {},
         "ollama_executable_sha256": "sha256:" + sha256(executable.read_bytes()).hexdigest(),
         "model_store": model_store.name,
         "model_files": {
@@ -132,7 +140,10 @@ def test_runtime_verifies_exact_executable_version_and_full_model_digest(
             return Response(json.dumps(payload).encode())
 
     monkeypatch.setattr("redaction_lab.application.inference_runtime.subprocess.run", fake_run)
-    monkeypatch.setattr("redaction_lab.application.inference_runtime.build_opener", lambda *handlers: Opener())
+    def fake_probe(runtime, actual, *, timeout):
+        runtime._assert_api_identity(Opener(), actual, timeout=timeout)
+
+    monkeypatch.setattr(InferenceRuntime, "_probe_api_identity", fake_probe)
     def fake_start(self, executable_fd, executable, model_store):
         observed["serve_fd"] = executable_fd
         observed["serve_path"] = executable
@@ -146,14 +157,17 @@ def test_runtime_verifies_exact_executable_version_and_full_model_digest(
     assert adapter.model_id == value["model_id"]
     assert verified.model_manifest_digest == value["model_manifest_digest"]
     assert verified.model_config_id == value["model_config_id"]
-    assert observed["command"] == [str(tmp_path / value["ollama_executable"]), "--version"]
+    executable = tmp_path / str(value["runtime_payload"]) / str(value["ollama_executable"])
+    assert observed["command"] == [str(executable), "--version"]
     assert not observed["command"][0].startswith("/dev/fd/")
-    assert observed["serve_path"] == tmp_path / value["ollama_executable"]
+    assert observed["serve_path"] == executable
     assert observed["kwargs"]["env"] == {
         "PATH": "/usr/bin:/bin",
         "HOME": str(tmp_path),
         "OLLAMA_MODELS": str(tmp_path / value["model_store"]),
+        "OLLAMA_NO_CLOUD": "true",
     }
+    assert observed["kwargs"]["cwd"] == str(tmp_path / value["runtime_payload"])
     assert observed["kwargs"]["pass_fds"]
     assert observed["urls"] == [
         "http://127.0.0.1:11434/api/version",
@@ -164,11 +178,38 @@ def test_runtime_verifies_exact_executable_version_and_full_model_digest(
     assert process.closed is True
 
 
+def test_api_identity_probe_has_a_hard_subprocess_deadline(monkeypatch) -> None:
+    observed = {}
+
+    def timeout(command, **kwargs):
+        observed["command"] = command
+        observed["timeout"] = kwargs["timeout"]
+        raise subprocess.TimeoutExpired(command, kwargs["timeout"])
+
+    monkeypatch.setattr(
+        "redaction_lab.application.inference_runtime.subprocess.run", timeout
+    )
+    with pytest.raises(InferenceRuntimeUnavailable, match="timed out"):
+        InferenceRuntime._probe_api_identity(
+            {
+                "endpoint": "http://127.0.0.1:11434",
+                "ollama_version": "0.40.13",
+                "provider_model_id": "model",
+                "model_manifest_digest": "sha256:" + "a" * 64,
+            },
+            timeout=0.25,
+        )
+    assert observed["timeout"] == 0.25
+    assert observed["command"][-2:] == ["--probe", "http://127.0.0.1:11434"]
+
+
 def test_runtime_rejects_executable_path_replaced_before_version_execution(
     tmp_path, monkeypatch
 ) -> None:
     path, value = _lock(tmp_path)
-    executable = tmp_path / str(value["ollama_executable"])
+    executable = (
+        tmp_path / str(value["runtime_payload"]) / str(value["ollama_executable"])
+    )
     monkeypatch.setattr(InferenceRuntime, "LOCK_PATH", path)
     real_open = InferenceRuntime._open_verified_executable
     version_called = False
@@ -201,7 +242,9 @@ def test_runtime_rejects_executable_path_replaced_during_version_execution(
     tmp_path, monkeypatch
 ) -> None:
     path, value = _lock(tmp_path)
-    executable = tmp_path / str(value["ollama_executable"])
+    executable = (
+        tmp_path / str(value["runtime_payload"]) / str(value["ollama_executable"])
+    )
     monkeypatch.setattr(InferenceRuntime, "LOCK_PATH", path)
     observed_fd = -1
     runtime_started = False
@@ -446,6 +489,8 @@ def test_owned_runtime_launches_only_pinned_binary_and_confined_model_store(
     }
     assert observed["kwargs"]["close_fds"] is True
     assert observed["kwargs"]["pass_fds"] == (descriptor,)
+    assert observed["kwargs"]["cwd"] == str(tmp_path)
+    assert observed["kwargs"]["start_new_session"] is True
 
 
 def _process_exists(pid: int) -> bool:
@@ -505,6 +550,64 @@ def test_supervisor_reaps_owned_child_after_abrupt_application_exit(tmp_path) ->
 
     _wait_for(lambda: not _process_exists(child_pid))
     _wait_for(lambda: not _process_exists(supervisor_pid))
+
+
+def test_supervisor_reaps_descendant_when_direct_runtime_exits(tmp_path) -> None:
+    executable = tmp_path / "runtime-with-descendant"
+    model_store = tmp_path / "models"
+    model_store.mkdir()
+    executable.write_text(
+        "#!/usr/bin/python3\n"
+        "import os, pathlib, subprocess\n"
+        "child=subprocess.Popen(['/bin/sleep','30'])\n"
+        "pathlib.Path(os.environ['OLLAMA_MODELS'],'descendant.pid').write_text(str(child.pid))\n"
+    )
+    executable.chmod(0o700)
+    descriptor = os.open(executable, os.O_RDONLY)
+    descendant_pid = 0
+    try:
+        owned = InferenceRuntime._launch_supervisor(
+            descriptor, executable, model_store
+        )
+        assert owned.wait(timeout=5) == 0
+        _wait_for((model_store / "descendant.pid").exists)
+        descendant_pid = int((model_store / "descendant.pid").read_text())
+        _wait_for(lambda: not _process_exists(descendant_pid))
+    finally:
+        os.close(descriptor)
+        if descendant_pid and _process_exists(descendant_pid):
+            os.kill(descendant_pid, signal.SIGKILL)
+
+
+def test_supervisor_kills_term_resistant_descendant_after_runtime_crash(tmp_path) -> None:
+    executable = tmp_path / "runtime-with-resistant-descendant"
+    model_store = tmp_path / "models"
+    model_store.mkdir()
+    executable.write_text(
+        "#!/usr/bin/python3\n"
+        "import os, pathlib, signal, time\n"
+        "pid=os.fork()\n"
+        "if pid:\n"
+        "    raise SystemExit(0)\n"
+        "signal.signal(signal.SIGTERM, signal.SIG_IGN)\n"
+        "pathlib.Path(os.environ['OLLAMA_MODELS'],'resistant.pid').write_text(str(os.getpid()))\n"
+        "time.sleep(30)\n"
+    )
+    executable.chmod(0o700)
+    descriptor = os.open(executable, os.O_RDONLY)
+    descendant_pid = 0
+    try:
+        owned = InferenceRuntime._launch_supervisor(
+            descriptor, executable, model_store
+        )
+        assert owned.wait(timeout=7) == 0
+        _wait_for((model_store / "resistant.pid").exists)
+        descendant_pid = int((model_store / "resistant.pid").read_text())
+        _wait_for(lambda: not _process_exists(descendant_pid))
+    finally:
+        os.close(descriptor)
+        if descendant_pid and _process_exists(descendant_pid):
+            os.kill(descendant_pid, signal.SIGKILL)
 
 
 def test_supervisor_start_failure_is_reaped_and_reported(tmp_path) -> None:
@@ -745,6 +848,89 @@ def test_model_file_inventory_rejects_unlisted_payload(tmp_path) -> None:
     (model_store / "unlisted-actual-model-blob").write_bytes(b"unlisted")
     with pytest.raises(InferenceRuntimeUnavailable, match="inventory is incomplete"):
         InferenceRuntime._assert_model_files(model_store, value)
+
+
+def test_model_file_inventory_rejects_root_replaced_by_matching_symlink(tmp_path) -> None:
+    _, value = _lock(tmp_path)
+    model_store = tmp_path / str(value["model_store"])
+    redirected = tmp_path / "redirected-models"
+    model_store.rename(redirected)
+    model_store.symlink_to(redirected, target_is_directory=True)
+
+    with pytest.raises(InferenceRuntimeUnavailable, match="untrusted"):
+        InferenceRuntime._assert_model_files(model_store, value)
+
+
+def test_model_file_inventory_rechecks_opened_file_mode(tmp_path, monkeypatch) -> None:
+    _, value = _lock(tmp_path)
+    model_store = tmp_path / str(value["model_store"])
+    model_file = next(model_store.iterdir())
+    real_open = os.open
+    changed = False
+
+    def writable_before_open(path, flags, *args, **kwargs):
+        nonlocal changed
+        if (Path(path) == model_file or path == model_file.name) and not changed:
+            changed = True
+            model_file.chmod(0o666)
+        return real_open(path, flags, *args, **kwargs)
+
+    monkeypatch.setattr(
+        "redaction_lab.application.inference_runtime.os.open", writable_before_open
+    )
+    with pytest.raises(InferenceRuntimeUnavailable, match="untrusted"):
+        InferenceRuntime._assert_model_files(model_store, value)
+
+
+def test_runtime_payload_inventory_rejects_substituted_inference_helper(tmp_path) -> None:
+    runtime_payload = tmp_path / "runtime"
+    runtime_payload.mkdir()
+    launcher = runtime_payload / "ollama"
+    runner = runtime_payload / "llama-server"
+    launcher.write_bytes(b"launcher")
+    runner.write_bytes(b"runner")
+    value = {
+        "runtime_files": {
+            "ollama": "sha256:" + sha256(launcher.read_bytes()).hexdigest(),
+            "llama-server": "sha256:" + sha256(runner.read_bytes()).hexdigest(),
+        },
+        "runtime_symlinks": {},
+    }
+    assert hasattr(InferenceRuntime, "_assert_runtime_files")
+    InferenceRuntime._assert_runtime_files(runtime_payload, value)
+    runner.write_bytes(b"substituted runner")
+
+    with pytest.raises(InferenceRuntimeUnavailable, match="digest mismatch"):
+        InferenceRuntime._assert_runtime_files(runtime_payload, value)
+
+
+@pytest.mark.parametrize("mutation", ["missing", "hardlink", "unapproved-symlink"])
+def test_runtime_payload_inventory_rejects_missing_or_aliased_files(
+    tmp_path, mutation
+) -> None:
+    runtime_payload = tmp_path / "runtime"
+    runtime_payload.mkdir()
+    launcher = runtime_payload / "ollama"
+    runner = runtime_payload / "llama-server"
+    launcher.write_bytes(b"launcher")
+    runner.write_bytes(b"runner")
+    value = {
+        "runtime_files": {
+            "ollama": "sha256:" + sha256(launcher.read_bytes()).hexdigest(),
+            "llama-server": "sha256:" + sha256(runner.read_bytes()).hexdigest(),
+        },
+        "runtime_symlinks": {},
+    }
+    if mutation == "missing":
+        runner.unlink()
+    elif mutation == "hardlink":
+        os.link(runner, runtime_payload / "runner-alias")
+    else:
+        runner.rename(runtime_payload / "runner-real")
+        runner.symlink_to("runner-real")
+
+    with pytest.raises(InferenceRuntimeUnavailable):
+        InferenceRuntime._assert_runtime_files(runtime_payload, value)
 
 
 @pytest.mark.parametrize("mutation", ["writable", "hardlink"])

@@ -370,7 +370,16 @@ def test_identical_run_intent_is_stable_across_service_restart(tmp_path) -> None
     assert restarted == first
 
 
-def test_legacy_branch_only_run_identity_is_rejected_without_rewrite(tmp_path) -> None:
+@pytest.mark.parametrize(
+    ("run_version", "service_id"),
+    [
+        ("run-v0.2", "application-prediction-service-v0.2"),
+        ("run-v0.3", "application-prediction-service-v0.3"),
+    ],
+)
+def test_legacy_branch_only_run_identity_is_rejected_without_rewrite(
+    tmp_path, run_version, service_id
+) -> None:
     app_store, run_store, version_id, source = _ready_source(tmp_path)
     service = PredictionService(app_store)
     _, current = service._run_definition(
@@ -395,12 +404,12 @@ def test_legacy_branch_only_run_identity_is_rejected_without_rewrite(tmp_path) -
     legacy = current.model_copy(
         update={
             "run_id": "run-" + sha256(encoded).hexdigest(),
-            "run_version": "run-v0.2",
+            "run_version": run_version,
             "created_by": json.dumps(
                 {
                     "model_config_id": "config-a",
                     "model_manifest_digest": "sha256:" + "a" * 64,
-                    "service": "application-prediction-service-v0.2",
+                    "service": service_id,
                 },
                 sort_keys=True,
                 separators=(",", ":"),
@@ -409,7 +418,7 @@ def test_legacy_branch_only_run_identity_is_rejected_without_rewrite(tmp_path) -
     )
     run_store.enqueue(source.source_id, source.targets[0].target_id, legacy)
 
-    with pytest.raises(ValueError, match="legacy v0.2"):
+    with pytest.raises(ValueError, match="legacy prediction"):
         service._stored_run(version_id)
 
     stored = run_store.runs_for_source(
