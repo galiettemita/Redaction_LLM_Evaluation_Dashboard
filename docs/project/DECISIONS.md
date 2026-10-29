@@ -1,6 +1,6 @@
 # Decision register
 
-Baseline: [MASTER_SPEC.md](MASTER_SPEC.md), imported 2026-10-06. Epoch E0068.
+Baseline: [MASTER_SPEC.md](MASTER_SPEC.md), imported 2026-10-06. Epoch E0069.
 Product decision IDs `DEC-...` are distinct from the source PDF's open-decision IDs `D01`-`D10`.
 
 ## Authority
@@ -143,3 +143,7 @@ On 2026-10-27, owner approved preparation/publication of [RL-MVP-007D E0066 Corr
 ## E0068 — Owner approves grouped Correction 01 code-only execution
 
 Owner approved [Correction 01 execution and one-file scope amendment](task_packets/RL-MVP-007D-E0066-CORRECTION-01-EXECUTION.md) on 2026-10-27. Exactly `src/redaction_lab/adapters/ollama.py` added; permit only the three named source and three named test files plus unique Backend handoff. Implement four QA defects as one grouped TDD repair with fresh exact-SHA QA/security and Research reviews. No other path/dependency, installs/downloads, PDF processing, real inference, scientific scoring, paid calls, merge or deployment. Runtime 15 GiB gate remains.
+
+## E0069 — Two-fix code-only correction planning approved, not execution
+
+Owner approved preparation/publication of [RL-MVP-007D E0069 Correction 02 plan](task_packets/RL-MVP-007D-E0069-CORRECTION-02-PLAN.md) on 2026-10-29. Proposed changes limited to `src/redaction_lab/application/inference_runtime.py`, `tests/application/test_inference_runtime.py` plus one unique Backend handoff. Address macOS incompatible `/dev/fd` version attestation and lifetime-FD leak for already-exited supervisor. This **does not authorize correction execution**. Require TDD, focused/full permitted regressions and fresh exact-SHA QA/Research reviews after separately approved execution; no download/install, runtime/PDF processing, inference, spending, merge or deployment. Candidate `f244d13` remains QA CHANGES_REQUESTED; Research handoff still unverified.
