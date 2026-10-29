@@ -60,11 +60,11 @@ def test_committed_manifest_serves_the_reviewed_frontend_byte_for_byte():
     app = create_static_app(None, ROOT, manifest["frontend"])
     expected = {
         "/": ("web/dist/index.html", "text/html; charset=utf-8", 567,
-              "1a638c34649d4fc727a446b7f06f0103562af019bfc58b8d554514cbc8d09367"),
-        "/assets/index-Dr7D93Wo.css": ("web/dist/assets/index-Dr7D93Wo.css", "text/css; charset=utf-8", 6836,
-              "5e85c428f8aea611a729cccad5194870a956bb5b794f7d1f8ba6895ae7a867bd"),
-        "/assets/index-D4KVD8ty.js": ("web/dist/assets/index-D4KVD8ty.js", "text/javascript; charset=utf-8", 216554,
-              "a088437a22f246a85be596cc2d34eddd5c6e4993e83085b2ad2975744aa8d4dc"),
+              "ec263a9100e23363eab5ff019f14c87a83133ff4a3f56b6400242856e539076e"),
+        "/assets/index-cs0q5swb.css": ("web/dist/assets/index-cs0q5swb.css", "text/css; charset=utf-8", 7054,
+              "f9558242c5506edadbfb433d023544e9ed93642dbfde2629217e100845b55706"),
+        "/assets/index-aQq_IaFa.js": ("web/dist/assets/index-aQq_IaFa.js", "text/javascript; charset=utf-8", 218846,
+              "cafc2c373b5e3210a462c16eb67f818d669a7322e8d3a8ac2c9d9f48f72142cc"),
     }
     assert app.frontend_available is True
     for route, (relative, mime, size, digest) in expected.items():

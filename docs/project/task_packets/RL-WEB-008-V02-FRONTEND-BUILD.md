@@ -12,6 +12,8 @@ Build the already-reviewed React/TypeScript API v0.2 source with the unchanged p
 
 - `web/dist/index.html`
 - `web/dist/assets/**` generated production assets only
+- `web/package.json`
+- `web/package-lock.json`
 - `web/tests/build.test.js`
 - `packaging/local/manifest.json`
 - `packaging/local/README.md`
@@ -19,7 +21,11 @@ Build the already-reviewed React/TypeScript API v0.2 source with the unchanged p
 - `tests/packaging/test_local_static.py`
 - this packet and one unique Frontend/Packaging handoff
 
-No source, API, schema, model/PDF runtime, scientific-method or dependency/lock change. `web/node_modules` is untracked build state and must not be committed.
+No source, API, schema, model/PDF runtime or scientific-method change. No dependency/lock change is allowed except the exact security amendment below. `web/node_modules` is untracked build state and must not be committed.
+
+### Security amendment — exact Vite patch
+
+Current registry audit on 2026-10-29 reports a high-severity advisory affecting the existing direct `vite@7.3.5` pin and identifies `7.3.7` as the non-major fix. This task therefore permits only `vite 7.3.5 -> 7.3.7` in `web/package.json` and a package-tool-regenerated `web/package-lock.json`. Registry evidence: MIT license, Node engine `^20.19.0 || >=22.12.0`, SHA-512 integrity, HTTPS npm tarball and unchanged dependency families; Node 24.21.0 is compatible. Keep every other direct pin and the `esbuild@0.27.2` override unchanged. Re-run complete audit and abort if high/critical findings remain.
 
 ## Dependency and build gates
 
