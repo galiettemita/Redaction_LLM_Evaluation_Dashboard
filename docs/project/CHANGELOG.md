@@ -1,3 +1,19 @@
+## E0070 — 2026-10-29 — standing Codex-led autonomous engineering
+
+Owner replaced repetitive per-task engineering approvals with [RL-OPS-002](task_packets/RL-OPS-002-AUTONOMOUS-ENGINEERING.md). Codex may create bounded task records and autonomously implement, test, independently review, correct, document, commit and normally integrate work inside confirmed product and safety boundaries. Scientific/institutional approval, paid resources, missing credentials, destructive external actions, product-scope changes and public deployment remain human gates. Published and activated the [two-file E0069 Correction 02 execution record](task_packets/RL-MVP-007D-E0070-CORRECTION-02-EXECUTION.md). Documentation-only governance change; no application tests run in this commit.
+
+## E0069 — 2026-10-29 — macOS runtime two-fix planning packet
+
+Owner approved preparation/publication only of [RL-MVP-007D E0069 Correction 02 plan](task_packets/RL-MVP-007D-E0069-CORRECTION-02-PLAN.md), addressing QA's macOS `/dev/fd` version-attestation incompatibility and supervisor lifetime FD leak. Implementation/QA re-review requires a separate execution authorization. No code changes, test execution, model/download/runtime operations, paid calls, merge or deployment occurred in this coordination update.
+
+## E0068 — 2026-10-27 — grouped Correction 01 execution authorized
+
+Owner approved code-only implementation of four QA fixes and exact addition of `src/redaction_lab/adapters/ollama.py` to file scope; packet [Correction 01 execution](task_packets/RL-MVP-007D-E0066-CORRECTION-01-EXECUTION.md). No application edits, tests, runtime operations, merge or deployment performed in coordination step.
+
+## E0067 — 2026-10-27 — grouped QA Correction 01 packet
+
+Owner approved planning/publication of [RL-MVP-007D E0066 Correction 01](task_packets/RL-MVP-007D-E0066-CORRECTION-01.md) covering four independent QA findings on code SHA `e6669c2`. Execution and out-of-scope file additions are not approved. Main implementation remains unmerged; read-only scope feasibility is next. No runtime/model operations, inference, implementation, installation, or deployment conducted in this update.
+
 ## E0066 — 2026-10-13 — emergency code-only amendment
 
 Owner approved [Task 7D Code-Only Amendment 01](task_packets/RL-MVP-007D-EMERGENCY-CODE-ONLY-AMENDMENT-01.md). Isolated branch implementation and mock/synthetic automated testing within E0065 file scope can proceed despite low storage; real runtime/model acquisition, PDF processing, inference, costs, deployment and merge remain blocked. No implementation or tests performed in this coordination update.

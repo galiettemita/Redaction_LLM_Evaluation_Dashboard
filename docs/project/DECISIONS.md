@@ -1,6 +1,6 @@
 # Decision register
 
-Baseline: [MASTER_SPEC.md](MASTER_SPEC.md), imported 2026-10-06. Epoch E0066.
+Baseline: [MASTER_SPEC.md](MASTER_SPEC.md), imported 2026-10-06. Epoch E0070.
 Product decision IDs `DEC-...` are distinct from the source PDF's open-decision IDs `D01`-`D10`.
 
 ## Authority
@@ -135,3 +135,21 @@ Owner approved on 2026-10-13 (America/New_York) [RL-MVP-007D-EMERGENCY-REAL-INFE
 
 ## E0066 — owner-approved code-only emergency amendment
 Owner approved [Task 7D Code-Only Amendment 01](task_packets/RL-MVP-007D-EMERGENCY-CODE-ONLY-AMENDMENT-01.md). Permit isolated-branch code changes and mock/synthetic automated tests within existing E0065 file scope, despite failed disk gate. Forbid downloads, installations, Podman/VM execution, real PDF processing, genuine inference, costs, deployment and merge. Maintain original runtime storage/integrity/license gates, null scoring and independent reviews.
+
+## E0067 — owner-approved grouped correction packet publication (execution not yet authorized)
+
+On 2026-10-27, owner approved preparation/publication of [RL-MVP-007D E0066 Correction 01](task_packets/RL-MVP-007D-E0066-CORRECTION-01.md) for four QA findings: crash-safe Ollama ownership, before-mutation model ID verification, oversize-response MALFORMED classification, and complete run ID semantics. This authorization covers the **correction plan only**; Codex must confirm scope feasibility, and out-of-scope files (notably `src/redaction_lab/adapters/ollama.py`), dependencies or helpers require explicit owner amendment before implementation. Existing runtime/download/real PDF/inference/spend/deployment/merge restrictions continue. Research handoff is not yet verified. Candidate `e6669c2` is CHANGES_REQUESTED, not merge-ready.
+
+## E0068 — Owner approves grouped Correction 01 code-only execution
+
+Owner approved [Correction 01 execution and one-file scope amendment](task_packets/RL-MVP-007D-E0066-CORRECTION-01-EXECUTION.md) on 2026-10-27. Exactly `src/redaction_lab/adapters/ollama.py` added; permit only the three named source and three named test files plus unique Backend handoff. Implement four QA defects as one grouped TDD repair with fresh exact-SHA QA/security and Research reviews. No other path/dependency, installs/downloads, PDF processing, real inference, scientific scoring, paid calls, merge or deployment. Runtime 15 GiB gate remains.
+
+## E0069 — Two-fix code-only correction planning approved, not execution
+
+Owner approved preparation/publication of [RL-MVP-007D E0069 Correction 02 plan](task_packets/RL-MVP-007D-E0069-CORRECTION-02-PLAN.md) on 2026-10-29. Proposed changes limited to `src/redaction_lab/application/inference_runtime.py`, `tests/application/test_inference_runtime.py` plus one unique Backend handoff. Address macOS incompatible `/dev/fd` version attestation and lifetime-FD leak for already-exited supervisor. This **does not authorize correction execution**. Require TDD, focused/full permitted regressions and fresh exact-SHA QA/Research reviews after separately approved execution; no download/install, runtime/PDF processing, inference, spending, merge or deployment. Candidate `f244d13` remains QA CHANGES_REQUESTED; Research handoff still unverified.
+
+## E0070 — Standing Codex-led engineering authority
+
+On 2026-10-29 the product owner replaced repeated per-task engineering approvals with [RL-OPS-002](task_packets/RL-OPS-002-AUTONOMOUS-ENGINEERING.md). Codex may create bounded task records and autonomously plan, implement, test, independently review, correct, document, commit and normally integrate work within confirmed product and safety boundaries. This standing authority activates [E0069 Correction 02 execution](task_packets/RL-MVP-007D-E0070-CORRECTION-02-EXECUTION.md) without a separate repair approval.
+
+This is an engineering-process authorization, not a scientific or institutional approval. Paid resources without budget, missing credentials, legal/data permission, destructive external actions, unresolved critical security risk, confirmed product-scope changes, public deployment/distribution, and human scoring/benchmark/release validation remain nondelegable gates. DEC-001 through DEC-022 and UNKNOWN/null, reference-isolation, provenance and immutable-record requirements remain controlling.
