@@ -162,7 +162,7 @@ an unsafe/invalid package manifest prevents launch entirely.
       routing/framing/confinement checks pass with a frozen fixture inventory.
 - [x] Frontend verification fails closed and preserves API-only diagnostics.
 - [x] RL-WEB-008 frontend exact-candidate automated QA/security review passed.
-- [ ] Current Task 9B correction exact-candidate independent review.
+- [x] Task 9B correction exact-candidate independent review passed.
 - [x] Genuine API v0.2 frontend build, reviewed hash-pinned integration and
       synthetic headless-Chrome browser workflow.
 - [x] Reference-host PDF worker and synthetic-only Ollama/model qualification.
