@@ -94,6 +94,8 @@ def test_qualification_artifacts_bind_observed_worker_and_dependency_inventory()
     assert len(integrity["wheelhouse"]) == 15
     assert sbom["bomFormat"] == "CycloneDX"
     assert sbom["specVersion"] == "1.5"
+    assert len(sbom["components"]) == 55
+    assert len({item["purl"] for item in sbom["components"]}) == 55
     components = {(item["name"], item["version"]) for item in sbom["components"]}
     assert ("Alpine Linux", "3.24.3") in components
     assert ("pillow", "13.0.0") in components
