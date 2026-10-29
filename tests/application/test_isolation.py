@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import replace
 from hashlib import sha256
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -25,6 +26,7 @@ class FakeRunner:
         self.response = response
         self.timed_out = timed_out
         self.command: tuple[str, ...] | None = None
+        self.closed = False
 
     def inspect(self, policy: RuntimePolicy) -> RuntimeInspection:
         return self.inspection
@@ -35,12 +37,19 @@ class FakeRunner:
             raise TimeoutError("deadline")
         return 0, self.response, b""
 
+    def close(self) -> None:
+        self.closed = True
+
 
 def _policy() -> RuntimePolicy:
     return RuntimePolicy(
         executable="/opt/redaction-lab/bin/podman",
+        executable_sha256="sha256:" + "a" * 64,
+        executable_version="6.1.4",
         machine_name="redaction-lab-pdf-v1",
         image_digest="sha256:" + "1" * 64,
+        runtime_root="/opt/redaction-lab/runtime/pdf-worker",
+        containers_conf="/opt/redaction-lab/runtime/pdf-worker/containers.conf",
     )
 
 
@@ -48,6 +57,8 @@ def _inspection(**changes: object) -> RuntimeInspection:
     value = RuntimeInspection(
         executable_available=True, machine_name="redaction-lab-pdf-v1",
         rootless=True, machine_volumes=(), image_digest="sha256:" + "1" * 64,
+        executable_sha256="sha256:" + "a" * 64,
+        executable_version="6.1.4",
     )
     return replace(value, **changes)
 
@@ -85,11 +96,182 @@ def test_runtime_absence_or_host_volume_share_fails_closed() -> None:
             )
 
 
-def test_shipped_unverified_runtime_lock_cannot_create_policy() -> None:
-    lock = Path(__file__).resolve().parents[2] / "packaging/pdf-worker/runtime.lock"
+def test_unverified_runtime_lock_cannot_create_policy(tmp_path: Path) -> None:
+    lock = tmp_path / "runtime.lock"
+    lock.write_text(json.dumps({"runtime_verified": False}))
 
     with pytest.raises(RuntimeUnavailable, match="unverified"):
-        RuntimePolicy.from_lock(lock)
+        RuntimePolicy.from_lock(lock, application_root=tmp_path)
+
+
+def test_runtime_lock_resolves_only_exact_application_owned_paths(tmp_path: Path) -> None:
+    runtime = tmp_path / "runtime/pdf-worker"
+    executable = runtime / "podman/bin/podman"
+    executable.parent.mkdir(parents=True)
+    executable.write_bytes(b"synthetic podman")
+    executable.chmod(0o700)
+    (runtime / "state").mkdir()
+    (runtime / "containers.conf").write_text("[machine]\nvolumes=[]\n")
+    payload = {
+        "runtime_verified": True,
+        "protocol_version": WORKER_PROTOCOL_VERSION,
+        "podman_executable": "runtime/pdf-worker/podman/bin/podman",
+        "podman_executable_sha256": "sha256:" + sha256(executable.read_bytes()).hexdigest(),
+        "podman_version": "6.1.4",
+        "runtime_state": "runtime/pdf-worker/state",
+        "containers_conf": "runtime/pdf-worker/containers.conf",
+        "machine_name": "redaction-lab-pdf-v1",
+        "machine_image_digest": "sha256:" + "2" * 64,
+        "base_image_digest": "sha256:" + "3" * 64,
+        "image_digest": "sha256:" + "4" * 64,
+        "timeout_seconds": 60,
+    }
+    lock = tmp_path / "runtime.lock"
+    lock.write_text(json.dumps(payload))
+
+    policy = RuntimePolicy.from_lock(lock, application_root=tmp_path)
+
+    assert policy.executable == str(executable)
+    assert policy.runtime_root == str(runtime)
+    assert policy.containers_conf == str(runtime / "containers.conf")
+    for replacement in (
+        "/tmp/podman",
+        "runtime/pdf-worker/../podman",
+        "runtime/other/podman",
+    ):
+        payload["podman_executable"] = replacement
+        lock.write_text(json.dumps(payload))
+        with pytest.raises(RuntimeUnavailable):
+            RuntimePolicy.from_lock(lock, application_root=tmp_path)
+    payload["podman_executable"] = "runtime/pdf-worker/podman/bin/podman"
+    for key, replacement in (
+        ("machine_name", "other-machine"),
+        ("timeout_seconds", 0),
+        ("image_digest", "sha256:not-a-digest"),
+    ):
+        original = payload[key]
+        payload[key] = replacement
+        lock.write_text(json.dumps(payload))
+        with pytest.raises(RuntimeUnavailable):
+            RuntimePolicy.from_lock(lock, application_root=tmp_path)
+        payload[key] = original
+
+
+def test_real_runner_binds_executable_version_environment_and_machine_policy(
+    tmp_path: Path,
+) -> None:
+    runtime = tmp_path / "runtime"
+    executable = runtime / "podman/bin/podman"
+    executable.parent.mkdir(parents=True)
+    state = runtime / "state"
+    machine_config = state / "config/containers/podman/machine/applehv"
+    machine_config.mkdir(parents=True)
+    (machine_config / "redaction-lab-pdf-v1.json").write_text(
+        json.dumps({
+            "Name": "redaction-lab-pdf-v1",
+            "Mounts": [],
+            "HostUser": {"Rootful": False},
+        })
+    )
+    (state / "data").mkdir()
+    (state / "tmp").mkdir()
+    conf = runtime / "containers.conf"
+    conf.write_text(
+        f'[engine]\nhelper_binaries_dir=["{runtime}/podman/bin"]\n'
+        '[machine]\nvolumes=[]\n'
+        '[containers]\nnetns="none"\nread_only=true\nno_hosts=true\n'
+    )
+    executable.write_text(
+        "#!/bin/sh\n"
+        f"test \"$XDG_CONFIG_HOME\" = \"{state}/config\" || exit 41\n"
+        f"test \"$XDG_DATA_HOME\" = \"{state}/data\" || exit 42\n"
+        f"test \"$XDG_RUNTIME_DIR\" = \"{state}/tmp\" || exit 43\n"
+        f"test \"$CONTAINERS_CONF\" = \"{conf}\" || exit 44\n"
+        "if test \"$1\" = --version; then echo 'podman version 6.1.4'; exit 0; fi\n"
+        "if test \"$1\" = machine; then printf '%s' '[{\"Name\":\"redaction-lab-pdf-v1\",\"Rootful\":false,\"State\":\"running\"}]'; exit 0; fi\n"
+        "printf '%s' '[{\"Id\":\"1111111111111111111111111111111111111111111111111111111111111111\",\"RepoDigests\":[]}]'\n"
+    )
+    executable.chmod(0o700)
+    policy = RuntimePolicy(
+        executable=str(executable),
+        executable_sha256="sha256:" + sha256(executable.read_bytes()).hexdigest(),
+        executable_version="6.1.4",
+        machine_name="redaction-lab-pdf-v1",
+        image_digest="sha256:" + "1" * 64,
+        runtime_root=str(runtime),
+        containers_conf=str(conf),
+    )
+    inspection = SubprocessPodmanRunner().inspect(policy)
+
+    assert inspection.executable_available is True
+    assert inspection.machine_name == "redaction-lab-pdf-v1"
+    assert inspection.rootless is True
+    assert inspection.machine_volumes == ()
+    assert inspection.image_digest == "sha256:" + "1" * 64
+    assert inspection.executable_sha256 == policy.executable_sha256
+    assert inspection.executable_version == "6.1.4"
+
+    conf.write_text('[machine]\nvolumes=["/Users:/Users"]\n')
+    with pytest.raises(RuntimeUnavailable, match="configuration"):
+        SubprocessPodmanRunner().inspect(policy)
+
+
+def test_real_runner_rejects_path_replacement_during_version_attestation(
+    tmp_path: Path, monkeypatch
+) -> None:
+    executable = tmp_path / "podman"
+    executable.write_bytes(b"trusted")
+    executable.chmod(0o700)
+    conf = tmp_path / "containers.conf"
+    conf.write_text(
+        f'[engine]\nhelper_binaries_dir=["{tmp_path}/podman/bin"]\n'
+        '[machine]\nvolumes=[]\n'
+        '[containers]\nnetns="none"\nread_only=true\nno_hosts=true\n'
+    )
+    (tmp_path / "state/config").mkdir(parents=True)
+    (tmp_path / "state/data").mkdir()
+    (tmp_path / "state/tmp").mkdir()
+    policy = RuntimePolicy(
+        executable=str(executable),
+        executable_sha256="sha256:" + sha256(executable.read_bytes()).hexdigest(),
+        executable_version="6.1.4",
+        machine_name="redaction-lab-pdf-v1",
+        image_digest="sha256:" + "1" * 64,
+        runtime_root=str(tmp_path),
+        containers_conf=str(conf),
+    )
+
+    def replace_path(*args, **kwargs):
+        executable.rename(tmp_path / "original")
+        executable.write_bytes(b"replacement")
+        executable.chmod(0o700)
+        return type("Completed", (), {"stdout": b"podman version 6.1.4\n"})()
+
+    monkeypatch.setattr("redaction_lab.application.isolation.subprocess.run", replace_path)
+    with pytest.raises(RuntimeUnavailable, match="changed"):
+        SubprocessPodmanRunner().inspect(policy)
+
+
+def test_runtime_path_audit_rejects_symlinked_final_directory(tmp_path: Path) -> None:
+    runtime = tmp_path / "runtime"
+    real_bin = tmp_path / "outside-bin"
+    (runtime / "podman").mkdir(parents=True)
+    real_bin.mkdir()
+    (runtime / "podman/bin").symlink_to(real_bin, target_is_directory=True)
+
+    with pytest.raises(RuntimeUnavailable, match="untrusted"):
+        SubprocessPodmanRunner._audit_runtime_path(
+            runtime, runtime / "podman/bin"
+        )
+
+
+def test_availability_probe_releases_runner_attestation() -> None:
+    runner = FakeRunner(_inspection())
+    probe = NonAuthoritativePdfWorkerProbe(_policy(), runner)
+
+    probe.ensure_available()
+
+    assert runner.closed is True
 
 
 def test_application_worker_accepts_no_caller_policy_or_runner() -> None:
@@ -113,7 +295,7 @@ def test_verified_runtime_uses_hardened_container_command(monkeypatch) -> None:
     command = runner.command
     assert command is not None
     for required in (
-        "--network=none", "--read-only", "--cap-drop=all",
+        "--interactive", "--network=none", "--read-only", "--cap-drop=all",
         "--security-opt=no-new-privileges", "--pids-limit=32",
         "--memory=1536m", "--memory-swap=1536m", "--cpus=1", "--pull=never",
     ):
@@ -144,12 +326,31 @@ def test_nonce_hash_project_role_version_and_timeout_are_fail_closed(monkeypatch
         )
 
 
-def test_subprocess_runner_bounds_stdout_before_returning() -> None:
-    runner = SubprocessPodmanRunner(max_stdout_bytes=64)
+def test_subprocess_runner_bounds_stdout_before_returning(tmp_path: Path) -> None:
+    executable = tmp_path / "podman"
+    executable.write_text("#!/bin/sh\nhead -c 4096 /dev/zero | tr '\\000' x\n")
+    executable.chmod(0o700)
+    class TrackingRunner(SubprocessPodmanRunner):
+        cleanup_had_environment = False
+
+        def _terminate_container(self, command):
+            self.cleanup_had_environment = self._environment is not None
+
+    runner = TrackingRunner(max_stdout_bytes=64)
+    runner._executable_fd = os.open(executable, os.O_RDONLY)  # type: ignore[attr-defined]
+    runner._executable_identity = runner._file_identity(  # type: ignore[attr-defined]
+        os.fstat(runner._executable_fd)  # type: ignore[attr-defined]
+    )
+    runner._environment = {  # type: ignore[attr-defined]
+        "PATH": "/usr/bin:/bin",
+        "XDG_CONFIG_HOME": str(tmp_path / "state/config"),
+        "CONTAINERS_CONF": str(tmp_path / "containers.conf"),
+    }
 
     with pytest.raises(RuntimeUnavailable, match="output limit"):
         runner.run(
-            ("/usr/bin/python3", "-c", "import sys; sys.stdout.write('x' * 4096)"),
+            (str(executable), "--connection", "probe"),
             input_bytes=b"",
             timeout_seconds=5,
         )
+    assert runner.cleanup_had_environment is True

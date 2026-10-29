@@ -24,7 +24,18 @@ def test_packaging_declares_no_network_no_host_mounts_and_pinned_runtime() -> No
     assert "volumes = []" in configuration
     assert runtime["protocol_version"] == "pdf-worker-v1"
     assert runtime["image_digest"].startswith("sha256:")
-    assert runtime["runtime_verified"] is False
+    assert runtime["runtime_verified"] is True
+    assert runtime["podman_executable"] == "runtime/pdf-worker/podman/bin/podman"
+    assert runtime["podman_executable_sha256"] == (
+        "sha256:9603079ca32a9fa88f0aa2b3f9e41c9365d7db2dc19c75857a1ec40aee6e5837"
+    )
+    assert runtime["podman_version"] == "6.1.4"
+    assert runtime["machine_image_digest"] == (
+        "sha256:633971788fcfe7df04f49da53f06c98b28933c5df2f684d57c2f9831411cac77"
+    )
+    assert runtime["image_digest"] == (
+        "sha256:7a78eaf7ef812d354f0abe13f40c6c0a4e3684d94f72002245c5249249bf293b"
+    )
 
 
 def test_scripts_are_offline_and_never_embed_user_paths_or_credentials() -> None:
@@ -45,3 +56,45 @@ def test_worker_lock_excludes_known_vulnerable_pdf_parser_versions() -> None:
     assert "pypdf==6.21.4" in requirements
     assert "pillow==12.3.0" not in requirements
     assert "pypdf==6.20.0" not in requirements
+
+
+def test_worker_base_is_exact_audited_arm64_image() -> None:
+    containerfile = (ROOT / "packaging/pdf-worker/Containerfile").read_text()
+    runtime = json.loads((ROOT / "packaging/pdf-worker/runtime.lock").read_text())
+    sources = json.loads(
+        (ROOT / "packaging/pdf-worker/qualification-sources.json").read_text()
+    )
+    digest = "sha256:5642cb13b1fc85462dec7ad9d954623a57fe1e65981e1508dff894942eaa8694"
+
+    assert f"python:3.12.16-alpine3.24@{digest}" in containerfile
+    assert runtime["base_image_digest"] == digest
+    assert runtime["python_version"] == "3.12.16"
+    assert sources["base_image"]["arm64_manifest_digest"] == digest
+    assert sources["base_image"]["docker_hub_scan"]["critical"] == 0
+    assert sources["base_image"]["docker_hub_scan"]["high"] == 0
+
+
+def test_qualification_artifacts_bind_observed_worker_and_dependency_inventory() -> None:
+    runtime = json.loads((ROOT / "packaging/pdf-worker/runtime.lock").read_text())
+    sources = json.loads(
+        (ROOT / "packaging/pdf-worker/qualification-sources.json").read_text()
+    )
+    integrity = json.loads(
+        (ROOT / "packaging/pdf-worker/integrity-manifest.json").read_text()
+    )
+    sbom = json.loads((ROOT / "packaging/pdf-worker/sbom.cdx.json").read_text())
+
+    assert sources["worker_image"]["local_image_id"] == runtime["image_digest"]
+    assert integrity["artifacts"]["worker_image_id"]["sha256"] == (
+        runtime["image_digest"].removeprefix("sha256:")
+    )
+    assert integrity["artifacts"]["podman_machine_image"]["sha256"] == (
+        runtime["machine_image_digest"].removeprefix("sha256:")
+    )
+    assert len(integrity["wheelhouse"]) == 15
+    assert sbom["bomFormat"] == "CycloneDX"
+    assert sbom["specVersion"] == "1.5"
+    components = {(item["name"], item["version"]) for item in sbom["components"]}
+    assert ("Alpine Linux", "3.24.3") in components
+    assert ("pillow", "13.0.0") in components
+    assert ("pypdf", "6.21.4") in components

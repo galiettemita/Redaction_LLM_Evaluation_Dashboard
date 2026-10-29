@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "audited_at": "2026-10-29T15:55:00Z",
+  "host": {
+    "architecture": "arm64",
+    "macos_version": "26.5.1",
+    "memory_bytes": 34359738368,
+    "available_disk_gib_at_preflight": 17
+  },
+  "podman": {
+    "version": "6.1.4",
+    "license": "Apache-2.0",
+    "source": "https://github.com/podman-container-tools/podman/releases/download/v6.1.4/podman-installer-macos-arm64.pkg",
+    "size": 76099040,
+    "sha256": "48f675622f66233ca2116e67fdab41ed9dbcc25b48b78a8e6ef0be6549031d22",
+    "package_signature": "Developer ID Installer: Red Hat, Inc. (HYSCB8KRL2)",
+    "package_notarization": "trusted by the Apple notary service",
+    "portable_payload": {
+      "podman_sha256": "9603079ca32a9fa88f0aa2b3f9e41c9365d7db2dc19c75857a1ec40aee6e5837",
+      "gvproxy_sha256": "2c6debf5a5cc92f0e191659730664323c2078437a17c80609552949e5cb860aa",
+      "vfkit_sha256": "acd7cb319125bb708857647debb3e7d14db3a5d61a7adcad93610b00408381a2",
+      "krunkit_sha256": "fa83de64a6f80ac5780e6aaa0d412044acec816d566a016c4ed8b7de68a494f5",
+      "podman_mac_helper_sha256": "e26bf83e1286cdb97ccc617e4f7d8b417ce7449259438249c3d65229bc9e5ef3"
+    },
+    "installation_note": "The signed package requires root and has destructive /opt/podman preinstall behavior. Qualification uses only the code-signed payload extracted into task-owned state; package scripts are never run."
+  },
+  "machine_image": {
+    "product": "Podman Machine OS AppleHV aarch64",
+    "release": "v6.1.3",
+    "license": "Apache-2.0 build definitions plus Fedora/component licenses",
+    "source": "https://github.com/podman-container-tools/podman-machine-os/releases/download/v6.1.3/podman-machine.aarch64.applehv.raw.zst",
+    "release_api": "https://api.github.com/repos/podman-container-tools/podman-machine-os/releases/tags/v6.1.3",
+    "size": 937980979,
+    "sha256": "633971788fcfe7df04f49da53f06c98b28933c5df2f684d57c2f9831411cac77",
+    "operational_evidence": "Initialized by Podman 6.1.4 with provider applehv, no mounts, rootless host user, 2 CPUs, 2048 MiB RAM, 512 MiB swap, and a 10 GiB disk.",
+    "rejected_alternative": {
+      "product": "generic Fedora CoreOS 44.20261012.3.1 AppleHV image",
+      "sha256": "dbac5af45f6e9c464442feec6d427227810fbfe84a7945a49f9cb4a06a3e5a6c",
+      "reason": "Cryptographically authentic but not a supported Podman Machine OS image; repeat boot entered initramfs emergency mode, so the task-created VM and download were removed."
+    }
+  },
+  "base_image": {
+    "name": "docker.io/library/python:3.12.16-alpine3.24",
+    "license": "PSF-2.0 and Alpine/package component licenses",
+    "index_digest": "sha256:44bf3bcc455e0c9ccd912b78f39019b2f7e9d2f4fb47c6d6973c7638a99aff14",
+    "arm64_manifest_digest": "sha256:5642cb13b1fc85462dec7ad9d954623a57fe1e65981e1508dff894942eaa8694",
+    "arm64_compressed_size": 18527125,
+    "docker_hub_scan": {
+      "critical": 0,
+      "high": 0,
+      "medium": 5,
+      "low": 1,
+      "unknown": 1
+    }
+  },
+  "worker_image": {
+    "local_image_id": "sha256:7a78eaf7ef812d354f0abe13f40c6c0a4e3684d94f72002245c5249249bf293b",
+    "manifest_digest": "sha256:cc9988ec0166c840e4d04eb115757aa8d3f7a193355c600725217e20f3115aba",
+    "architecture": "arm64",
+    "os": "linux",
+    "size": 170248815,
+    "user": "65532:65532",
+    "entrypoint": ["python", "-m", "redaction_lab.application.worker_protocol"],
+    "build_policy": "Exact pinned base already present; --pull=never; --network=none; complete hash-locked local wheelhouse.",
+    "runtime_canaries": {
+      "network_none": "PASS",
+      "host_paths_absent": "PASS",
+      "mounts_empty": "PASS",
+      "read_only_root": "PASS",
+      "capabilities_dropped": "PASS",
+      "no_new_privileges": "PASS",
+      "non_root_uid": "PASS",
+      "pids_memory_cpu_shm_nofile_limits": "PASS",
+      "synthetic_framed_protocol": "PASS"
+    }
+  },
+  "python_dependencies": [
+    ["annotated-types", "0.8.0", "MIT"],
+    ["cffi", "2.1.1", "MIT-0"],
+    ["charset-normalizer", "3.5.2", "MIT"],
+    ["cryptography", "50.0.2", "Apache-2.0 OR BSD-3-Clause"],
+    ["pdfminer-six", "20260107", "MIT"],
+    ["pdfplumber", "0.11.10", "MIT"],
+    ["pillow", "13.0.0", "MIT-CMU"],
+    ["pycparser", "3.11", "BSD-3-Clause"],
+    ["pydantic", "2.14.0", "MIT"],
+    ["pydantic-core", "2.50.0", "MIT"],
+    ["pypdf", "6.21.4", "BSD-3-Clause"],
+    ["pypdfium2", "5.14.0", "BSD-3-Clause AND Apache-2.0 AND bundled component licenses"],
+    ["reportlab", "4.5.1", "BSD-3-Clause-like"],
+    ["typing-extensions", "4.16.0", "PSF-2.0"],
+    ["typing-inspection", "0.4.4", "MIT"]
+  ],
+  "python_package_advisory_check": "PyPI JSON reported zero known vulnerabilities for every exact version at audited_at. The previous Pillow 12.3.0 and pypdf 6.20.0 pins were rejected and replaced before acquisition."
+}

@@ -1,6 +1,6 @@
 # RL-RUNTIME-009A — PDF worker feasibility and qualification
 
-Status: ACTIVE under RL-OPS-002 standing engineering authority. Decision epoch E0071.  
+Status: IMPLEMENTED_PENDING_INDEPENDENT_REVIEW under RL-OPS-002 standing engineering authority. Decision epoch E0071.
 Baseline: `34e4c06f8840d01ca5c5b99be778467835c79c28`.  
 Accountable role: Backend / Infrastructure; Engineering Lead integrates after independent exact-candidate review.
 
@@ -34,8 +34,12 @@ Source/package changes are limited to:
 - `tests/application/test_isolation.py`
 - `tests/application/test_worker_protocol.py`
 - `tests/application/test_document_worker.py`
+- `packaging/local/manifest.json`
+- `packaging/local/preflight.sh`
 
 New qualification artifacts may be added only under `packaging/pdf-worker/` for an SBOM, license/source inventory, and integrity manifest. One unique `docs/project/handoffs/RL-RUNTIME-009A-backend-<UTC>-<SHA>.md` is authorized. This task record may be updated with observed evidence. No database schema, API contract, prediction/reference contract, frontend, scoring, model-runtime, or shared canonical-state file is in scope.
+
+The local package manifest and read-only preflight are included narrowly as affected consumers: they must pin the refreshed parser versions and exact qualified PDF-worker lock while continuing to report that the distributable package does not bundle a clean-recipient runtime. Model-runtime and release gates remain unchanged.
 
 The project dependency declaration and generated lock are included narrowly because Phase 1 found published hostile-file parsing vulnerabilities in the previously locked Pillow `12.3.0` and pypdf `6.20.0`. They may be refreshed only to current compatible fixed releases, with regenerated hash locks and full regression evidence; no unrelated dependency or project-metadata change is permitted.
 
@@ -55,3 +59,11 @@ Host actions are limited to zero-cost verified Podman installation if no privile
 Stop or retain `runtime_verified: false` for inadequate disk reserve; missing/changed official source, digest, signature, license or architecture support; privileged credential requirement; runtime policy mismatch; any isolation canary failure; nondeterministic or unbound output; required regression failure; or need for an out-of-scope file/schema/contract change.
 
 No private/restricted PDF, model acquisition or inference, provider call, paid service, scientific/benchmark approval, public deployment/distribution, clean-recipient claim, force push, or destructive cleanup is authorized. Qualification on this host is not institutional permission and is not a release claim.
+
+## Observed qualification evidence
+
+- Official signed/notarized Podman 6.1.4 arm64 payload was hash-attested and installed without package scripts or privileges beneath the application runtime root.
+- Official Podman Machine OS v6.1.3 AppleHV arm64 release asset was size/hash-attested; the dedicated machine is rootless, mount-free, helper-free, stopped at handoff, and uses 2 CPUs, 2048 MiB memory, 512 MiB swap and a 10 GiB disk.
+- The exact Python 3.12.16 Alpine 3.24 arm64 base and complete hash-locked wheelhouse produced worker image `sha256:7a78eaf7ef812d354f0abe13f40c6c0a4e3684d94f72002245c5249249bf293b` with manifest `sha256:cc9988ec0166c840e4d04eb115757aa8d3f7a193355c600725217e20f3115aba`.
+- No-network, no-host-path, empty-mount, read-only-root, non-root, dropped-capability, no-new-privileges, bounded-resource, framed synthetic PDF, application-launcher and timeout-cleanup canaries passed. A missing Podman `--interactive` integration defect was found by the first framed canary, reproduced, corrected under TDD, and requalified.
+- Final local regressions: 689 Python tests; 24 Node tests; Node typecheck/build/audit; Python compilation; uv lock, shell syntax, JSON, lock-hash and diff checks. Independent exact-candidate review remains required before integration.

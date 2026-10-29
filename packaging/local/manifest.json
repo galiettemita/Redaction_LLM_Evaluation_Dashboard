@@ -29,7 +29,7 @@
   "dependency_pins": {
     "pdfplumber": "0.11.10",
     "pdfminer.six": "20260107",
-    "pypdf": "6.20.0",
+    "pypdf": "6.21.4",
     "pypdfium2": "5.14.0",
     "pydantic": "2.14.0",
     "pydantic-core": "2.50.0",
@@ -37,7 +37,7 @@
     "typing-extensions": "4.16.0",
     "typing-inspection": "0.4.4",
     "reportlab": "4.5.1",
-    "Pillow": "12.3.0",
+    "Pillow": "13.0.0",
     "charset-normalizer": "3.5.2",
     "cryptography": "50.0.2",
     "cffi": "2.1.1",
@@ -45,7 +45,8 @@
   },
   "pdf_worker": {
     "lock_path": "packaging/pdf-worker/runtime.lock",
-    "lock_sha256": "aec1716357b99cffe877bcfff0a2610ad5932da4a5fa9326cdf9d86ff6e8996a",
+    "lock_sha256": "de5a1b72ed4a5f20445f0783e92ad47422b48b7455dd6d2fab6406983e3bf820",
+    "lock_qualified_on_reference_host": true,
     "runtime_qualified": false
   },
   "model_runtime": {
