@@ -1,6 +1,6 @@
 # Current state
 
-Updated: 2026-10-11 (America/New_York). Coordination epoch: **E0068**.
+Updated: 2026-10-11 (America/New_York). Coordination epoch: **E0069**.
 Integration branch: `main`. Canonical writer: **Lead/Architect**, within the owner's approved scope.
 Resolve the actual HEAD with GitHub; do not infer a current SHA from this file's timestamp.
 
@@ -106,3 +106,5 @@ E0066: Owner authorized [emergency code-only amendment](task_packets/RL-MVP-007D
 E0067: Backend E0066 code candidate `e6669c2234dbb683225b40e3642551092628e6aa` published in branch head `0998af7afb0218e9bceebe1eb571a62228133c9f` (NOT MERGED). Two QA/security reviews on that exact candidate both CHANGES_REQUESTED, latest `2f39c26cda6b13344abf558777ceb981687a06af` identifies crash-orphaned Ollama, substituted model identity before database writes, oversized HTTP response classification and incomplete semantic run ID. Research review publication remains unverified. Owner authorized publishing [grouped Correction 01 packet](task_packets/RL-MVP-007D-E0066-CORRECTION-01.md), NOT its execution or new source files. Codex next performs a read-only exact-file-scope feasibility check; out-of-scope `adapters/ollama.py` or new supervisor helper requires explicit owner amendment. No installations, real PDF/inference, costs, deployment or merge.
 
 E0068: Owner approved [Correction 01 code-only execution](task_packets/RL-MVP-007D-E0066-CORRECTION-01-EXECUTION.md), adding only `src/redaction_lab/adapters/ollama.py` to strict six source/test paths plus one Backend handoff. Codex may perform grouped four-defect TDD repair on existing isolated E0066 branch; implementation NOT YET EXECUTED under E0068. Exact-SHA independent QA/security and Research review required; no merge, runtime installs, PDFs, real inference, spending or deployment. Existing `e6669c2` remains CHANGES_REQUESTED.
+
+E0069: Owner approved publication only of [RL-MVP-007D two-fix Correction 02 plan](task_packets/RL-MVP-007D-E0069-CORRECTION-02-PLAN.md). QA CHANGES_REQUESTED on exact `f244d1337e51dd188cd2253f3845c5a3d243e144` for macOS `/dev/fd` version-command incompatibility and lifetime-pipe FD leakage after supervisor exit. Research independent handoff not verified. Proposed scope only `application/inference_runtime.py` and its existing test file plus unique Backend handoff. **Implementation NOT AUTHORIZED / NOT STARTED**. Continue runtime, model, inference, install, spending, merge and deployment holds.
