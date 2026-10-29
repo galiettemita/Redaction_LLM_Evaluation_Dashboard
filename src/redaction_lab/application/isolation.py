@@ -145,6 +145,9 @@ class SubprocessPodmanRunner:
         self.max_stdout_bytes = max_stdout_bytes
         self._executable_fd: int | None = None
         self._executable_identity: tuple[int, ...] | None = None
+        self._connection_fd: int | None = None
+        self._connection_identity: tuple[int, ...] | None = None
+        self._connection_path: Path | None = None
         self._environment: dict[str, str] | None = None
 
     @staticmethod
@@ -162,11 +165,16 @@ class SubprocessPodmanRunner:
 
     def _release_executable(self) -> None:
         descriptor, self._executable_fd = self._executable_fd, None
+        connection_descriptor, self._connection_fd = self._connection_fd, None
         self._executable_identity = None
+        self._connection_identity = None
+        self._connection_path = None
         self._environment = None
-        if descriptor is not None:
+        for owned_descriptor in (descriptor, connection_descriptor):
+            if owned_descriptor is None:
+                continue
             try:
-                os.close(descriptor)
+                os.close(owned_descriptor)
             except OSError:
                 pass
 
@@ -249,6 +257,25 @@ class SubprocessPodmanRunner:
             or self._file_identity(path_info) != self._executable_identity
         ):
             raise RuntimeUnavailable(f"Podman executable changed {phase}")
+
+    def _assert_connection_identity(self, phase: str) -> None:
+        if (
+            self._connection_fd is None
+            or self._connection_identity is None
+            or self._connection_path is None
+        ):
+            raise RuntimeUnavailable("Podman connection is not retained")
+        try:
+            descriptor_info = os.fstat(self._connection_fd)
+            path_info = self._connection_path.lstat()
+        except OSError as error:
+            raise RuntimeUnavailable(f"Podman connection changed {phase}") from error
+        if (
+            stat.S_ISLNK(path_info.st_mode)
+            or self._file_identity(descriptor_info) != self._connection_identity
+            or self._file_identity(path_info) != self._connection_identity
+        ):
+            raise RuntimeUnavailable(f"Podman connection changed {phase}")
 
     @staticmethod
     def _runtime_environment(policy: RuntimePolicy) -> dict[str, str]:
@@ -360,6 +387,99 @@ class SubprocessPodmanRunner:
             raise RuntimeUnavailable("Podman machine configuration is invalid")
         return value
 
+    def _bind_connection_configuration(
+        self, policy: RuntimePolicy, machine: dict[str, object]
+    ) -> None:
+        path = (
+            Path(policy.runtime_root)
+            / "state/config/containers/podman-connections.json"
+        )
+        self._audit_runtime_path(Path(policy.runtime_root), path.parent)
+        try:
+            descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+            before = os.fstat(descriptor)
+            if (
+                not stat.S_ISREG(before.st_mode)
+                or before.st_uid != os.geteuid()
+                or before.st_mode & 0o022
+                or before.st_nlink != 1
+                or not 0 < before.st_size <= 64 * 1024
+            ):
+                raise RuntimeUnavailable("Podman connection configuration is untrusted")
+            raw = os.read(descriptor, 64 * 1024 + 1)
+            after = os.fstat(descriptor)
+            if (
+                len(raw) != before.st_size
+                or self._file_identity(before) != self._file_identity(after)
+            ):
+                raise RuntimeUnavailable("Podman connection configuration changed")
+            value = json.loads(raw)
+            connection_group = value.get("Connection") if isinstance(value, dict) else None
+            connections = (
+                connection_group.get("Connections")
+                if isinstance(connection_group, dict)
+                else None
+            )
+            connection = (
+                connections.get(policy.machine_name)
+                if isinstance(connections, dict)
+                else None
+            )
+            ssh = machine.get("SSH")
+            host_user = machine.get("HostUser")
+            if (
+                not isinstance(connection_group, dict)
+                or connection_group.get("Default") != policy.machine_name
+                or not isinstance(connection, dict)
+                or not isinstance(ssh, dict)
+                or not isinstance(host_user, dict)
+            ):
+                raise RuntimeUnavailable("Podman connection configuration is incomplete")
+            identity = str(
+                Path(policy.runtime_root)
+                / "state/data/containers/podman/machine/machine"
+            )
+            port = ssh.get("Port")
+            uid = host_user.get("UID")
+            username = ssh.get("RemoteUsername")
+            expected_uri = (
+                f"ssh://{username}@127.0.0.1:{port}"
+                f"/run/user/{uid}/podman/podman.sock"
+            )
+            if (
+                username != "core"
+                or not isinstance(port, int)
+                or not 1 <= port <= 65535
+                or uid != os.geteuid()
+                or ssh.get("IdentityPath") != identity
+                or connection.get("URI") != expected_uri
+                or connection.get("Identity") != identity
+                or connection.get("IsMachine") is not True
+            ):
+                raise RuntimeUnavailable("Podman connection does not match the machine")
+            identity_path = Path(identity)
+            self._audit_runtime_path(Path(policy.runtime_root), identity_path.parent)
+            identity_info = identity_path.lstat()
+            if (
+                identity_path.is_symlink()
+                or not stat.S_ISREG(identity_info.st_mode)
+                or identity_info.st_uid != os.geteuid()
+                or identity_info.st_mode & 0o077
+                or identity_info.st_nlink != 1
+            ):
+                raise RuntimeUnavailable("Podman connection identity is untrusted")
+        except RuntimeUnavailable:
+            if "descriptor" in locals():
+                os.close(descriptor)
+            raise
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+            if "descriptor" in locals():
+                os.close(descriptor)
+            raise RuntimeUnavailable("Podman connection configuration is unavailable") from error
+        self._connection_fd = descriptor
+        self._connection_identity = self._file_identity(after)
+        self._connection_path = path
+
     def _terminate_container(self, command: tuple[str, ...]) -> None:
         try:
             name = command[command.index("--name") + 1]
@@ -396,6 +516,21 @@ class SubprocessPodmanRunner:
                 policy,
                 (policy.executable, "machine", "inspect", policy.machine_name),
             )
+            machine_data = json.loads(machine.stdout)[0]
+            machine_configuration = self._read_machine_configuration(policy)
+            self._bind_connection_configuration(policy, machine_configuration)
+            server = self._run_verified(
+                policy,
+                (
+                    policy.executable,
+                    "--connection",
+                    policy.machine_name,
+                    "info",
+                    "--format",
+                    "json",
+                ),
+            )
+            self._assert_connection_identity("during server inspection")
             image = self._run_verified(
                 policy,
                 (
@@ -407,9 +542,9 @@ class SubprocessPodmanRunner:
                     policy.image_digest,
                 ),
             )
-            machine_data = json.loads(machine.stdout)[0]
+            self._assert_connection_identity("during image inspection")
+            server_data = json.loads(server.stdout)
             image_data = json.loads(image.stdout)[0]
-            machine_configuration = self._read_machine_configuration(policy)
             configured_mounts = machine_configuration.get("Mounts")
             configured_host_user = machine_configuration.get("HostUser")
             if not isinstance(configured_mounts, list) or not isinstance(
@@ -419,6 +554,12 @@ class SubprocessPodmanRunner:
             volumes = tuple(str(value) for value in configured_mounts)
             configured_rootful = configured_host_user.get("Rootful") is not False
             live_rootful = machine_data.get("Rootful") is not False
+            server_security = (
+                server_data.get("host", {}).get("security", {})
+                if isinstance(server_data, dict)
+                else {}
+            )
+            server_rootless = server_security.get("rootless") is True
             running = machine_data.get("State") == "running"
             digests = tuple(image_data.get("RepoDigests", ()))
             identities = {
@@ -434,7 +575,10 @@ class SubprocessPodmanRunner:
             return RuntimeInspection(
                 True,
                 str(machine_data.get("Name", "")),
-                running and not configured_rootful and not live_rootful,
+                running
+                and not configured_rootful
+                and not live_rootful
+                and server_rootless,
                 volumes,
                 observed_digest,
                 policy.executable_sha256,
@@ -466,6 +610,7 @@ class SubprocessPodmanRunner:
             containers_conf=self._environment["CONTAINERS_CONF"],
         )
         self._assert_executable_identity(policy, "before worker launch")
+        self._assert_connection_identity("before worker launch")
         try:
             process = subprocess.Popen(
                 command,
@@ -527,10 +672,13 @@ class SubprocessPodmanRunner:
             if overflow.is_set():
                 self._terminate_container(command)
                 raise RuntimeUnavailable("isolated PDF worker output limit exceeded")
+            if returncode != 0:
+                self._terminate_container(command)
             return returncode, bytes(stdout), bytes(stderr)
         finally:
             try:
                 self._assert_executable_identity(policy, "during worker execution")
+                self._assert_connection_identity("during worker execution")
             finally:
                 self._release_executable()
 

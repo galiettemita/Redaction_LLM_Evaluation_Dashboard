@@ -166,15 +166,37 @@ def test_real_runner_binds_executable_version_environment_and_machine_policy(
     state = runtime / "state"
     machine_config = state / "config/containers/podman/machine/applehv"
     machine_config.mkdir(parents=True)
+    identity = state / "data/containers/podman/machine/machine"
     (machine_config / "redaction-lab-pdf-v1.json").write_text(
         json.dumps({
             "Name": "redaction-lab-pdf-v1",
             "Mounts": [],
-            "HostUser": {"Rootful": False},
+            "HostUser": {"Rootful": False, "UID": 501},
+            "SSH": {
+                "IdentityPath": str(identity),
+                "Port": 60660,
+                "RemoteUsername": "core",
+            },
         })
     )
-    (state / "data").mkdir()
+    identity.parent.mkdir(parents=True)
+    identity.write_text("synthetic-private-key")
+    identity.chmod(0o600)
     (state / "tmp").mkdir()
+    connection_file = state / "config/containers/podman-connections.json"
+    connection_file.write_text(json.dumps({
+        "Connection": {
+            "Default": "redaction-lab-pdf-v1",
+            "Connections": {
+                "redaction-lab-pdf-v1": {
+                    "URI": "ssh://core@127.0.0.1:60660/run/user/501/podman/podman.sock",
+                    "Identity": str(identity),
+                    "IsMachine": True,
+                }
+            },
+        },
+        "Farm": {},
+    }))
     conf = runtime / "containers.conf"
     conf.write_text(
         f'[engine]\nhelper_binaries_dir=["{runtime}/podman/bin"]\n'
@@ -189,6 +211,7 @@ def test_real_runner_binds_executable_version_environment_and_machine_policy(
         f"test \"$CONTAINERS_CONF\" = \"{conf}\" || exit 44\n"
         "if test \"$1\" = --version; then echo 'podman version 6.1.4'; exit 0; fi\n"
         "if test \"$1\" = machine; then printf '%s' '[{\"Name\":\"redaction-lab-pdf-v1\",\"Rootful\":false,\"State\":\"running\"}]'; exit 0; fi\n"
+        "if test \"$3\" = info; then printf '%s' '{\"host\":{\"security\":{\"rootless\":true}}}'; exit 0; fi\n"
         "printf '%s' '[{\"Id\":\"1111111111111111111111111111111111111111111111111111111111111111\",\"RepoDigests\":[]}]'\n"
     )
     executable.chmod(0o700)
@@ -210,6 +233,18 @@ def test_real_runner_binds_executable_version_environment_and_machine_policy(
     assert inspection.image_digest == "sha256:" + "1" * 64
     assert inspection.executable_sha256 == policy.executable_sha256
     assert inspection.executable_version == "6.1.4"
+
+    connection = json.loads(connection_file.read_text())
+    connection["Connection"]["Connections"]["redaction-lab-pdf-v1"]["URI"] = (
+        "ssh://root@127.0.0.1:60660/run/podman/podman.sock"
+    )
+    connection_file.write_text(json.dumps(connection))
+    with pytest.raises(RuntimeUnavailable, match="connection"):
+        SubprocessPodmanRunner().inspect(policy)
+    connection["Connection"]["Connections"]["redaction-lab-pdf-v1"]["URI"] = (
+        "ssh://core@127.0.0.1:60660/run/user/501/podman/podman.sock"
+    )
+    connection_file.write_text(json.dumps(connection))
 
     conf.write_text('[machine]\nvolumes=["/Users:/Users"]\n')
     with pytest.raises(RuntimeUnavailable, match="configuration"):
@@ -341,6 +376,13 @@ def test_subprocess_runner_bounds_stdout_before_returning(tmp_path: Path) -> Non
     runner._executable_identity = runner._file_identity(  # type: ignore[attr-defined]
         os.fstat(runner._executable_fd)  # type: ignore[attr-defined]
     )
+    connection = tmp_path / "connection.json"
+    connection.write_text("{}")
+    runner._connection_fd = os.open(connection, os.O_RDONLY)  # type: ignore[attr-defined]
+    runner._connection_identity = runner._file_identity(  # type: ignore[attr-defined]
+        os.fstat(runner._connection_fd)  # type: ignore[attr-defined]
+    )
+    runner._connection_path = connection  # type: ignore[attr-defined]
     runner._environment = {  # type: ignore[attr-defined]
         "PATH": "/usr/bin:/bin",
         "XDG_CONFIG_HOME": str(tmp_path / "state/config"),
@@ -353,4 +395,45 @@ def test_subprocess_runner_bounds_stdout_before_returning(tmp_path: Path) -> Non
             input_bytes=b"",
             timeout_seconds=5,
         )
+    assert runner.cleanup_had_environment is True
+
+
+def test_subprocess_runner_cleans_named_container_on_nonzero_exit(
+    tmp_path: Path,
+) -> None:
+    executable = tmp_path / "podman"
+    executable.write_text("#!/bin/sh\nexit 7\n")
+    executable.chmod(0o700)
+
+    class TrackingRunner(SubprocessPodmanRunner):
+        cleanup_had_environment = False
+
+        def _terminate_container(self, command):
+            self.cleanup_had_environment = self._environment is not None
+
+    runner = TrackingRunner()
+    runner._executable_fd = os.open(executable, os.O_RDONLY)  # type: ignore[attr-defined]
+    runner._executable_identity = runner._file_identity(  # type: ignore[attr-defined]
+        os.fstat(runner._executable_fd)  # type: ignore[attr-defined]
+    )
+    connection = tmp_path / "connection.json"
+    connection.write_text("{}")
+    runner._connection_fd = os.open(connection, os.O_RDONLY)  # type: ignore[attr-defined]
+    runner._connection_identity = runner._file_identity(  # type: ignore[attr-defined]
+        os.fstat(runner._connection_fd)  # type: ignore[attr-defined]
+    )
+    runner._connection_path = connection  # type: ignore[attr-defined]
+    runner._environment = {  # type: ignore[attr-defined]
+        "PATH": "/usr/bin:/bin",
+        "XDG_CONFIG_HOME": str(tmp_path / "state/config"),
+        "CONTAINERS_CONF": str(tmp_path / "containers.conf"),
+    }
+
+    returncode, _, _ = runner.run(
+        (str(executable), "--connection", "probe", "run", "--name", "failed"),
+        input_bytes=b"",
+        timeout_seconds=5,
+    )
+
+    assert returncode == 7
     assert runner.cleanup_had_environment is True
