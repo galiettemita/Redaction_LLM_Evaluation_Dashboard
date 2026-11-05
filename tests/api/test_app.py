@@ -264,8 +264,9 @@ def test_v02_result_payload_exposes_only_revalidated_attempt_provenance() -> Non
 
 
 def test_unverified_runtime_returns_503_without_claiming_job_or_creating_source(
-    tmp_path: Path,
+    tmp_path: Path, monkeypatch,
 ) -> None:
+    monkeypatch.setenv("REDACTION_LAB_RUNTIME_ROOT", str(tmp_path / "missing-runtime"))
     app, store, artifacts = _app(tmp_path)
     try:
         with store.connect() as connection:

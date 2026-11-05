@@ -1,30 +1,267 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-10-29T17:55:00Z",
+  "generated_at": "2026-11-05T22:00:25Z",
   "architecture": "linux/arm64",
   "artifacts": {
-    "podman_installer": {"size":76099040,"sha256":"48f675622f66233ca2116e67fdab41ed9dbcc25b48b78a8e6ef0be6549031d22"},
-    "podman_executable": {"sha256":"9603079ca32a9fa88f0aa2b3f9e41c9365d7db2dc19c75857a1ec40aee6e5837"},
-    "podman_machine_image": {"size":937980979,"sha256":"633971788fcfe7df04f49da53f06c98b28933c5df2f684d57c2f9831411cac77"},
-    "base_image_manifest": {"sha256":"5642cb13b1fc85462dec7ad9d954623a57fe1e65981e1508dff894942eaa8694"},
-    "worker_image_id": {"size":170248815,"sha256":"7a78eaf7ef812d354f0abe13f40c6c0a4e3684d94f72002245c5249249bf293b"},
-    "worker_image_manifest": {"sha256":"cc9988ec0166c840e4d04eb115757aa8d3f7a193355c600725217e20f3115aba"}
+    "podman_installer": {
+      "size": 76099040,
+      "sha256": "48f675622f66233ca2116e67fdab41ed9dbcc25b48b78a8e6ef0be6549031d22"
+    },
+    "podman_executable": {
+      "sha256": "9603079ca32a9fa88f0aa2b3f9e41c9365d7db2dc19c75857a1ec40aee6e5837"
+    },
+    "podman_machine_image": {
+      "size": 937980979,
+      "sha256": "633971788fcfe7df04f49da53f06c98b28933c5df2f684d57c2f9831411cac77"
+    },
+    "base_image_manifest": {
+      "sha256": "5642cb13b1fc85462dec7ad9d954623a57fe1e65981e1508dff894942eaa8694"
+    },
+    "worker_image_id": {
+      "size": 179907427,
+      "sha256": "954ca79b9c06811911b3d68ceb90a3b7ca85bdb509b1e09b5c17ba7c1c603129"
+    },
+    "worker_image_manifest": {
+      "sha256": "6549682347120c2fa64d4f18015c63a381b22d7829832fdbcb517769e33d261e"
+    }
   },
   "wheelhouse": [
-    {"name":"annotated_types-0.8.0-py3-none-any.whl","size":13427,"sha256":"f072f4d804ea359e4eaf198b1af7a8b0943881a87f31bb764f8bf219bb9419e0"},
-    {"name":"cffi-2.1.1-cp312-cp312-musllinux_1_2_aarch64.whl","size":225232,"sha256":"208f941bb9d18e768138677f0a6d2ce01f590df56043dda1df1535ac57c88517"},
-    {"name":"charset_normalizer-3.5.2-cp312-cp312-musllinux_1_2_aarch64.whl","size":248482,"sha256":"ae4f5fea5b8b8ccff88238cc8569303e5ee95efae67fa62922a311397a71f346"},
-    {"name":"cryptography-50.0.2-cp311-abi3-musllinux_1_2_aarch64.whl","size":4870819,"sha256":"25784ce8b9621c90c643efb9e1e2162ab3b0224cae446ad5e70e7fcb1ce18b51"},
-    {"name":"pdfminer_six-20260107-py3-none-any.whl","size":6592252,"sha256":"366585ba97e80dffa8f00cebe303d2f381884d8637af4ce422f1df3ef38111a9"},
-    {"name":"pdfplumber-0.11.10-py3-none-any.whl","size":60047,"sha256":"7741ea81bf165b474b153e6789d10d18e06b6ddcf3ec84289c3ef2fed6802580"},
-    {"name":"pillow-13.0.0-cp312-cp312-musllinux_1_2_aarch64.whl","size":6618042,"sha256":"4bd024d567eca931b668978d672dba914d4b8e2628e2c3073a2ad178de8a2620"},
-    {"name":"pycparser-3.11-py3-none-any.whl","size":51178,"sha256":"51d5a8ba2be0bbe440b99d2112604c95bbbc3c2748a64260186c541e1729cd80"},
-    {"name":"pydantic-2.14.0-py3-none-any.whl","size":487109,"sha256":"15fab1bea6f1dc5003b54fc2ecab230c1fd1dbade2acd4addc52d81e32416d4b"},
-    {"name":"pydantic_core-2.50.0-cp312-cp312-musllinux_1_1_aarch64.whl","size":2279176,"sha256":"1751e92d56fbb623b937d73985e500b1a2b1053e56f718a6c564660d99bb9cb0"},
-    {"name":"pypdf-6.21.4-py3-none-any.whl","size":410430,"sha256":"33e4fb41ca352810eb4e9838aa0d82d6888a5f8bf682f43e99cce5faa666255c"},
-    {"name":"pypdfium2-5.14.0-py3-none-musllinux_1_2_aarch64.whl","size":5058436,"sha256":"382de7fe20d32c42993a274d7b6c555a5623a97570dfc1d2f5e0a16fe0d5d482"},
-    {"name":"reportlab-4.5.1-py3-none-any.whl","size":1957812,"sha256":"06fce8cb56c83307cfa4909cdf4e6a2ddbb44e5d6ef4d2edca896d7e9769f091"},
-    {"name":"typing_extensions-4.16.0-py3-none-any.whl","size":45571,"sha256":"481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8"},
-    {"name":"typing_inspection-0.4.4-py3-none-any.whl","size":14750,"sha256":"65b8397ba37ccbce054456aaccddfc91e6e3083c92824df348d96ca832f3f147"}
-  ]
+    {
+      "name": "annotated_types-0.8.0-py3-none-any.whl",
+      "size": 13427,
+      "sha256": "f072f4d804ea359e4eaf198b1af7a8b0943881a87f31bb764f8bf219bb9419e0"
+    },
+    {
+      "name": "cffi-2.1.1-cp312-cp312-musllinux_1_2_aarch64.whl",
+      "size": 225232,
+      "sha256": "208f941bb9d18e768138677f0a6d2ce01f590df56043dda1df1535ac57c88517"
+    },
+    {
+      "name": "charset_normalizer-3.5.2-cp312-cp312-musllinux_1_2_aarch64.whl",
+      "size": 248482,
+      "sha256": "ae4f5fea5b8b8ccff88238cc8569303e5ee95efae67fa62922a311397a71f346"
+    },
+    {
+      "name": "cryptography-50.0.2-cp311-abi3-musllinux_1_2_aarch64.whl",
+      "size": 4870819,
+      "sha256": "25784ce8b9621c90c643efb9e1e2162ab3b0224cae446ad5e70e7fcb1ce18b51"
+    },
+    {
+      "name": "pdfminer_six-20260107-py3-none-any.whl",
+      "size": 6592252,
+      "sha256": "366585ba97e80dffa8f00cebe303d2f381884d8637af4ce422f1df3ef38111a9"
+    },
+    {
+      "name": "pdfplumber-0.11.10-py3-none-any.whl",
+      "size": 60047,
+      "sha256": "7741ea81bf165b474b153e6789d10d18e06b6ddcf3ec84289c3ef2fed6802580"
+    },
+    {
+      "name": "pillow-13.0.0-cp312-cp312-musllinux_1_2_aarch64.whl",
+      "size": 6618042,
+      "sha256": "4bd024d567eca931b668978d672dba914d4b8e2628e2c3073a2ad178de8a2620"
+    },
+    {
+      "name": "pycparser-3.11-py3-none-any.whl",
+      "size": 51178,
+      "sha256": "51d5a8ba2be0bbe440b99d2112604c95bbbc3c2748a64260186c541e1729cd80"
+    },
+    {
+      "name": "pydantic-2.14.0-py3-none-any.whl",
+      "size": 487109,
+      "sha256": "15fab1bea6f1dc5003b54fc2ecab230c1fd1dbade2acd4addc52d81e32416d4b"
+    },
+    {
+      "name": "pydantic_core-2.50.0-cp312-cp312-musllinux_1_1_aarch64.whl",
+      "size": 2279176,
+      "sha256": "1751e92d56fbb623b937d73985e500b1a2b1053e56f718a6c564660d99bb9cb0"
+    },
+    {
+      "name": "pypdf-6.21.4-py3-none-any.whl",
+      "size": 410430,
+      "sha256": "33e4fb41ca352810eb4e9838aa0d82d6888a5f8bf682f43e99cce5faa666255c"
+    },
+    {
+      "name": "pypdfium2-5.14.0-py3-none-musllinux_1_2_aarch64.whl",
+      "size": 5058436,
+      "sha256": "382de7fe20d32c42993a274d7b6c555a5623a97570dfc1d2f5e0a16fe0d5d482"
+    },
+    {
+      "name": "reportlab-4.5.1-py3-none-any.whl",
+      "size": 1957812,
+      "sha256": "06fce8cb56c83307cfa4909cdf4e6a2ddbb44e5d6ef4d2edca896d7e9769f091"
+    },
+    {
+      "name": "typing_extensions-4.16.0-py3-none-any.whl",
+      "size": 45571,
+      "sha256": "481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8"
+    },
+    {
+      "name": "typing_inspection-0.4.4-py3-none-any.whl",
+      "size": 14750,
+      "sha256": "65b8397ba37ccbce054456aaccddfc91e6e3083c92824df348d96ca832f3f147"
+    }
+  ],
+  "worker_source_files": {
+    "src/redaction_lab/adapters/base.py": {
+      "byte_size": 5638,
+      "sha256": "9a8903b94235fa201ef4b4c730b67dfe83419464e9c2fae0b582b5540d0613cb"
+    },
+    "src/redaction_lab/adapters/ollama.py": {
+      "byte_size": 16090,
+      "sha256": "f06eaedf266078608983a5b1e65418fa5bd47ab45f69ced9a9fb1aaf71024861"
+    },
+    "src/redaction_lab/api/__init__.py": {
+      "byte_size": 149,
+      "sha256": "f415e2d993057a46db6c4e6f95162cee5d50f16aa18513d6f21fbaa79521af0e"
+    },
+    "src/redaction_lab/api/app.py": {
+      "byte_size": 23629,
+      "sha256": "de3d1ee091aeb2999e4ad656815d22c1ccd0916d214939c5a7a59dbdc2a99144"
+    },
+    "src/redaction_lab/api/gateway.py": {
+      "byte_size": 11541,
+      "sha256": "2dbb07d155cceb5876756e3812bb4c145b67c42d4fe85445b18ccdf748da3ddf"
+    },
+    "src/redaction_lab/api/http.py": {
+      "byte_size": 9836,
+      "sha256": "164509b82dcb31edeb572b42f6b7212d7b9b00c311476f9b9386f2b5ed92a408"
+    },
+    "src/redaction_lab/api/static.py": {
+      "byte_size": 10675,
+      "sha256": "9b7111b9218e7407a7b6e71f099bc598c49cac280b4969e40883fccf0ea17fe3"
+    },
+    "src/redaction_lab/application/__init__.py": {
+      "byte_size": 69,
+      "sha256": "520b03306b9d0217d51c1cbdffa98ac783250deeeb31e2b5c47f7d8a0ad98ab9"
+    },
+    "src/redaction_lab/application/application_store.py": {
+      "byte_size": 25706,
+      "sha256": "893286da8a74220bcaaa851ba617f6d6a84a47879861ca7f052a644e6717f316"
+    },
+    "src/redaction_lab/application/artifact_store.py": {
+      "byte_size": 11101,
+      "sha256": "e3a45aa633c46c5a39ed0cce09228e626b50c85441d5a6c08eed38e941615847"
+    },
+    "src/redaction_lab/application/config.py": {
+      "byte_size": 379,
+      "sha256": "27981f222c4dc1b821eacc1189ea734b3cf735ab1a882295a1bdfd581fab8e90"
+    },
+    "src/redaction_lab/application/document_worker.py": {
+      "byte_size": 3954,
+      "sha256": "7c659a80bba59486852220d8028cc28e9409129903191f0992352f1748e4522f"
+    },
+    "src/redaction_lab/application/evaluation_service.py": {
+      "byte_size": 4643,
+      "sha256": "eeb21a627e436f12b71ef1e1f2366278de55bfa5fceba628fb8efba71603ef59"
+    },
+    "src/redaction_lab/application/inference_runtime.py": {
+      "byte_size": 41586,
+      "sha256": "968edc05af97c8e96332bbfa597633c1529a02e6c5532a8822a6b07002923c2a"
+    },
+    "src/redaction_lab/application/isolation.py": {
+      "byte_size": 32810,
+      "sha256": "cd86ef6bc46543a59625e850b2dcb91e80c3debd417b29cc66a6836dda5220b1"
+    },
+    "src/redaction_lab/application/migration.py": {
+      "byte_size": 25202,
+      "sha256": "14aaa8a48ce7c9c76c57c7fb678ed682c6fd47c86ffffcfa59d44889ae68e466"
+    },
+    "src/redaction_lab/application/migrations/0001.sql": {
+      "byte_size": 5784,
+      "sha256": "73a9d1369de8ec113e911cd703af40c82fc777263477d631d99475fa3f694ea3"
+    },
+    "src/redaction_lab/application/migrations/0002.sql": {
+      "byte_size": 2711,
+      "sha256": "8fad495fdbf69b530e1c41d3dd8e03f9e3b304d37b61846f609feb6ae0964012"
+    },
+    "src/redaction_lab/application/paths.py": {
+      "byte_size": 6275,
+      "sha256": "188ab4c4c461fc82b15730af0c62718eb19f1dba698f466afc07e6036828da18"
+    },
+    "src/redaction_lab/application/prediction_service.py": {
+      "byte_size": 12860,
+      "sha256": "f4687492bcebe5d0c3addebb7a13331feb8f171d401bed40178a70a1b1615b28"
+    },
+    "src/redaction_lab/application/upload_service.py": {
+      "byte_size": 2150,
+      "sha256": "b92c31bf28c01f20c2b8d3c82cdb34441174563b91496d3536b2e0e01ad10fcf"
+    },
+    "src/redaction_lab/application/worker_protocol.py": {
+      "byte_size": 14029,
+      "sha256": "1ed2242f7180ce9be327ce0400d81434142a4c9a4cebcadb61d68db2f46d3338"
+    },
+    "src/redaction_lab/canonical.py": {
+      "byte_size": 6454,
+      "sha256": "587ec672325fd602eed223653db4d6bbac1853da71bda25c87d81d6bbec54ebf"
+    },
+    "src/redaction_lab/contracts.py": {
+      "byte_size": 50124,
+      "sha256": "030149e7efe0dac589c6d9227d53480319f6cb130fda1bd580bf7ef3aa7dfb76"
+    },
+    "src/redaction_lab/evaluation_store.py": {
+      "byte_size": 39243,
+      "sha256": "41d8d652236b4664708a0b5833cd0adc5999f0b513777012e0e75fac7ca48d8a"
+    },
+    "src/redaction_lab/evaluator.py": {
+      "byte_size": 27586,
+      "sha256": "e70f2ae1b1c8b25856ebc6b42506c450814b2db28aa1b86f639596fd7ffe0fc9"
+    },
+    "src/redaction_lab/experimental_scoring.py": {
+      "byte_size": 6705,
+      "sha256": "855c2adc98876fecd85fa593e5d70c867660f27a3d896ac2dc13f31d09edd277"
+    },
+    "src/redaction_lab/fixtures.py": {
+      "byte_size": 5462,
+      "sha256": "da37d5b49499173026b124a3753b910b633c9527d4fdfcb1ea85b597972ce410"
+    },
+    "src/redaction_lab/judges/base.py": {
+      "byte_size": 2606,
+      "sha256": "6a904fe2b6e068440a91dd564da6f95cfbf8528ae69727ac9eff08436c0245ac"
+    },
+    "src/redaction_lab/judges/local_nli.py": {
+      "byte_size": 808,
+      "sha256": "b1943df21420444b1dc9ec7bd35034ee7de73a44a1c9be29c156423b3024371c"
+    },
+    "src/redaction_lab/pdf_detector.py": {
+      "byte_size": 33605,
+      "sha256": "cd7df4299d1b56a8c150e000ebfee085244efc7699237ce302642c6705843d5d"
+    },
+    "src/redaction_lab/prediction_source.py": {
+      "byte_size": 13119,
+      "sha256": "e832e72200150be1c5f8ffb2bd74ee8a00f017bc72ada1fa0d191684b8bc81c4"
+    },
+    "src/redaction_lab/reference.py": {
+      "byte_size": 50111,
+      "sha256": "4e0bd59dfeca30224d0ec1893cf3519e07eec7d78d58c33be0e63e4b52f73d54"
+    },
+    "src/redaction_lab/reference_registry.py": {
+      "byte_size": 2393,
+      "sha256": "17732dd1fd8eae56842590be6c6d437f38a017984502077404b86d8b05d221e3"
+    },
+    "src/redaction_lab/store.py": {
+      "byte_size": 31589,
+      "sha256": "6feb8960006288f9e5c2f5cb6e176ff73d59112abe00cd31fc13b1501ba31dcb"
+    },
+    "src/redaction_lab/summary.py": {
+      "byte_size": 46214,
+      "sha256": "68983836c86dfcfceae23b38c02d0727ba0416d0cad7f12c17f287ae07514937"
+    },
+    "src/redaction_lab/temporary_prediction.py": {
+      "byte_size": 4417,
+      "sha256": "228d10258dbec5eaef87e7349c4e05ed13266351943c5d9f35aa4567eb7db1d3"
+    },
+    "src/redaction_lab/worker.py": {
+      "byte_size": 2035,
+      "sha256": "04d60ad57b967d4902c002a7040068ce8a3515e4454c2675d79864c41c28101d"
+    }
+  },
+  "dependency_source_image": "sha256:7a78eaf7ef812d354f0abe13f40c6c0a4e3684d94f72002245c5249249bf293b",
+  "observed_dependency_inventory": {
+    "usr_local_file_count": 3216,
+    "usr_local_inventory_sha256": "796918201c671074182df724ba7a42fb59f5628bfbb595897c90be5a8653ddc5",
+    "license_file_count": 21,
+    "license_inventory_sha256": "1048df2b689585e6b847f2150e30f59d46f13321fc0552b30877653a400d31b4"
+  },
+  "source_inventory_sha256": "c9af4248a5dfe1dc5272aac7ac89846194f0709fbf4754c6a17004cd1691f337"
 }

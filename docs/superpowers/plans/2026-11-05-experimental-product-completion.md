@@ -205,12 +205,12 @@ Task 4 implementation evidence: full Python suite 856 passed; genuine prompt-v2 
 - Consumes: reviewed API v0.3 application on `127.0.0.1:8765`, configured exact public hostname, private basic-auth/ngrok policy outside Git.
 - Produces: loopback gateway on `127.0.0.1:8766`, reviewed launch instructions, final handoff/checklist, and working authenticated HTTPS link.
 
-- [ ] **Prerequisite: Rebuild/requalify the exact pdf-worker-v2 image and record source/image/inventory/SBOM/protocol/isolation evidence before any live v2 processing.**
-- [ ] **Step 1: Write failing gateway tests for exact Host/Origin, auth, body/framing bounds, streaming-safe PDF upload, translated loopback headers, response headers, and rejection of any Ollama/direct arbitrary upstream path.**
-- [ ] **Step 2: Run gateway tests and verify failure because no gateway exists.**
-- [ ] **Step 3: Implement the smallest standard-library gateway and private configuration contract; no secrets or tunnel hostname are committed.**
-- [ ] **Step 4: Extend preflight/launch tests for runtime-root, API v0.3, frontend integrity, gateway binding, occupied ports, and clean shutdown.**
-- [ ] **Step 5: Run full Python and Node suites, typecheck/build/audit, packaging checks, genuine PDF/Qwen/evaluation canary, and authenticated browser workflow.**
+- [x] **Prerequisite: Rebuild/requalify the exact pdf-worker-v2 image and record source/image/inventory/SBOM/protocol/isolation evidence before any live v2 processing.**
+- [x] **Step 1: Write failing gateway tests for exact Host/Origin, auth, body/framing bounds, streaming-safe PDF upload, translated loopback headers, response headers, and rejection of any Ollama/direct arbitrary upstream path.**
+- [x] **Step 2: Run gateway tests and verify failure because no gateway exists.**
+- [x] **Step 3: Implement the smallest standard-library gateway and private configuration contract; no secrets or tunnel hostname are committed.**
+- [x] **Step 4: Extend preflight/launch tests for runtime-root, API v0.3, frontend integrity, gateway binding, occupied ports, and clean shutdown.**
+- [x] **Step 5: Run full Python and Node suites, typecheck/build/audit, packaging checks, genuine PDF/Qwen/evaluation canary, and authenticated browser workflow.**
 - [ ] **Step 6: Dispatch exact-candidate whole-branch security/product review; correct all Critical/Important findings and rerun affected/full verification.**
 - [ ] **Step 7: Recheck live `main`, reconcile, update all checklist/handoff records, and commit `docs: record experimental application delivery`.**
 - [ ] **Step 8: Push normally, open/integrate the reviewed PR under RL-OPS-002, launch application/gateway/ngrok, and verify the returned HTTPS link through browser acceptance without exposing credentials in Git.**

@@ -57,7 +57,7 @@ def package(tmp_path):
 
 def environment(tmp_path, **updates):
     env = os.environ.copy()
-    for key in ("REDACTION_LAB_HOST", "REDACTION_LAB_PORT", "PYTHONPATH", "PYTHONHOME"):
+    for key in (*[key for key in env if key.startswith("REDACTION_LAB_")], "PYTHONPATH", "PYTHONHOME"):
         env.pop(key, None)
     env.update(REDACTION_LAB_PYTHON=sys.executable,
                REDACTION_LAB_HOME=str(tmp_path / "local state"))
@@ -390,4 +390,91 @@ def test_occupied_port_rejects_launch_before_creating_state(package, tmp_path):
         result = run(package, "launch.sh", env)
     assert result.returncode != 0
     assert "STARTUP_FAILED" in result.stderr
+    assert not Path(env["REDACTION_LAB_HOME"]).exists()
+
+
+def gateway_environment(tmp_path, **updates):
+    return environment(tmp_path, REDACTION_LAB_PYTHON=simulated_python(tmp_path),
+        REDACTION_LAB_PORT="8765", REDACTION_LAB_GATEWAY="1",
+        REDACTION_LAB_PUBLIC_HOST="demo.example.invalid",
+        REDACTION_LAB_GATEWAY_USERNAME="synthetic-owner",
+        REDACTION_LAB_GATEWAY_PASSWORD="synthetic-test-password-0123456789", **updates)
+
+
+def test_gateway_check_requires_private_config_and_fixed_application_port(package, tmp_path):
+    env = gateway_environment(tmp_path)
+    result = run(package, "preflight.sh", env)
+    assert result.returncode == 0
+    report = json.loads(result.stdout)
+    assert report["gateway"] == {"enabled": True, "host": "127.0.0.1", "port": 8766}
+    assert "synthetic-owner" not in result.stdout and "demo.example.invalid" not in result.stdout
+    for key, value in [("REDACTION_LAB_GATEWAY_PASSWORD", ""), ("REDACTION_LAB_PORT", "8767"),
+                       ("REDACTION_LAB_GATEWAY", "maybe")]:
+        result = run(package, "preflight.sh", {**env, key: value})
+        assert result.returncode != 0
+        assert json.loads(result.stdout)["error"]["code"] == "GATEWAY_CONFIG_INVALID"
+    assert not Path(env["REDACTION_LAB_HOME"]).exists()
+
+
+def test_gateway_port_is_reserved_before_state_creation(package, tmp_path):
+    with socket.socket() as occupied:
+        occupied.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        occupied.bind(("127.0.0.1", 8766))
+        occupied.listen()
+        env = gateway_environment(tmp_path)
+        result = run(package, "launch.sh", env)
+    assert result.returncode != 0
+    assert "STARTUP_FAILED" in result.stderr
+    assert not Path(env["REDACTION_LAB_HOME"]).exists()
+
+
+def test_gateway_launch_serves_exact_assets_and_shuts_down_both_ports(package, tmp_path):
+    import base64
+    env = gateway_environment(tmp_path)
+    process, base, health = start(package, env)
+    try:
+        token = base64.b64encode(b"synthetic-owner:synthetic-test-password-0123456789").decode()
+        with HTTP.open(Request("http://127.0.0.1:8766/", headers={
+            "Host": "demo.example.invalid", "Authorization": "Basic " + token,
+        }), timeout=3) as response:
+            assert response.read() == (package / "web/dist/index.html").read_bytes()
+            assert response.headers["Strict-Transport-Security"] == "max-age=31536000"
+        status, _ = request("http://127.0.0.1:8766/", headers={"Host": "demo.example.invalid"})
+        assert status == 401
+        assert health["api_version"] == "0.3"
+        body = (b'--synthetic\r\nContent-Disposition: form-data; name="project_id"\r\n\r\nsynthetic-gateway\r\n'
+                b'--synthetic\r\nContent-Disposition: form-data; name="redacted_pdf"; filename="synthetic.pdf"\r\n'
+                b'Content-Type: application/pdf\r\n\r\n%PDF-1.4\nsynthetic-only\r\n--synthetic--\r\n')
+        status, uploaded = request("http://127.0.0.1:8766/api/v1/documents", method="POST", body=body,
+            headers={"Host": "demo.example.invalid", "Authorization": "Basic " + token,
+                "Origin": "https://demo.example.invalid", "Content-Type": "multipart/form-data; boundary=synthetic"})
+        assert status == 201, uploaded
+    finally:
+        process.terminate()
+        stdout, stderr = process.communicate(timeout=5)
+    assert "synthetic-owner" not in stdout + stderr
+    for port in (8765, 8766):
+        with socket.socket() as connection:
+            assert connection.connect_ex(("127.0.0.1", port)) != 0
+
+
+@pytest.mark.parametrize("kind", ["relative", "missing", "symlink", "writable", "empty-inventory"])
+def test_explicit_runtime_root_requires_trusted_complete_artifacts(package, tmp_path, kind):
+    runtime = tmp_path / "runtime"
+    runtime.mkdir(mode=0o700)
+    configured = str(runtime)
+    if kind == "relative":
+        configured = "runtime"
+    elif kind == "missing":
+        configured = str(runtime / "missing")
+    elif kind == "symlink":
+        link = tmp_path / "runtime-link"
+        link.symlink_to(runtime, target_is_directory=True)
+        configured = str(link)
+    elif kind == "writable":
+        runtime.chmod(0o777)
+    env = environment(tmp_path, REDACTION_LAB_PYTHON=simulated_python(tmp_path), REDACTION_LAB_RUNTIME_ROOT=configured)
+    result = run(package, "preflight.sh", env)
+    assert result.returncode != 0
+    assert json.loads(result.stdout)["error"]["code"] == "RUNTIME_FILES_UNVERIFIED"
     assert not Path(env["REDACTION_LAB_HOME"]).exists()

@@ -1,5 +1,5 @@
 #!/bin/sh
-# Local same-origin website/API demo. No downloads, model calls or Podman.
+# Same-origin website/API with optional owner-only authenticated gateway.
 set -eu
 umask 077
 package_dir=$(CDPATH= cd -P -- "$(dirname -- "$0")" && pwd -P)
@@ -17,11 +17,13 @@ import os
 from pathlib import Path
 import signal
 import sys
+from threading import Thread
 from wsgiref.simple_server import WSGIRequestHandler, WSGIServer, make_server
 
 root = Path(sys.argv[1]).parents[1]
 sys.path.insert(0, str(root / "src"))
 from redaction_lab.api.app import create_app
+from redaction_lab.api.gateway import GatewayConfig, GatewayServer
 from redaction_lab.api.static import create_static_app, read_local_manifest
 from redaction_lab.application.application_store import ApplicationStore
 from redaction_lab.application.artifact_store import ArtifactStore
@@ -67,24 +69,32 @@ def stop(signum, frame):
 
 
 server = None
+gateway = None
+gateway_thread = None
 artifacts = None
 try:
     manifest = read_local_manifest(root)
     # Bind before creating directories or migrating the dedicated application DB.
     port = int(os.environ.get("REDACTION_LAB_PORT", str(manifest["default_port"])))
     server = make_server("127.0.0.1", port, None, server_class=LocalServer, handler_class=QuietHandler)
+    if os.environ.get("REDACTION_LAB_GATEWAY", "0") == "1":
+        gateway = GatewayServer(GatewayConfig.from_environment())
     paths = initialize_paths(resolve_paths())
     store = ApplicationStore(paths.database, backup_directory=paths.backups)
     artifacts = ArtifactStore(paths.artifacts, paths.temporary)
     app = create_static_app(create_app(UploadService(artifacts, store)), root, manifest.get("frontend"))
     server.set_app(app)
+    if gateway is not None:
+        gateway_thread = Thread(target=gateway.serve_forever, daemon=True)
+        gateway_thread.start()
+        print("Authenticated gateway: 127.0.0.1:8766 (configured HTTPS tunnel required)", flush=True)
     signal.signal(signal.SIGTERM, stop)
     print(f"API diagnostic: http://127.0.0.1:{port}/api/v1/health", flush=True)
     if app.frontend_available:
         print(f"Verified frontend assets: http://127.0.0.1:{port}/", flush=True)
     else:
         print("FRONTEND_UNAVAILABLE: verified assets missing or invalid; API diagnostic only", flush=True)
-    print("DEGRADED: PDF processing, inference and recipient acceptance are unavailable", flush=True)
+    print("EXPERIMENTAL: runtime is re-attested on explicit processing; scientific and recipient acceptance remain open", flush=True)
     server.serve_forever()
 except KeyboardInterrupt:
     pass
@@ -92,6 +102,11 @@ except Exception:
     print("STARTUP_FAILED: local API could not start; check preflight, port availability and dedicated data directory", file=sys.stderr)
     raise SystemExit(1)
 finally:
+    if gateway is not None:
+        if gateway_thread is not None:
+            gateway.shutdown()
+            gateway_thread.join(timeout=2)
+        gateway.server_close()
     if server is not None:
         server.server_close()
     if artifacts is not None:

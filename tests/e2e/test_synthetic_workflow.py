@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 from hashlib import sha256
 from io import BytesIO
 import json
+import subprocess
 
 import pytest
 from pathlib import Path
@@ -309,7 +310,25 @@ def _matching_reference_pair(tmp_path):
     return redacted, reference
 
 
-def test_v03_process_persists_reference_evaluations_and_get_is_read_only(tmp_path, monkeypatch):
+def _assert_frontend_accepts_results(result):
+    """Exercise the actual v0.3 TypeScript consumer with a Python API payload."""
+    consumer = (Path(__file__).resolve().parents[2] / 'web/src/api.ts').as_uri()
+    script = f"""
+      import {{ createApi }} from {json.dumps(consumer)};
+      import {{ readFileSync }} from 'node:fs';
+      const result = JSON.parse(readFileSync(0, 'utf8'));
+      const api = createApi('http://127.0.0.1:8765', async () => new Response(
+        JSON.stringify(result), {{headers: {{'Content-Type': 'application/json',
+          'X-Redaction-Lab-API': '0.3'}}}}));
+      await api.results(result.version_id);
+    """
+    completed = subprocess.run(['node', '--input-type=module', '-e', script],
+        input=json.dumps(result), text=True, capture_output=True, timeout=20)
+    assert completed.returncode == 0, completed.stderr
+
+
+@pytest.mark.parametrize('wrong_mapping', [None, 'redacted_document_version_id', 'redacted_canonical_hash'])
+def test_v03_process_persists_reference_evaluations_and_get_is_read_only(tmp_path, monkeypatch, wrong_mapping):
     import sqlite3
     from redaction_lab.adapters.ollama import OllamaAdapter
     from redaction_lab.application.document_worker import DocumentWorker
@@ -340,6 +359,21 @@ def test_v03_process_persists_reference_evaluations_and_get_is_read_only(tmp_pat
         assert status == 200
         assert store.get_version(receipt['reference']['version_id']).processing_state is ProcessingStatus.READY
         result = _request(app, 'GET', f'/api/v1/results/{version_id}')[1]
+        if wrong_mapping:
+            original_list = app.evaluations.list_evaluations
+            wrong = '0' * 64 if wrong_mapping.endswith('hash') else 'unrelated-document'
+            def changed_mapping(*args, **kwargs):
+                return tuple(record.model_copy(update={'mapping': record.mapping.model_copy(update={wrong_mapping: wrong})})
+                    for record in original_list(*args, **kwargs))
+            monkeypatch.setattr(app.evaluations, 'list_evaluations', changed_mapping)
+            assert _request(app, 'GET', f'/api/v1/results/{version_id}')[0] == 422
+            return
+        _assert_frontend_accepts_results(result)
+        assert all(row['mapping']['redacted_document_version_id'] == version_id for row in result['targets'])
+        source_id, _ = app.predictions._stored_run(version_id)
+        source = app.predictions.runs.source(source_id)
+        stored_records = app.evaluations.list_evaluations(project_id='experimental')
+        assert all(record.mapping.redacted_document_version_id == source.redacted_document_version_id for record in stored_records)
         assert result['counts'] == {'requested': 2, 'eligible': 2, 'scored': 2, 'unknown': 0, 'excluded': 0, 'technical_failures': 0}
         assert result['score_status'] == 'EXPERIMENTAL'
         assert result['verified_score'] is None and result['truth_status'] == 'UNKNOWN'

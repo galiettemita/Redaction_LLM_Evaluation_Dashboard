@@ -107,6 +107,61 @@ def test_unverified_runtime_lock_cannot_create_policy(tmp_path: Path) -> None:
         RuntimePolicy.from_lock(lock, application_root=tmp_path)
 
 
+def test_shipped_worker_v2_qualification_binds_current_source_and_exact_inventory():
+    root = Path(__file__).resolve().parents[2]
+    packaging = root / "packaging/pdf-worker"
+    lock = json.loads((packaging / "runtime.lock").read_text())
+    integrity = json.loads((packaging / "integrity-manifest.json").read_text())
+    sbom = json.loads((packaging / "sbom.cdx.json").read_text())
+    assert lock["protocol_version"] == WORKER_PROTOCOL_VERSION
+    assert lock["image_digest"] != "sha256:7a78eaf7ef812d354f0abe13f40c6c0a4e3684d94f72002245c5249249bf293b"
+    assert sbom["metadata"]["component"]["version"] == lock["image_digest"]
+    assert integrity["artifacts"]["worker_image_id"]["sha256"] == lock["image_digest"].removeprefix("sha256:")
+    source = integrity["worker_source_files"]
+    for path in ("src/redaction_lab/application/worker_protocol.py", "src/redaction_lab/pdf_detector.py", "src/redaction_lab/contracts.py"):
+        assert source[path]["sha256"] == sha256((root / path).read_bytes()).hexdigest()
+    assert json.loads((packaging / "qualification-sources.json").read_text())["worker_image"]["runtime_canaries"]["reference_v2_protocol"] == "PASS"
+
+
+@pytest.mark.parametrize("mutation", ["valid", "relative", "missing", "symlink", "writable", "parent-symlink", "parent-writable", "wrong-owner"])
+def test_pdf_worker_uses_only_trusted_explicit_runtime_root(tmp_path, monkeypatch, mutation):
+    runtime = tmp_path / "installed/runtime"
+    runtime.mkdir(parents=True)
+    runtime.chmod(0o700)
+    lock = tmp_path / "runtime.lock"
+    payload = json.loads((Path(__file__).resolve().parents[2] / "packaging/pdf-worker/runtime.lock").read_text())
+    payload["protocol_version"] = WORKER_PROTOCOL_VERSION
+    lock.write_text(json.dumps(payload))
+    configured = str(runtime)
+    if mutation == "relative":
+        configured = "relative/runtime"
+    elif mutation == "missing":
+        configured = str(tmp_path / "missing")
+    elif mutation == "symlink":
+        link = tmp_path / "link"
+        link.symlink_to(runtime, target_is_directory=True)
+        configured = str(link)
+    elif mutation == "writable":
+        runtime.chmod(0o777)
+    elif mutation == "parent-symlink":
+        link = tmp_path / "link"
+        link.symlink_to(runtime.parent, target_is_directory=True)
+        configured = str(link / "runtime")
+    elif mutation == "parent-writable":
+        runtime.parent.chmod(0o777)
+    elif mutation == "wrong-owner":
+        monkeypatch.setattr(os, "geteuid", lambda: 123456)
+    monkeypatch.setenv("REDACTION_LAB_RUNTIME_ROOT", configured)
+    if mutation == "valid":
+        policy = RuntimePolicy.from_lock(lock, application_root=tmp_path / "separate-state")
+        assert policy.runtime_root == str(runtime / "pdf-worker")
+        assert policy.executable == str(runtime / "pdf-worker/podman/bin/podman")
+        assert policy.containers_conf == str(runtime / "pdf-worker/containers.conf")
+    else:
+        with pytest.raises(RuntimeUnavailable):
+            RuntimePolicy.from_lock(lock, application_root=tmp_path / "separate-state")
+
+
 def test_runtime_lock_resolves_only_exact_application_owned_paths(tmp_path: Path) -> None:
     runtime = tmp_path / "runtime/pdf-worker"
     executable = runtime / "podman/bin/podman"

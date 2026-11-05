@@ -214,6 +214,8 @@ class LocalApi:
             return result
         progress = self.predictions.progress(version.version_id)
         result["progress"] = progress
+        source_id, run = self.predictions._stored_run(version.version_id)
+        source = self.predictions.runs.source(source_id)
         records = {}
         for row in targets:
             values = self.evaluations.list_evaluations(project_id=version.project_id, attempt_id=row["attempt_id"])
@@ -227,10 +229,23 @@ class LocalApi:
                 if any(getattr(record, key) != row[key] for key in (
                         "attempt_id", "target_id", "target_version", "model_id", "model_config_id", "provider_model_id")):
                     raise ValueError("evaluation does not bind result row")
+                if any(getattr(record, key) != getattr(source, key) for key in (
+                        "project_id", "source_id", "source_version", "source_sha256", "redacted_document_version_id")):
+                    raise ValueError("evaluation does not bind current source")
                 records[record.job_id] = record
                 row["evaluation"] = self._evaluation_payload(record)
                 if record.mapping:
+                    mapping = record.mapping
+                    if (mapping.project_id != source.project_id
+                            or mapping.target_id != row["target_id"]
+                            or mapping.target_version != row["target_version"]
+                            or mapping.redacted_document_version_id != source.redacted_document_version_id
+                            or mapping.redacted_canonical_hash not in (None, source.canonical_document.canonical_hash)):
+                        raise ValueError("mapping does not bind current source")
                     row["mapping"] = record.mapping.model_dump(mode="json")
+                    # API document identity is the upload ID. Keep the authenticated
+                    # internal source identity unchanged in immutable storage.
+                    row["mapping"]["redacted_document_version_id"] = version.version_id
                     row["mapping"]["explanation"] = record.mapping.explanation
         eligible = sum(record.eligible for record in records.values())
         scored = sum(record.experimental_score is not None for record in records.values())
@@ -238,11 +253,9 @@ class LocalApi:
             unknown=progress["total"]-eligible,
             technical_failures=sum(row["attempt_status"] in {"REFUSED", "TIMEOUT", "MALFORMED", "ERROR", "IN_DOUBT"} for row in targets))
         result["score_status"] = "EXPERIMENTAL" if scored else "NONE"
-        source_id, run = self.predictions._stored_run(version.version_id)
         if run is None:
             return result
         jobs = {job.job_id: job for job in self.predictions.runs.jobs_for_run(run.run_id, project_id=version.project_id)}
-        source = self.predictions.runs.source(source_id)
         # Only snapshots of current durable cells; old revisions remain in storage.
         for summary in self.evaluations.list_summaries(project_id=version.project_id):
             if summary.document_version_ids != (source.redacted_document_version_id,):

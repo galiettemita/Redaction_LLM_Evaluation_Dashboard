@@ -61,8 +61,62 @@ No arbitrary upstream selection, redirect/proxy feature or Ollama route. Never e
 
 ## Common gates, review and rollback
 
+### Task 6 bounded engineering amendment (2026-11-05)
+
+The Engineering Lead authorizes `src/redaction_lab/application/isolation.py` in
+addition to the above scope solely to resolve the existing explicit
+`REDACTION_LAB_RUNTIME_ROOT` for the PDF worker. Apply the same absolute-path,
+ownership, no-symlink and no-group/world-write checks as Task 4, use only fixed
+locked child paths, and preserve all existing runtime, connection and image
+checks. The legacy default remains fail-closed. Regression tests remain in the
+already-scoped `tests/application/test_isolation.py`.
+
+The prior 15 GiB acquisition gate is superseded **only for this no-download
+reuse/rebuild of installed pinned artifacts** by an 8 GiB minimum free-space
+gate before and throughout build/canary. Record exact free space, relevant
+artifact/cache sizes and projected incremental use first. Stop if projected use
+could cross 8 GiB; if observed free space crosses it, stop and clean only
+task-created temporary/build artifacts. Never remove unrelated/user data. This
+does not authorize any new model/runtime acquisition. Rationale: all large
+runtime/model dependencies are already installed; only bounded application
+source layers and synthetic acceptance state are added. Lead authorized this
+amendment before implementation after the 15 GiB read-only preflight failed.
+
+The existing wheelhouse is absent. Lead additionally permits the exact locally
+present v1 worker image `sha256:7a78eaf7ef812d354f0abe13f40c6c0a4e3684d94f72002245c5249249bf293b`
+as an immutable offline dependency stage, preserving the pinned Python base and
+installed dependency bytes. Builds use `--pull=never --network=none`, replace
+only reviewed application source, and fail closed if that exact source image is
+absent. Record its identity as build provenance only. The resulting v2 image
+requires new digest/source inventory/SBOM, complete installed inventory/license,
+protocol/reference bounds, isolation, cleanup/restart and synthetic acceptance
+evidence; the v1 qualification is not inherited.
+
 Preserve R01–R12 and DEC-001–DEC-023 within DEC-023's explicit experimental-only supersession. `verified_score` remains null; verified `truth_status` remains UNKNOWN. Missing/partial/unreadable/ambiguous/mismatched/unprocessed truth remains Accuracy unknown/null, never zero. Reference data never enters prediction inputs; immutable versions and one-shot recovery remain mandatory. This record authorizes no paid resources, private/restricted research data, credentials in Git, destructive external action, scientific validation or public unauthenticated release. Only generated synthetic fixtures or separately documented authorized public data may be used; the shared demonstration workspace stores synthetic documents only.
 
 Behavior changes require red-green-refactor evidence, focused/full permitted regressions, exact-candidate independent automated QA/security and experimental-semantics review, correction and re-review before normal non-force integration. Self-review is not independent review. No automated reviewer grants D03–D06, institutional permission or scientific/release validation. Stop only affected work for unsafe reference leakage, unexplained score/version changes, scope/contract conflicts, unqualified runtime, essential missing credentials, paid-resource need, private-data need, destructive action or unresolved Critical security risk; continue independent safe work. Record any necessary bounded scope amendment before writes.
 
 Rollback: stop affected services if necessary, revert additive task commits normally, retain original immutable attempts/evaluations and restore a verified pre-migration backup only through the documented safe migration recovery path. Do not overwrite later evidence or roll old validators forward silently. Publish a unique task handoff under `docs/project/handoffs/` using every field in [AGENT_HANDOFF](../AGENT_HANDOFF.md#handoff-template-all-fields-required-explicit-not-applicable-is-valid), with exact artifacts/commits, tests run/unrun, decisions, blockers, affected consumers and next action. Live integration HEAD must be rechecked before consequential writes, runtime calls and final review.
+
+### Task 6 test-only compatibility amendment (2026-11-05)
+
+After v2 qualification, the full suite showed two stale environmental/packaging
+assumptions (938 passed, two failed). Lead adds only `tests/api/test_app.py` and
+`tests/security/test_pdf_worker_container.py`: explicitly give the
+unverified-runtime case a missing trusted runtime root, and update the container
+security/provenance assertions from v1/wheelhouse installation to the observed
+immutable offline dependency-stage v2 contract. No application behavior is
+changed to satisfy these tests. Rerun focused and full regressions.
+
+### Task 6 API mapping identity correction (2026-11-05)
+
+Mounted genuine acceptance found that serialized mappings retained the internal
+trusted-source redacted document ID while the v0.3 UI requires the uploaded
+application document ID. Lead adds only `src/redaction_lab/api/app.py` and
+`tests/e2e/test_synthetic_workflow.py` (with `tests/api/test_app.py` already in
+scope): authenticate the stored mapping's internal source/version against the
+current trusted source, then project the API-facing document ID to the upload
+ID without mutating immutable provenance. Add actual API-to-TypeScript contract
+and mismatched-identity rejection regressions. Preserve all prior successful
+attempts; a prompt-marker reference remains conflicting/null evidence, and an
+exact matching reference is a separate declared synthetic scoring canary.

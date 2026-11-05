@@ -54,42 +54,142 @@
     }
   },
   "worker_image": {
-    "local_image_id": "sha256:7a78eaf7ef812d354f0abe13f40c6c0a4e3684d94f72002245c5249249bf293b",
-    "manifest_digest": "sha256:cc9988ec0166c840e4d04eb115757aa8d3f7a193355c600725217e20f3115aba",
+    "local_image_id": "sha256:954ca79b9c06811911b3d68ceb90a3b7ca85bdb509b1e09b5c17ba7c1c603129",
+    "manifest_digest": "sha256:6549682347120c2fa64d4f18015c63a381b22d7829832fdbcb517769e33d261e",
     "architecture": "arm64",
     "os": "linux",
-    "size": 170248815,
+    "size": 179907427,
     "user": "65532:65532",
-    "entrypoint": ["python", "-m", "redaction_lab.application.worker_protocol"],
-    "build_policy": "Exact pinned base already present; --pull=never; --network=none; complete hash-locked local wheelhouse.",
+    "entrypoint": [
+      "python",
+      "-m",
+      "redaction_lab.application.worker_protocol"
+    ],
+    "protocol_version": "pdf-worker-v2",
+    "build_policy": "Exact installed v1 image used only as dependency stage; original pinned base; --pull=never --network=none; isolated 38-file source context; COPY --chmod=0555; independent v2 qualification. No downloads.",
+    "dependency_source_image": "sha256:7a78eaf7ef812d354f0abe13f40c6c0a4e3684d94f72002245c5249249bf293b",
+    "source_inventory_sha256": "c9af4248a5dfe1dc5272aac7ac89846194f0709fbf4754c6a17004cd1691f337",
+    "installed_inventory": {
+      "usr_local_file_count": 3216,
+      "usr_local_inventory_sha256": "796918201c671074182df724ba7a42fb59f5628bfbb595897c90be5a8653ddc5",
+      "license_file_count": 21,
+      "license_inventory_sha256": "1048df2b689585e6b847f2150e30f59d46f13321fc0552b30877653a400d31b4"
+    },
     "runtime_canaries": {
-      "network_none": "PASS",
-      "host_paths_absent": "PASS",
-      "mounts_empty": "PASS",
-      "read_only_root": "PASS",
-      "capabilities_dropped": "PASS",
-      "no_new_privileges": "PASS",
-      "non_root_uid": "PASS",
-      "pids_memory_cpu_shm_nofile_limits": "PASS",
-      "synthetic_framed_protocol": "PASS"
-    }
+      "adversarial_isolation": "PASS",
+      "covered_reference_excluded": "PASS",
+      "failure_cleanup": "PASS",
+      "redacted_source_excludes_covered_text": "PASS",
+      "reference_page_limit": "PASS",
+      "reference_text_bounds": "PASS",
+      "reference_v2_protocol": "PASS",
+      "timeout_cleanup": "PASS",
+      "clean_machine_restart": "PASS",
+      "production_application_attestation": "PASS"
+    },
+    "protocol_receipts": {
+      "REDACTED": {
+        "canonical_hash": "940048894e43e1fb1d3a08ecd08f72f96e82f1ef39932e3ee69a8a75fcc8d26b",
+        "input_sha256": "ac2c0f38383ac607abc82c19c9b8f9bb603053d2dcd7eb13a8b8d75e9ab9b144",
+        "reference_hash": null,
+        "status": "PROCESSABLE"
+      },
+      "REFERENCE": {
+        "canonical_hash": null,
+        "input_sha256": "8c797663f3953b1fccf791cfd6adf93080447ca65b4fd6e1e04980e4fb3cdd21",
+        "reference_hash": "84874baed95096b535d43797a450eeff4a576b3333d62bccdab2ffad3e51adfc",
+        "status": "PROCESSABLE"
+      }
+    },
+    "runtime_qualification_scope": "Reference-host synthetic-only engineering qualification; no scientific or recipient-device acceptance.",
+    "last_restart_check_utc": "2026-11-05T22:07:00Z"
   },
   "python_dependencies": [
-    ["annotated-types", "0.8.0", "MIT"],
-    ["cffi", "2.1.1", "MIT-0"],
-    ["charset-normalizer", "3.5.2", "MIT"],
-    ["cryptography", "50.0.2", "Apache-2.0 OR BSD-3-Clause"],
-    ["pdfminer-six", "20260107", "MIT"],
-    ["pdfplumber", "0.11.10", "MIT"],
-    ["pillow", "13.0.0", "MIT-CMU"],
-    ["pycparser", "3.11", "BSD-3-Clause"],
-    ["pydantic", "2.14.0", "MIT"],
-    ["pydantic-core", "2.50.0", "MIT"],
-    ["pypdf", "6.21.4", "BSD-3-Clause"],
-    ["pypdfium2", "5.14.0", "BSD-3-Clause AND Apache-2.0 AND bundled component licenses"],
-    ["reportlab", "4.5.1", "BSD-3-Clause-like"],
-    ["typing-extensions", "4.16.0", "PSF-2.0"],
-    ["typing-inspection", "0.4.4", "MIT"]
+    [
+      "annotated-types",
+      "0.8.0",
+      "MIT"
+    ],
+    [
+      "cffi",
+      "2.1.1",
+      "MIT-0"
+    ],
+    [
+      "charset-normalizer",
+      "3.5.2",
+      "MIT"
+    ],
+    [
+      "cryptography",
+      "50.0.2",
+      "Apache-2.0 OR BSD-3-Clause"
+    ],
+    [
+      "pdfminer-six",
+      "20260107",
+      "MIT"
+    ],
+    [
+      "pdfplumber",
+      "0.11.10",
+      "MIT"
+    ],
+    [
+      "pillow",
+      "13.0.0",
+      "MIT-CMU"
+    ],
+    [
+      "pycparser",
+      "3.11",
+      "BSD-3-Clause"
+    ],
+    [
+      "pydantic",
+      "2.14.0",
+      "MIT"
+    ],
+    [
+      "pydantic-core",
+      "2.50.0",
+      "MIT"
+    ],
+    [
+      "pypdf",
+      "6.21.4",
+      "BSD-3-Clause"
+    ],
+    [
+      "pypdfium2",
+      "5.14.0",
+      "BSD-3-Clause AND Apache-2.0 AND bundled component licenses"
+    ],
+    [
+      "reportlab",
+      "4.5.1",
+      "BSD-3-Clause-like"
+    ],
+    [
+      "typing-extensions",
+      "4.16.0",
+      "PSF-2.0"
+    ],
+    [
+      "typing-inspection",
+      "0.4.4",
+      "MIT"
+    ]
   ],
-  "python_package_advisory_check": "PyPI JSON reported zero known vulnerabilities for every exact version at audited_at. The previous Pillow 12.3.0 and pypdf 6.20.0 pins were rejected and replaced before acquisition."
+  "python_package_advisory_check": "PyPI JSON reported zero known vulnerabilities for every exact version at audited_at. The previous Pillow 12.3.0 and pypdf 6.20.0 pins were rejected and replaced before acquisition.",
+  "requalified_at": "2026-11-05T22:00:25Z",
+  "rebuild_storage": {
+    "initial_free_bytes": 13598306304,
+    "minimum_free_bytes_during_successful_build": 15651373056,
+    "required_reserve_bytes": 8589934592,
+    "projected_incremental_bytes_ceiling": 536870912,
+    "dependency_image_unique_cache_bytes_before": 170329968,
+    "no_downloads": true
+  },
+  "v2_dependency_inventory_verification": "Complete /usr/local file/link inventory, all license file hashes, installed Python versions, and APK package/version/license inventory observed inside both exact images and matched; unchanged acquisition/source and advisory observations remain dated audited_at, not a new advisory scan."
 }

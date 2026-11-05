@@ -95,14 +95,24 @@ class RuntimePolicy:
         if not root.is_absolute():
             raise RuntimeUnavailable("application runtime root is invalid")
         runtime_root = root / "runtime" / "pdf-worker"
+        if "REDACTION_LAB_RUNTIME_ROOT" in os.environ:
+            # Use the same explicit-root trust boundary as the model runtime.
+            # Child policy/inventory checks still run in SubprocessPodmanRunner.
+            from redaction_lab.application.inference_runtime import (
+                InferenceRuntime, InferenceRuntimeUnavailable,
+            )
+            try:
+                runtime_root = InferenceRuntime._resolve_locked_path("runtime/pdf-worker")
+            except InferenceRuntimeUnavailable as error:
+                raise RuntimeUnavailable("PDF runtime root is untrusted") from error
         return cls(
-            executable=str(root / expected_paths["podman_executable"]),
+            executable=str(runtime_root / "podman/bin/podman"),
             executable_sha256=executable_sha256,
             executable_version=executable_version,
             machine_name=payload["machine_name"],
             image_digest=payload["image_digest"],
             runtime_root=str(runtime_root),
-            containers_conf=str(root / expected_paths["containers_conf"]),
+            containers_conf=str(runtime_root / "containers.conf"),
             timeout_seconds=timeout_seconds,
         )
 
