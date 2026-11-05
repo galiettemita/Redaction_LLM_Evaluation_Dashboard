@@ -223,7 +223,8 @@ function validMapping(x: unknown, row: PredictionTarget, version: string): x is 
 }
 function validEvaluation(x: unknown, row: PredictionTarget): x is Evaluation | null {
   if (x === null) return true;
-  if (!object(x) || !identifier(x.evaluation_id) || x.schema_version !== 'experimental-text-agreement-evidence-v1' ||
+  if (!object(x) || !Object.keys(x).every(key => ['evaluation_id', 'schema_version', 'method_id', 'scale', 'score_status', 'experimental_score', 'verified_score', 'reason', 'prediction_hash', 'reference_hash', 'subscores', 'warnings', 'applied_caps'].includes(key)) ||
+      !identifier(x.evaluation_id) || x.schema_version !== 'experimental-text-agreement-evidence-v1' ||
       x.method_id !== METHOD || x.scale !== SCALE || x.verified_score !== null || !nullableHash(x.prediction_hash) || !nullableHash(x.reference_hash) ||
       !Array.isArray(x.warnings) || !x.warnings.every(w => boundedText(w, 1024)) || !Array.isArray(x.applied_caps) ||
       !x.applied_caps.every(c => c === 35 || c === 60) || new Set(x.applied_caps).size !== x.applied_caps.length) return false;
@@ -243,7 +244,7 @@ function validSummary(x: unknown, level: 'target' | 'document' | 'model', versio
   if (level === 'model') return ids(x.document_version_ids) && x.document_version_ids.length === 1 && x.document_version_ids[0] === version &&
     x.document_count === x.document_version_ids.length && x.denominator <= x.document_count && x.member_ids.length === x.document_count;
   return x.denominator === x.counts.scored && x.member_ids.length === x.counts.requested &&
-    (level === 'target' ? identifier(x.target_id) && identifier(x.target_version) : x.document_version_id === version);
+    (level === 'target' ? identifier(x.target_id) && identifier(x.target_version) && x.counts.requested === 1 : x.document_version_id === version);
 }
 function validResults(x: unknown, version: string): x is Results {
   if (!object(x) || x.version_id !== version || typeof x.status !== 'string' || !resultStates.includes(x.status) ||
@@ -255,6 +256,13 @@ function validResults(x: unknown, version: string): x is Results {
   if (rows.length !== x.progress.terminal || new Set(rows.map(r => r.attempt_id)).size !== rows.length ||
       new Set(rows.map(r => JSON.stringify([r.target_id, r.target_version, r.model_id, r.model_config_id]))).size !== rows.length ||
       !rows.every(r => validMapping(r.mapping, r, version) && validEvaluation(r.evaluation, r))) return false;
+  const locators = new Map<string, PredictionTarget>();
+  for (const row of rows) {
+    const key = JSON.stringify([row.target_id, row.target_version]);
+    const prior = locators.get(key);
+    if (prior && (prior.page_index !== row.page_index || prior.normalized_bbox.some((coordinate, index) => coordinate !== row.normalized_bbox[index]))) return false;
+    locators.set(key, row);
+  }
   const evaluations = rows.filter(r => r.evaluation !== null);
   if (new Set(evaluations.map(r => r.evaluation!.evaluation_id)).size !== evaluations.length ||
       rows.filter(r => r.mapping?.scoreability === 'SCOREABLE').length !== x.counts.eligible ||
@@ -268,20 +276,50 @@ function validResults(x: unknown, version: string): x is Results {
   const summaries = x.summaries as Results['summaries'];
   const all = [...summaries.target, ...summaries.document, ...summaries.model];
   if (new Set(all.map(s => s.summary_id)).size !== all.length) return false;
+  const byEvaluation = new Map(evaluations.map(row => [row.evaluation!.evaluation_id, row]));
+  // Before evaluation, member_ids contain opaque intent IDs. A single-cell
+  // target summary supplies the exact target/model binding absent from that ID.
+  // Never assume an unknown member is pending: it can be an IN_DOUBT attempt.
+  const unresolved = new Map<string, {row: PredictionTarget | null; model_id: string; model_config_id: string}>();
+  const summarizedCells = new Set<string>();
+  let pendingMembers = 0;
+  for (const summary of summaries.target) {
+    const member = summary.member_ids[0];
+    const key = JSON.stringify([summary.target_id, summary.target_version, summary.model_id, summary.model_config_id]);
+    if (summarizedCells.has(key)) return false;
+    summarizedCells.add(key);
+    const row = rows.find(r => r.target_id === summary.target_id && r.target_version === summary.target_version &&
+      r.model_id === summary.model_id && r.model_config_id === summary.model_config_id) ?? null;
+    if (byEvaluation.has(member)) {
+      if (byEvaluation.get(member) !== row) return false;
+    } else {
+      if (unresolved.has(member) || row?.evaluation) return false;
+      unresolved.set(member, {row, model_id: summary.model_id, model_config_id: summary.model_config_id});
+      if (!row) pendingMembers++;
+    }
+  }
+  if (pendingMembers > (x.progress.pending as number) + (x.progress.running as number)) return false;
   for (const level of ['target', 'document', 'model'] as const) for (const summary of summaries[level]) {
-    const members = level === 'model' ? summaries.document.filter(d => summary.member_ids.includes(d.summary_id)) :
-      evaluations.filter(r => summary.member_ids.includes(r.evaluation!.evaluation_id));
-    if (members.some(m => m.model_id !== summary.model_id || m.model_config_id !== summary.model_config_id)) return false;
     if (level === 'model') {
-      const documents = members as Summary[];
-      if (documents.length !== summary.member_ids.length || documents.filter(d => d.experimental_score !== null).length !== summary.denominator) return false;
+      const documents = summaries.document.filter(d => summary.member_ids.includes(d.summary_id));
+      if (documents.some(d => d.model_id !== summary.model_id || d.model_config_id !== summary.model_config_id) ||
+          documents.length !== summary.member_ids.length || documents.filter(d => d.experimental_score !== null).length !== summary.denominator) return false;
       for (const key of ['requested', 'eligible', 'scored', 'unknown', 'technical_failures'] as const) if (documents.reduce((sum, d) => sum + d.counts[key], 0) !== summary.counts[key]) return false;
     } else {
-      const cells = members as PredictionTarget[];
-      if (level === 'target' && cells.some(r => r.target_id !== summary.target_id || r.target_version !== summary.target_version)) return false;
-      if (cells.filter(r => r.evaluation!.experimental_score !== null).length !== summary.counts.scored ||
-          cells.filter(r => r.mapping?.scoreability === 'SCOREABLE').length !== summary.counts.eligible ||
-          summary.member_ids.length - cells.length > x.counts.requested - evaluations.length) return false;
+      const cells: (PredictionTarget | null)[] = [];
+      for (const member of summary.member_ids) {
+        const evaluated = byEvaluation.get(member);
+        const pending = unresolved.get(member);
+        const identity = evaluated ?? pending;
+        if (!identity || identity.model_id !== summary.model_id || identity.model_config_id !== summary.model_config_id) return false;
+        cells.push(evaluated ?? pending!.row);
+      }
+      const terminal = cells.filter((cell): cell is PredictionTarget => cell !== null);
+      if (level === 'target' && terminal.some(r => r.target_id !== summary.target_id || r.target_version !== summary.target_version)) return false;
+      const eligible = terminal.filter(r => r.mapping?.scoreability === 'SCOREABLE').length;
+      if (terminal.filter(r => r.evaluation?.experimental_score != null).length !== summary.counts.scored ||
+          eligible !== summary.counts.eligible || cells.length - eligible !== summary.counts.unknown ||
+          terminal.filter(r => r.attempt_status !== 'SUCCEEDED').length !== summary.counts.technical_failures) return false;
     }
   }
   return true;

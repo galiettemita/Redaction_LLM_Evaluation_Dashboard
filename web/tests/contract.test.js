@@ -296,3 +296,90 @@ test('summary truth and technical counts remain bound to their member attempts',
   const value = scoredResult(); value.summaries.document[0].counts = {requested: 2, eligible: 1, scored: 1, unknown: 1, excluded: 0, technical_failures: 1};
   await assert.rejects(() => client(async () => response(value)).results('version-1'), /contract/i);
 });
+
+function technicalResult(status = 'TIMEOUT') {
+  const value = scoredResult(); const row = value.targets[0];
+  Object.assign(row, {attempt_status: status, prediction: null, response_hash: null});
+  Object.assign(row.evaluation, {score_status: 'NONE', experimental_score: null, reason: status, prediction_hash: null, subscores: null});
+  value.counts = {requested: 1, eligible: 1, scored: 0, unknown: 0, excluded: 0, technical_failures: 1};
+  value.score_status = 'NONE';
+  for (const level of Object.values(value.summaries)) for (const summary of level) Object.assign(summary, {score_status: 'NONE', experimental_score: null, denominator: 0, counts: {...value.counts}});
+  return value;
+}
+test('rejects TIMEOUT hidden by mutually consistent zero technical-failure summaries', async () => {
+  const value = technicalResult();
+  for (const level of Object.values(value.summaries)) for (const summary of level) summary.counts.technical_failures = 0;
+  assert.equal(value.counts.technical_failures, 1);
+  await assert.rejects(() => client(async () => response(value)).results('version-1'), /contract/i);
+});
+test('validates individual target, document and model failure counts across technical statuses', async () => {
+  for (const status of ['REFUSED', 'TIMEOUT', 'MALFORMED', 'ERROR']) {
+    const value = technicalResult(status);
+    assert.deepEqual(await client(async () => response(value)).results('version-1'), value);
+    for (const level of ['target', 'document', 'model']) {
+      const bad = structuredClone(value); bad.summaries[level][0].counts.technical_failures = 0;
+      await assert.rejects(() => client(async () => response(bad)).results('version-1'), /contract/i);
+    }
+  }
+});
+test('mixed scored and timeout members preserve counts and completed-answer denominator', async () => {
+  const value = scoredResult(); const failed = technicalResult();
+  const row = failed.targets[0]; row.target_id = 'target-2'; row.attempt_id = 'attempt-2'; row.evaluation.evaluation_id = 'eval-2';
+  value.targets.push(row);
+  const targetSummary = failed.summaries.target[0];
+  Object.assign(targetSummary, {summary_id: 'summary-target-2', target_id: 'target-2', member_ids: ['eval-2']});
+  value.summaries.target.push(targetSummary);
+  value.counts = {requested: 2, eligible: 2, scored: 1, unknown: 0, excluded: 0, technical_failures: 1};
+  value.progress = {total: 2, pending: 0, running: 0, terminal: 2};
+  value.summaries.document[0].member_ids = ['eval-1', 'eval-2'];
+  value.summaries.document[0].counts = {...value.counts}; value.summaries.model[0].counts = {...value.counts};
+  assert.equal((await client(async () => response(value)).results('version-1')).summaries.document[0].denominator, 1);
+  value.summaries.document[0].counts.technical_failures = 0; value.summaries.model[0].counts.technical_failures = 0;
+  await assert.rejects(() => client(async () => response(value)).results('version-1'), /contract/i);
+});
+function unresolvedResult() {
+  const value = technicalResult('IN_DOUBT'); const row = value.targets[0];
+  row.mapping = null; row.evaluation = null; row.provider_model_id = null;
+  value.progress = {total: 2, pending: 1, running: 0, terminal: 1};
+  value.counts = {requested: 2, eligible: 0, scored: 0, unknown: 2, excluded: 0, technical_failures: 1};
+  const first = value.summaries.target[0]; first.member_ids = ['intent-1']; first.counts = {requested: 1, eligible: 0, scored: 0, unknown: 1, excluded: 0, technical_failures: 1};
+  value.summaries.target.push({...structuredClone(first), summary_id: 'summary-pending', target_id: 'target-2', member_ids: ['intent-2'], counts: {...first.counts, technical_failures: 0}});
+  value.summaries.document[0].member_ids = ['intent-1', 'intent-2'];
+  value.summaries.document[0].counts = {...value.counts}; value.summaries.model[0].counts = {...value.counts};
+  return value;
+}
+test('pending intents and unresolved terminal attempts bind through unique target summaries', async () => {
+  const value = unresolvedResult();
+  assert.deepEqual(await client(async () => response(value)).results('version-1'), value);
+  for (const mutate of [
+    v => {for (const level of Object.values(v.summaries)) for (const summary of level) summary.counts.technical_failures = 0;},
+    v => v.summaries.target[1].counts.technical_failures = 1,
+    v => v.summaries.document[0].member_ids = ['intent-1', 'unbound-intent'],
+    v => v.summaries.target[1].member_ids = ['intent-1'],
+    v => v.summaries.target[0].target_id = 'missing-target',
+  ]) {
+    const bad = structuredClone(value); mutate(bad);
+    await assert.rejects(() => client(async () => response(bad)).results('version-1'), /contract/i);
+  }
+});
+test('shared immutable target geometry cannot diverge between model attempts', async () => {
+  const value = scoredResult(); value.summaries = {target: [], document: [], model: []};
+  value.targets.push({...structuredClone(value.targets[0]), attempt_id: 'attempt-2', model_id: 'model-2', provider_model_id: 'model-2', model_config_id: 'config-2', evaluation: {...value.targets[0].evaluation, evaluation_id: 'eval-2'}});
+  value.counts = {requested: 2, eligible: 2, scored: 2, unknown: 0, excluded: 0, technical_failures: 0}; value.progress = {total: 2, pending: 0, running: 0, terminal: 2};
+  assert.equal((await client(async () => response(value)).results('version-1')).targets.length, 2);
+  for (const change of [{page_index: 50}, {normalized_bbox: [.6, .7, .8, .9]}, {page_index: 50, normalized_bbox: [.6, .7, .8, .9]}]) {
+    const bad = structuredClone(value); Object.assign(bad.targets[1], change);
+    await assert.rejects(() => client(async () => response(bad)).results('version-1'), /contract/i);
+  }
+});
+test('unsupported nested evaluation identity cannot contradict the enclosing immutable row', async () => {
+  for (const [key, value] of Object.entries({attempt_id: 'other-attempt', target_id: 'other-target', target_version: 'other-version', model_id: 'other-model', model_config_id: 'other-config', provider_model_id: 'other-provider', mapping_id: 'other-mapping'})) {
+    const bad = scoredResult(); bad.targets[0].evaluation[key] = value;
+    await assert.rejects(() => client(async () => response(bad)).results('version-1'), /contract/i);
+  }
+});
+test('extra attempt payload fields cannot impersonate an unresolved-member binding', async () => {
+  const value = technicalResult(); value.targets[0].row = null;
+  for (const level of Object.values(value.summaries)) for (const summary of level) summary.counts = {requested: 1, eligible: 0, scored: 0, unknown: 1, excluded: 0, technical_failures: 0};
+  await assert.rejects(() => client(async () => response(value)).results('version-1'), /contract/i);
+});

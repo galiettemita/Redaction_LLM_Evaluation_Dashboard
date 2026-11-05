@@ -12,9 +12,9 @@
   "frontend": {
     "dist_path": "web/dist",
     "assets": {
-      "assets/index-BLtu4W5Q.js": {
-        "sha256": "b91e280a07aa9a00a93f1d656cbd1a9ae5d8bcdb2a542c79ce9df75599aa14d5",
-        "byte_size": 224234,
+      "assets/index-BfjntY5Y.js": {
+        "sha256": "b51e9a86ebf73cfd45eb5db3c5324652872550b333b144a495394070c97cf533",
+        "byte_size": 225482,
         "content_type": "text/javascript; charset=utf-8"
       },
       "assets/index-DOfTYw_4.css": {
@@ -23,7 +23,7 @@
         "content_type": "text/css; charset=utf-8"
       },
       "index.html": {
-        "sha256": "dae74ea9d466bbfe73b06c86fd4d05d79c386ae8cf4c7ba0536a94b003fa50b4",
+        "sha256": "95ef232ffb8ecc6cef2a6e44ea438dab2811d01bf72b2daecce2cf46180ece7e",
         "byte_size": 567,
         "content_type": "text/html; charset=utf-8"
       }
