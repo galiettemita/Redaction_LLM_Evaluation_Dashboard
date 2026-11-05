@@ -1102,3 +1102,115 @@ def test_experimental_unscored_summary_cannot_spoof_frozen_model_config(tmp_path
     summary = build_experimental_summary((cell,), summary_level='DOCUMENT')
     with pytest.raises(ValueError, match='configuration|binding'):
         store.store_experimental_summary(summary)
+
+
+@pytest.mark.parametrize('status', ['PENDING', 'RUNNING', 'IN_DOUBT'])
+@pytest.mark.parametrize('spoof_provider', [False, True])
+def test_completed_attempt_cannot_be_relabelled_unfinished(tmp_path, status, spoof_provider):
+    from redaction_lab.contracts import ExperimentalSummaryCell
+    from redaction_lab.summary import build_experimental_summary
+    inputs, mapping = _experimental_inputs(tmp_path)
+    store = EvaluationStore(inputs[0])
+    record = store.evaluate_experimental_and_store(project_id=PROJECT_ID, attempt_id=inputs[5].attempt_id, mapping=mapping)
+    cell = ExperimentalSummaryCell.from_evaluation(record)
+    cell = ExperimentalSummaryCell.model_validate({**cell.model_dump(), 'evaluation': None, 'status': status,
+        'profile': {**cell.profile.model_dump(), 'provider_model_id': 'spoofed' if spoof_provider else None}})
+    summary = build_experimental_summary((cell,), summary_level='DOCUMENT')
+    with pytest.raises(ValueError, match='status|provenance|binding'):
+        store.store_experimental_summary(summary)
+
+
+def _pending_experimental_cell(inputs):
+    from redaction_lab.contracts import ExperimentalSummaryCell, ExperimentalSummaryProfile
+    from redaction_lab.evaluator import experimental_prediction_protocol
+    _, runs, source, run, _, _, *_ = inputs
+    target = source.targets[1]
+    job_id = runs.enqueue(source.source_id, target.target_id, run)
+    return ExperimentalSummaryCell(intent_id=job_id,
+        profile=ExperimentalSummaryProfile(project_id=PROJECT_ID, model_id=run.model_ids[0],
+            model_config_id='synthetic-config-v1', provider_model_id=None,
+            prediction_protocol_id=experimental_prediction_protocol(run)),
+        document_version_id=source.redacted_document_version_id,
+        target_id=target.target_id, target_version=target.target_version, status='PENDING')
+
+
+def test_legitimate_pending_and_in_doubt_history_survives_completion(tmp_path):
+    from redaction_lab.summary import build_experimental_summary, build_experimental_model_summary
+    inputs, _ = _experimental_inputs(tmp_path)
+    runs = inputs[1]
+    store = EvaluationStore(inputs[0])
+    cell = _pending_experimental_cell(inputs)
+    pending = build_experimental_summary((cell,), summary_level='DOCUMENT')
+    store.store_experimental_summary(pending)
+    attempt_id = runs.claim(cell.intent_id, request_hash='b'*64, model_config_id='synthetic-config-v1')
+    uncertain = build_experimental_summary((cell.model_copy(update={'status': 'IN_DOUBT'}),), summary_level='DOCUMENT')
+    store.store_experimental_summary(uncertain)
+    attempt = inputs[5].model_copy(update={'attempt_id': attempt_id,
+        'target_id': cell.target_id, 'target_version': cell.target_version, 'request_hash': 'b'*64})
+    runs.complete(cell.intent_id, attempt)
+    reopened = EvaluationStore(inputs[0])
+    for historic in (pending, uncertain):
+        assert reopened.get_experimental_summary(historic.summary_id, project_id=PROJECT_ID) == historic
+        assert reopened.store_experimental_summary(historic) == historic
+    # A model summary may explicitly aggregate authenticated historical document
+    # snapshots; it does not pretend to describe current live job states.
+    model = build_experimental_model_summary((pending,))
+    reopened.store_experimental_summary(model)
+    assert reopened.get_experimental_summary(model.summary_id, project_id=PROJECT_ID) == model
+
+
+def test_new_snapshot_holds_write_lock_during_provenance_validation(tmp_path, monkeypatch):
+    from redaction_lab.summary import build_experimental_summary
+    inputs, _ = _experimental_inputs(tmp_path)
+    store = EvaluationStore(inputs[0])
+    summary = build_experimental_summary((_pending_experimental_cell(inputs),), summary_level='DOCUMENT')
+    validate = store._validate_experimental_summary
+    def validate_with_competing_writer(candidate, *args, **kwargs):
+        validated = validate(candidate, *args, **kwargs)
+        with sqlite3.connect(inputs[0], timeout=0) as competing:
+            with pytest.raises(sqlite3.OperationalError, match='locked'):
+                competing.execute('BEGIN IMMEDIATE')
+        return validated
+    monkeypatch.setattr(store, '_validate_experimental_summary', validate_with_competing_writer)
+    assert store.store_experimental_summary(summary) == summary
+
+
+@pytest.mark.parametrize('status', ['RUNNING', 'IN_DOUBT'])
+def test_pending_job_cannot_claim_unpersisted_activity(tmp_path, status):
+    from redaction_lab.summary import build_experimental_summary
+    inputs, _ = _experimental_inputs(tmp_path)
+    store = EvaluationStore(inputs[0])
+    cell = _pending_experimental_cell(inputs).model_copy(update={'status': status})
+    with pytest.raises(ValueError, match='status|binding'):
+        store.store_experimental_summary(build_experimental_summary((cell,), summary_level='DOCUMENT'))
+
+
+def test_pending_snapshot_uses_configuration_frozen_in_run_intent(tmp_path):
+    from redaction_lab.summary import build_experimental_summary
+    inputs, _ = _experimental_inputs(tmp_path)
+    store = EvaluationStore(inputs[0])
+    cell = _pending_experimental_cell(inputs)
+    source = inputs[2]
+    run = _run(source, run_id='unclaimed-run').model_copy(update={'created_by': json.dumps({
+        'model_id': 'synthetic-model-v1', 'model_config_id': 'synthetic-config-v1'})})
+    job_id = inputs[1].enqueue(source.source_id, cell.target_id, run)
+    cell = cell.model_copy(update={'intent_id': job_id})
+    summary = build_experimental_summary((cell,), summary_level='DOCUMENT')
+    assert store.store_experimental_summary(summary) == summary
+    for change in ({'model_config_id': 'spoofed'}, {'provider_model_id': 'spoofed'}):
+        wrong = cell.model_copy(update={'profile': cell.profile.model_copy(update=change)})
+        with pytest.raises(ValueError, match='binding'):
+            store.store_experimental_summary(build_experimental_summary((wrong,), summary_level='DOCUMENT'))
+
+
+def test_pending_snapshot_requires_frozen_model_configuration(tmp_path):
+    from redaction_lab.summary import build_experimental_summary
+    inputs, _ = _experimental_inputs(tmp_path)
+    store = EvaluationStore(inputs[0])
+    cell = _pending_experimental_cell(inputs)
+    source = inputs[2]
+    run = _run(source, run_id='unconfigured-run')
+    job_id = inputs[1].enqueue(source.source_id, cell.target_id, run)
+    cell = cell.model_copy(update={'intent_id': job_id})
+    with pytest.raises(ValueError, match='configuration.*binding'):
+        store.store_experimental_summary(build_experimental_summary((cell,), summary_level='DOCUMENT'))

@@ -695,8 +695,6 @@ class EvaluationStore:
                 cell.profile.project_id, cell.target_id, cell.target_version,
                 cell.profile.model_id, cell.document_version_id):
                 raise ValueError('summary requested intent binding mismatch')
-            if job.model_config_id is not None and job.model_config_id != cell.profile.model_config_id:
-                raise ValueError('summary model configuration binding mismatch')
             from redaction_lab.evaluator import experimental_prediction_protocol
             runs = self.run_store.runs_for_source(source.source_id, project_id=cell.profile.project_id)
             run = next(r for r in runs if r.run_id == job.manifest.run_id)
@@ -723,18 +721,70 @@ class EvaluationStore:
             raise ValueError('experimental summary integrity mismatch')
         return summary
 
+    def _authenticate_new_summary_cells(self, summary, connection):
+        """Bind new target/document snapshots to state under BEGIN IMMEDIATE.
+
+        Model snapshots derive from already authenticated immutable document
+        snapshots, including intentionally selected historical revisions.
+        """
+        if summary.summary_level is SummaryLevel.MODEL:
+            return
+        for cell in summary.cells:
+            row = connection.execute('SELECT * FROM jobs WHERE job_id=?', (cell.intent_id,)).fetchone()
+            if row is None:
+                raise ValueError('summary requested intent binding missing')
+            manifest, run = self.run_store._validate_bound_job(connection, row)
+            attempt_row = connection.execute('SELECT attempt_id FROM attempts WHERE job_id=?',
+                                             (cell.intent_id,)).fetchone()
+            if attempt_row is not None:
+                resolved = self.run_store.resolve_attempt(attempt_row[0], project_id=cell.profile.project_id)
+                expected_status = resolved.attempt.status.value
+                expected_config = resolved.attempt.model_config_id
+                expected_provider = resolved.attempt.provider_model_id
+            else:
+                if row['state'] not in {'PENDING', 'IN_DOUBT'}:
+                    raise ValueError('summary job status lacks a durable outcome')
+                expected_status = row['state']
+                expected_provider = None
+                frozen_config = connection.execute(
+                    'SELECT model_config_id FROM run_configs WHERE project_id=? AND run_id=? AND model_id=?',
+                    (manifest.project_id, manifest.run_id, manifest.model_id),
+                ).fetchone()
+                expected_config = row['model_config_id'] or (frozen_config[0] if frozen_config else None)
+                if expected_config is None:
+                    # Application PredictionService freezes the configuration in
+                    # the immutable run intent before dispatching any target.
+                    try:
+                        runtime = json.loads(run.created_by)
+                    except json.JSONDecodeError:
+                        runtime = None
+                    if isinstance(runtime, dict) and runtime.get('model_id') == manifest.model_id:
+                        expected_config = runtime.get('model_config_id')
+                if not isinstance(expected_config, str) or not expected_config:
+                    raise ValueError('summary model configuration has no frozen binding')
+            if (cell.status, cell.profile.model_id, cell.profile.model_config_id,
+                cell.profile.provider_model_id) != (
+                expected_status, manifest.model_id, expected_config, expected_provider):
+                raise ValueError('summary current status/model/provider binding mismatch')
+
     def store_experimental_summary(self, summary: ExperimentalSummary) -> ExperimentalSummary:
-        summary = self._validate_experimental_summary(summary)
+        summary = ExperimentalSummary.model_validate(summary.model_dump())
         connection = self._connect()
         try:
             connection.execute('BEGIN IMMEDIATE')
             row = connection.execute('SELECT payload_json FROM experimental_summaries WHERE summary_id=?',
                                      (summary.summary_id,)).fetchone()
             if row is None:
+                self._authenticate_new_summary_cells(summary, connection)
+                summary = self._validate_experimental_summary(summary)
                 connection.execute('INSERT INTO experimental_summaries VALUES (?,?,?)',
                                    (summary.summary_id, summary.profile.project_id, summary.model_dump_json()))
             elif ExperimentalSummary.model_validate_json(row[0]) != summary:
                 raise ValueError('experimental summary identity collision')
+            else:
+                # Idempotent re-submission is a read of an existing historical
+                # snapshot; it must not reinterpret its status against live jobs.
+                summary = self.get_experimental_summary(summary.summary_id, project_id=summary.profile.project_id)
             connection.commit()
         except Exception:
             connection.rollback()

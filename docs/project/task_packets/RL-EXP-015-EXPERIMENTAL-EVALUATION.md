@@ -78,6 +78,7 @@ Task 4 implements exact v0.3 flat attempt rows, nested experimental mapping/eval
 - [x] Task 3 persistence: deterministic identities, version dispatch, legacy qualitative reopening, tamper rejection and immutable scores pass; verified scores always null.
 - [x] Task 3 summaries: eligible denominator independent of outcome, unknown truth, refusal/timeout/malformed/error, zero denominators, equal-target document/equal-document model means and no cross-model blend pass.
 - [x] Task 3 focused/full Python suite passes; commit `feat: add transparent experimental accuracy scoring`.
+- [x] Task 3 review correction round 1: Unicode minus sign preservation/ambiguous-sign rejection and transactionally authenticated new snapshot statuses pass RED/GREEN regressions; historical snapshots preserved. Focused 72/full 817 passed; independent re-review pending.
 - [ ] Task 4 RED/GREEN: realistic valid Ollama JSON/bounded reconstruction, refusal, extra keys, wrong model, truncation and malformed handling verified.
 - [ ] Task 4 runtime root: explicit absolute owner-controlled root works only with no-symlink/ownership/permission/inventory checks; unsafe/default unqualified paths fail closed.
 - [ ] Task 4 API/E2E: paired processing, one attempt, evaluation only after terminal prediction, progress counts, exact v0.3 shapes, reference absence from manifests, nulls and GET/reconnect idempotence pass.

@@ -88,3 +88,25 @@ def test_numeric_punctuation_and_date_order_cannot_bypass_caps(reference, predic
     assert result.experimental_score <= 60.0
     assert result.subscores.normalized_exact_match is False
     assert 60.0 in result.applied_caps
+
+
+@pytest.mark.parametrize('minus', ['−', '﹣', '－', '⁻', '₋'])
+def test_supported_unicode_minus_preserves_numeric_sign(minus):
+    reference = f'the amount is {minus}12 units in total today'
+    positive = score_text_agreement(reference, 'the amount is 12 units in total today')
+    # Lexical F1, LCS and trigrams all 1; signed-quantity agreement 0:
+    # 100 * (.4 + .25 + .2) = 85, capped at exactly 60.
+    assert positive.experimental_score == 60.0
+    assert positive.subscores.normalized_exact_match is False
+    assert positive.subscores.critical_detail_agreement == 0.0
+    assert positive.applied_caps == (60.0,)
+    assert 'QUANTITY_OR_DATE_MISMATCH' in positive.warnings
+    same_negative = score_text_agreement(reference, 'the amount is -12 units in total today')
+    assert same_negative.experimental_score == 100.0
+    assert same_negative.subscores.normalized_exact_match is True
+
+
+@pytest.mark.parametrize('ambiguous_sign', ['–', '—', '‑', '±', '∓'])
+def test_ambiguous_numeric_sign_is_rejected_instead_of_exact_match(ambiguous_sign):
+    with pytest.raises(ValueError, match='numeric sign'):
+        score_text_agreement(f'the amount is {ambiguous_sign}12 units', 'the amount is 12 units')

@@ -1,6 +1,7 @@
 """Version 1 lexical agreement; engineering evidence, never verified accuracy.
 
-Normalization: NFKC, casefold, Unicode alphanumeric tokens, punctuation removed,
+Normalization: NFKC, Unicode mathematical minus to ASCII minus, casefold,
+Unicode alphanumeric tokens, punctuation removed,
 whitespace collapsed. Trigrams are multisets of the joined normalized tokens
 (short strings use the entire string). LCS agreement is 2L/(reference+prediction
 lengths). Critical details are tagged multisets of signed numeric literals, ordered numeric date strings, English
@@ -58,7 +59,11 @@ _TOKEN = re.compile(r'[^\W_]+', re.UNICODE)
 def _parts(value: str):
     if not isinstance(value, str) or not value.strip() or len(value) > 32768:
         raise ValueError('text must be nonempty and at most 32768 characters')
-    original = unicodedata.normalize('NFKC', value).replace('’', "'")
+    original = unicodedata.normalize('NFKC', value).replace('’', "'").replace("−", "-")
+    for match in re.finditer(r'([^\d\s])\s*(?=\d)', original):
+        sign = match.group(1)
+        if sign in {'±', '∓'} or (unicodedata.category(sign) == 'Pd' and sign != '-'):
+            raise ValueError('ambiguous numeric sign notation')
     tokens = _TOKEN.findall(original.casefold())
     if not tokens or len(tokens) > 4096:
         raise ValueError('text must contain between 1 and 4096 tokens')
