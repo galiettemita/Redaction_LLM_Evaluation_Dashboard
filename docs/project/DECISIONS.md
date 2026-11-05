@@ -1,6 +1,6 @@
 # Decision register
 
-Baseline: [MASTER_SPEC.md](MASTER_SPEC.md), imported 2026-10-06. Epoch E0071.
+Baseline: [MASTER_SPEC.md](MASTER_SPEC.md), imported 2026-10-06. Epoch E0072.
 Product decision IDs `DEC-...` are distinct from the source PDF's open-decision IDs `D01`-`D10`.
 
 ## Authority
@@ -47,6 +47,30 @@ Source B1 is identified in MASTER_SPEC. These IDs normalize previously stated re
 | ID | Decision | Status / effects |
 | --- | --- | --- |
 | DEC-022 | For the October 12 synthetic-only demonstration, permit a trusted test-fixture manifest/registry of immutable redacted/reference pairs and hashes, accessible only through a trusted bootstrap/resolver; require full two-sided text evidence and exact spans or null. Unregistered/user-uploaded references remain NOT_SCOREABLE pending a separately authorized authenticated provenance/pairing system. | **APPROVED by product owner on 2026-10-08 (explicit yes).** [Scoped implementation packet](task_packets/RL-MVP-003-TRUSTED-SYNTHETIC-CORRECTION.md). Only byte-hash-pinned synthetic pairs can pass the checkpoint fixture-pairing gate; arbitrary uploaded references remain unknown/null while prediction remains allowed. This does not approve scientific D03 validation, real-document provenance, extra costs, merge, Task 4 or deployment. |
+
+## DEC-023 — Automatic experimental evaluation and controlled demonstration
+
+**Status:** APPROVED product direction / delegated experimental engineering; not scientific or institutional approval. Effective epoch E0072. Recorded UTC: 2026-11-05T16:14:01Z. Proposer/accountable integrator: Codex Engineering Lead.
+
+**Human authorization evidence:** product-owner clarification in the active completion conversation on 2026-11-05: finish autonomously using genuine models, compute clearly labeled experimental accuracy before formal scientific validation, use independent agents/review and provide a working link. This is the product-safe substance of that direction; no private transcript is published. [Completion design](../superpowers/specs/2026-11-05-experimental-product-completion-design.md) and [plan](../superpowers/plans/2026-11-05-experimental-product-completion.md) record the bounded approach. R01–R12 remain controlling; eventual commercial multi-model and validated semantic-evaluation requirements remain incomplete.
+
+**Old rule:** DEC-022 restricts scoreable reference evidence to pinned synthetic registry pairs; numeric scoring formula/weights remain unapproved under DEC-012/014 and D04/D06; RL-OPS-002 reserves public deployment/distribution to owner approval.
+
+**New bounded rule:** add a separate experimental channel for user-supplied matching reference PDFs processed by the qualified isolated worker. Only unique, complete, readable, reliably aligned exact target spans may produce an experimental number. Provenance is `USER_SUPPLIED_EXPERIMENTAL`; no promotion to verified truth. `score_status = EXPERIMENTAL` may carry `experimental_score`; `verified_score = null` and verified `truth_status = UNKNOWN` remain mandatory. Missing, partial, unreadable, conflicting, ambiguous, mismatched or unprocessed truth stays null / Accuracy unknown. Display `EXPERIMENTAL — NOT SCIENTIFICALLY VALIDATED` and the method/denominators/limitations.
+
+The owner delegates engineering selection/versioning of experimental weights and contradiction caps. Method `experimental-text-agreement-v1`, evidence schema `experimental-text-agreement-evidence-v1`, scale `0–100 text agreement`: token F1 40%, ordered-token agreement 25%, character-trigram F1 20%, critical-detail agreement 15%; normalized exact match returns 100; negation mismatch caps at 35; quantity/date mismatch caps at 60; tighter cap wins; round to one decimal. Report subscores and warnings. Document agreement uses equal scored-target means per exact model/configuration; model agreement uses equal scored-document means over a declared compatible set, with eligible/scored/unknown/excluded/technical counts and null empty denominators. This lexical agreement heuristic is not validated semantic accuracy, a probability, a recovery-rate denominator or proof of historical truth. D03–D06 remain open for verified/scientific claims.
+
+Enable only the installed integrity-pinned `qwen2.5:1.5b-instruct-q4_K_M` for this pass. Genuine provider output must be persisted and technical failures distinguished; rule-based demo output cannot stand in for inference. Preserve redacted-only inputs, one-shot attempts, immutable provenance and side-effect-free GET/reconnect. No new paid model or private-data permission.
+
+The working-link authorization is restricted to an owner-only authenticated temporary HTTPS ngrok demonstration backed by a synthetic-only local workspace and a reviewed loopback gateway. Application/Ollama remain loopback-only; gateway accepts only configured exact Host/HTTPS Origin, enforces authenticated access and preserves upload/framing/security bounds. Disable tunnel inspection; keep credentials/configuration/hostname outside Git. Credentials must not be shared with other researchers. This is not multi-user authorization, general public distribution or permanent hosting; availability depends on the awake Mac and running local services.
+
+**Supersession:** supersedes DEC-022's synthetic-registry-only restriction solely for this explicitly labeled experimental channel; verified synthetic-registry behavior is preserved. Supersedes prior numeric-method prohibitions in DEC-012/014 and historical task/API records solely for these versioned experimental defaults; scientific D03–D06 approvals are not granted. Satisfies RL-OPS-002's owner-deployment gate solely for the described authenticated owner demonstration. All other R01–R12/DEC-001–022 protections, private/institutional data gates, no-paid-resource rule and unrelated deployment/distribution gates remain. Older records describe historical scope, not a competing current authorization.
+
+**Affected consumers/contracts:** Backend, experimental evaluation, Frontend, QA/security and Lead. [API v0.3](API_CONTRACT_V0_3.md); [RL-EXP-015](task_packets/RL-EXP-015-EXPERIMENTAL-EVALUATION.md) (plan Tasks 2–4), [RL-UX-016](task_packets/RL-UX-016-EXPERIMENTAL-WORKSPACE.md) (Task 5), [RL-LINK-017](task_packets/RL-LINK-017-CONTROLLED-DEMO.md) (Task 6, including explicit v2 worker image requalification). Exact-candidate independent engineering/experimental-semantics reviews and genuine/browser acceptance remain required; agents cannot self-approve scientific or institutional gates.
+
+**Compatibility / benchmark effect:** additive migration with pre-migration backup, immutable reference/evaluation identities and original legacy validators. No historical score rewriting, benchmark claim or calibrated threshold. v0.3 browser/server identification changes together; v0.2 persisted data remains readable. A rebuilt `pdf-worker-v2` image must be independently qualified before live v2 work; prior v1 qualification is not inherited.
+
+**Effective revision / rollback:** the commit containing this E0072 record, based on live main `cb0fa4f1242ae8bf12afb084bc9475017040b784`. Revert experimental task commits to disable the new channel; preserve existing immutable predictions/evidence, use verified pre-migration backup recovery when needed, and stop the task-owned tunnel/gateway to remove exposure. No new expenditure, private-data transfer, visibility change or scientific approval is implied.
 
 ## E0036 implementation authorization (not scientific approval)
 
