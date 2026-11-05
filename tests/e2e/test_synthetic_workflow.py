@@ -5,6 +5,8 @@ from datetime import UTC, datetime
 from hashlib import sha256
 from io import BytesIO
 import json
+
+import pytest
 from pathlib import Path
 
 from redaction_lab.adapters.base import PredictionAdapter, PredictionResponse
@@ -283,11 +285,7 @@ def test_two_reference_pairs_and_required_only_upload_complete_without_leakage(
         assert "REFERENCE" not in manifest.canonical_redacted_text
 
 
-def test_v03_process_persists_reference_evaluations_and_get_is_read_only(tmp_path, monkeypatch):
-    import sqlite3
-    from redaction_lab.adapters.ollama import OllamaAdapter
-    from redaction_lab.application.document_worker import DocumentWorker
-    from redaction_lab.application.application_store import ProcessingStatus
+def _matching_reference_pair(tmp_path):
     from reportlab.pdfgen.canvas import Canvas
     from reportlab.pdfbase.pdfmetrics import stringWidth
     def paired_pdf(hidden):
@@ -308,6 +306,15 @@ def test_v03_process_persists_reference_evaluations_and_get_is_read_only(tmp_pat
     redacted, reference = tmp_path / 'redacted.pdf', tmp_path / 'reference.pdf'
     redacted.write_bytes(paired_pdf(True))
     reference.write_bytes(paired_pdf(False))
+    return redacted, reference
+
+
+def test_v03_process_persists_reference_evaluations_and_get_is_read_only(tmp_path, monkeypatch):
+    import sqlite3
+    from redaction_lab.adapters.ollama import OllamaAdapter
+    from redaction_lab.application.document_worker import DocumentWorker
+    from redaction_lab.application.application_store import ProcessingStatus
+    redacted, reference = _matching_reference_pair(tmp_path)
     artifacts = ArtifactStore(tmp_path / 'artifacts', tmp_path / 'temporary')
     store = ApplicationStore(tmp_path / 'app.sqlite3', backup_directory=tmp_path / 'backups')
     app = create_app(UploadService(artifacts, store))
@@ -417,4 +424,98 @@ def test_v03_interrupted_run_reconnect_is_read_only_and_explicit_resume_is_one_s
         assert len(adapter.manifests) == 1
         assert sum(s['counts']['requested'] for s in complete['summaries']['document']) == 2
     finally:
+        artifacts.close()
+
+
+@pytest.mark.parametrize('interruption', ['runtime_unavailable', 'false_claim', 'already_processing'])
+def test_resumable_reference_defers_evidence_until_explicit_retry(tmp_path, monkeypatch, interruption):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Event
+    from redaction_lab.adapters.ollama import OllamaAdapter
+    from redaction_lab.application.document_worker import DocumentWorker
+    from redaction_lab.application.isolation import RuntimeUnavailable
+    from redaction_lab.application.application_store import ProcessingStatus
+    from redaction_lab.contracts import DocumentRole
+    import sqlite3
+
+    redacted, reference = _matching_reference_pair(tmp_path)
+    artifacts = ArtifactStore(tmp_path / 'artifacts', tmp_path / 'temporary')
+    store = ApplicationStore(tmp_path / 'app.sqlite3', backup_directory=tmp_path / 'backups')
+    app = create_app(UploadService(artifacts, store))
+    monkeypatch.setattr('redaction_lab.application.document_worker.ApplicationPdfWorker', InProcessSyntheticPdfWorker)
+    adapter = OllamaAdapter(endpoint='http://127.0.0.1:11434', model_id='qwen2.5:1.5b-instruct-q4_K_M', model_config_id='synthetic-json-v2')
+    calls = []
+    async def transport(endpoint, body, timeout):
+        calls.append(body)
+        assert 'Agent Cedar' not in body.decode()
+        return b'{"model":"qwen2.5:1.5b-instruct-q4_K_M","response":"{\\"reconstruction\\":\\"Agent Cedar\\"}","done":true,"done_reason":"stop","prompt_eval_count":63,"eval_count":12}'
+    monkeypatch.setattr(adapter, '_stdlib_transport', transport)
+    monkeypatch.setattr('redaction_lab.application.prediction_service.InferenceRuntime.verified', lambda self: _verified(adapter))
+    entered, release = Event(), Event()
+    executor = ThreadPoolExecutor(max_workers=1)
+    future = None
+    try:
+        receipt = _upload(app, 'resumable', redacted.read_bytes(), reference.read_bytes())
+        version_id = receipt['redacted']['version_id']
+        reference_id = receipt['reference']['version_id']
+        redacted_job = receipt['redacted']['job_id']
+        reference_job = app._job_for_version(reference_id).job_id
+        assert DocumentWorker(store, artifacts).run_once(owner='redacted', expected_job_id=redacted_job)
+        class TemporarilyBlockedWorker(InProcessSyntheticPdfWorker):
+            @staticmethod
+            def ensure_available():
+                if interruption == 'runtime_unavailable':
+                    raise RuntimeUnavailable('synthetic unavailable')
+            @staticmethod
+            def process(pdf_bytes, *, project_id, role):
+                if (interruption == 'already_processing' and role is DocumentRole.REFERENCE
+                        or interruption == 'false_claim' and project_id == 'concurrent'):
+                    entered.set()
+                    assert release.wait(timeout=10), 'test did not release real worker'
+                return InProcessSyntheticPdfWorker.process(pdf_bytes, project_id=project_id, role=role)
+        with monkeypatch.context() as interrupted:
+            interrupted.setattr('redaction_lab.application.document_worker.ApplicationPdfWorker', TemporarilyBlockedWorker)
+            if interruption == 'false_claim':
+                other = _upload(app, 'concurrent', redacted.read_bytes(), None)
+                future = executor.submit(DocumentWorker(store, artifacts).run_once, owner='concurrent', expected_job_id=other['redacted']['job_id'])
+            elif interruption == 'already_processing':
+                future = executor.submit(DocumentWorker(store, artifacts).run_once, owner='reference', expected_job_id=reference_job)
+            if future:
+                assert entered.wait(timeout=5)
+            status, _ = _request(app, 'POST', f'/api/v1/jobs/{redacted_job}/process')
+            assert status == 200
+            pending = _request(app, 'GET', f'/api/v1/results/{version_id}')[1]
+            assert pending['progress'] == {'total': 2, 'pending': 0, 'running': 0, 'terminal': 2}
+            assert pending['counts']['requested'] == pending['counts']['unknown'] == 2
+            assert pending['score_status'] == 'NONE'
+            assert all(row['attempt_status'] == 'SUCCEEDED' for row in pending['targets'])
+            assert all(row['evaluation'] is None and row['mapping'] is None for row in pending['targets'])
+            assert pending['summaries'] == {'target': [], 'document': [], 'model': []}
+            attempt_ids = [row['attempt_id'] for row in pending['targets']]
+            with sqlite3.connect(store.path) as connection:
+                assert connection.execute('select count(*) from evaluations').fetchone()[0] == 0
+                snapshot = tuple(connection.iterdump())
+            assert _request(app, 'GET', f'/api/v1/results/{version_id}')[1] == pending
+            with sqlite3.connect(store.path) as connection:
+                assert tuple(connection.iterdump()) == snapshot
+            assert len(calls) == 2
+        release.set()
+        if future:
+            assert future.result(timeout=10)
+        # GET after a concurrent reference finishes still must not evaluate.
+        assert all(row['evaluation'] is None for row in _request(app, 'GET', f'/api/v1/results/{version_id}')[1]['targets'])
+        assert _request(app, 'POST', f'/api/v1/jobs/{redacted_job}/process')[0] == 200
+        final = _request(app, 'GET', f'/api/v1/results/{version_id}')[1]
+        assert store.get_version(reference_id).processing_state is ProcessingStatus.READY
+        assert [row['attempt_id'] for row in final['targets']] == attempt_ids
+        assert len(calls) == 2
+        assert final['counts']['eligible'] == final['counts']['scored'] == 2
+        assert all(row['evaluation']['experimental_score'] is not None for row in final['targets'])
+        assert any(row['evaluation']['experimental_score'] == 100 for row in final['targets'])
+        assert _request(app, 'POST', f'/api/v1/jobs/{redacted_job}/process')[0] == 200
+        assert _request(app, 'GET', f'/api/v1/results/{version_id}')[1] == final
+        assert len(calls) == 2
+    finally:
+        release.set()
+        executor.shutdown(wait=True)
         artifacts.close()

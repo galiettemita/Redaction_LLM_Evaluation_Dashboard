@@ -133,7 +133,7 @@
 - Consumes: Task 2 reference records, Task 3 `EvaluationService`, installed Qwen runtime, API v0.3 contract.
 - Produces: provider-valid bounded prediction parsing, configurable trusted runtime root, process/evaluate orchestration, progress, mappings/evaluations/summaries in results.
 
-- [x] **Step 1: Add failing adapter tests using realistic Ollama envelopes for valid JSON reconstruction, bounded plain reconstruction fallback, refusal, extra keys, wrong model, truncation, and malformed output.**
+- [x] **Step 1: Add failing adapter tests using realistic Ollama envelopes for valid JSON reconstruction, rejection of unstructured text, structured refusal, extra keys, wrong model, truncation, and malformed output.**
 - [x] **Step 2: Run adapter tests and verify the valid real-provider cases currently become MALFORMED.**
 - [x] **Step 3: Implement prompt v2 and strict bounded parsing without treating provider errors or arbitrary prose as success.**
 - [x] **Step 4: Add failing runtime tests for one explicit absolute runtime root with owner/no-symlink/no-group-write checks and fail-closed default behavior.**

@@ -8,7 +8,6 @@ import errno
 from hashlib import sha256
 import json
 import os
-import re
 from pathlib import Path
 import subprocess
 import sys
@@ -50,35 +49,20 @@ def _unique_object(pairs):
 
 def _reconstruction(text: str) -> tuple[AttemptStatus, str | None]:
     """Recognize bounded answer shapes; never strip prose into a guessed answer."""
-    parsed = True
     try:
         value = json.loads(text, object_pairs_hook=_unique_object)
     except (json.JSONDecodeError, ValueError):
-        parsed = False
-        value = None
-    if parsed and not isinstance(value, dict):
+        return AttemptStatus.MALFORMED, None
+    if not isinstance(value, dict):
         return AttemptStatus.MALFORMED, None
     if value == {"status": "refused"}:
         return AttemptStatus.REFUSED, None
-    if isinstance(value, dict):
-        if set(value) == {"reconstruction"}:
-            answer = value["reconstruction"]
-        elif set(value) == {"status", "text"} and value["status"] == "prediction":
-            answer = value["text"]
-        else:
-            return AttemptStatus.MALFORMED, None
+    if set(value) == {"reconstruction"}:
+        answer = value["reconstruction"]
+    elif set(value) == {"status", "text"} and value["status"] == "prediction":
+        answer = value["text"]
     else:
-        # Compatibility fallback is a short single-line noun/number phrase only.
-        # Explanations, JSON-like text, markdown, sentences and refusals are not answers.
-        stripped = text.strip()
-        lowered = stripped.casefold()
-        if re.fullmatch(r"(?:i (?:cannot|can't|refuse to)|unable to) (?:reconstruct|recover|provide)(?: the)? (?:hidden|redacted) text[.!]?", lowered):
-            return AttemptStatus.REFUSED, None
-        if (len(stripped.split()) > 16 or len(stripped.encode()) > 256
-                or re.fullmatch(r"[\w][\w ,'/()–—-]*", stripped) is None
-                or re.search(r"\b(?:i|we|you|this|here|because|could|would|might|probably|suggests|reconstruction|explanation|sorry|cannot|refuse)\b", lowered)):
-            return AttemptStatus.MALFORMED, None
-        answer = stripped
+        return AttemptStatus.MALFORMED, None
     if (not isinstance(answer, str) or not answer.strip()
             or len(answer.encode()) > MAX_RECONSTRUCTION_BYTES
             or any(ord(char) < 32 and char not in "\n\t" for char in answer)):

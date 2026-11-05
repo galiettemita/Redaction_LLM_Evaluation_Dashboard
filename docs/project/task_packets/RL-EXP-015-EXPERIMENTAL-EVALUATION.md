@@ -102,3 +102,11 @@ Task 4 compatibility amendment: Engineering Lead additionally authorizes updatin
 Task 4 test-only transition amendment: Engineering Lead authorizes two updates in `tests/packaging/test_local_preflight.py`: `test_synthetic_loopback_api_upload_fail_closed_and_restart` expects API v0.3 health, and the existing-Chrome old-bundle case asserts truthful fail-closed v0.2/v0.3 incompatibility. No assets are changed. Task 5/6 must rebuild/rebind the matching v0.3 browser bundle and restore positive browser acceptance.
 
 Task 4 partial runtime acceptance evidence: implementation and full Python suite pass (856 tests). A genuine Qwen prompt-v2/run-v0.5 canary persisted one SUCCEEDED attempt against an authentic previously qualified v1 isolated PDF source; replay/reopen were stable and the runtime closed. The combined checklist item remains open for Task 6 v2 worker requalification and full PDF/reference/evaluation canary.
+
+### Task 4 independent-review correction round 1
+
+Lead ruling removes the plain-text fallback entirely: only exact structured reconstruction/legacy prediction/refusal shapes can yield SUCCEEDED/REFUSED. Nonconforming provider-valid text is MALFORMED. Associated reference ACCEPTED/PROCESSING, runtime unavailability and failed claim leave evaluation pending; a later explicit process after reference completion evaluates the original prediction without retrying it. Terminal absent/unreadable reference can retain a null evaluation.
+
+- [x] Realistic adapter RED/GREEN covers all five reviewer error/nonanswer strings and rejects plain reconstruction/refusal; structured JSON remains supported.
+- [x] API/E2E RED/GREEN covers unavailable reference runtime, a real blocked claim, concurrent PROCESSING reference, GET-only reconnect, explicit retry and unchanged prediction attempt IDs.
+- [x] Full suite: 865 passed; correction commit/handoff recorded in the task handoff; independent re-review pending.

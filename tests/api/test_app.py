@@ -770,3 +770,50 @@ def test_reupload_of_terminal_identity_does_not_claim_a_new_accepted_job(
     assert store.get_job(uploaded["redacted"]["job_id"]).status is ProcessingStatus.NO_REDACTIONS
     assert job_count == 1
     assert version_count == 1
+
+
+def test_evaluation_command_waits_for_reference_then_terminal_failure_can_record_null(tmp_path, monkeypatch):
+    import asyncio
+    from redaction_lab.fixtures import make_synthetic_pair
+    from redaction_lab.adapters.ollama import OllamaAdapter
+    from redaction_lab.application.inference_runtime import VerifiedInferenceRuntime
+    from redaction_lab.application.worker_protocol import WorkerRequest, process_request
+
+    class PdfTransport:
+        def ensure_available(self):
+            pass
+        def process(self, pdf_bytes, *, project_id, role):
+            request = WorkerRequest(protocol_version=WORKER_PROTOCOL_VERSION,
+                request_nonce='a'*32, project_id=project_id, role=role,
+                input_sha256=sha256(pdf_bytes).hexdigest(), byte_count=len(pdf_bytes))
+            return WorkerObservation(response=process_request(request, pdf_bytes), image_digest='sha256:'+'a'*64)
+    monkeypatch.setattr('redaction_lab.application.document_worker.ApplicationPdfWorker', PdfTransport)
+    app, store, artifacts = _app(tmp_path)
+    redacted, _ = make_synthetic_pair('two_boxes', tmp_path / 'fixture')
+    adapter = OllamaAdapter(endpoint='http://127.0.0.1:11434', model_id='qwen2.5:1.5b-instruct-q4_K_M', model_config_id='test-v2')
+    async def transport(*args):
+        return b'{"model":"qwen2.5:1.5b-instruct-q4_K_M","response":"{\\"reconstruction\\":\\"Agent Cedar\\"}","done":true,"done_reason":"stop"}'
+    monkeypatch.setattr(adapter, '_stdlib_transport', transport)
+    monkeypatch.setattr('redaction_lab.application.prediction_service.InferenceRuntime.verified', lambda self: VerifiedInferenceRuntime(
+        adapter=adapter, model_id=adapter.model_id, model_config_id=adapter.model_config_id, model_manifest_digest='sha256:'+'b'*64))
+    try:
+        _, _, receipt = _upload(app, redacted=redacted.read_bytes(), reference=b'%PDF-unreadable-reference')
+        version_id = receipt['redacted']['version_id']
+        assert DocumentWorker(store, artifacts).run_once(owner='redacted', expected_job_id=receipt['redacted']['job_id'])
+        asyncio.run(app.predictions.run(version_id))
+        pair = store.get_pair(receipt['pair_id'])
+        app._evaluate(version_id, pair)
+        result = _request(app, 'GET', f'/api/v1/results/{version_id}')[2]
+        assert all(row['evaluation'] is None for row in result['targets'])
+        assert result['counts']['unknown'] == 2
+        attempts = [row['attempt_id'] for row in result['targets']]
+        # The real parser makes malformed reference bytes terminal; a subsequent
+        # explicit process action can now persist a final null evaluation.
+        assert _request(app, 'POST', f"/api/v1/jobs/{receipt['redacted']['job_id']}/process")[0] == 200
+        result = _request(app, 'GET', f'/api/v1/results/{version_id}')[2]
+        assert store.get_version(receipt['reference']['version_id']).processing_state in {ProcessingStatus.FAILED, ProcessingStatus.UNSUPPORTED}
+        assert [row['attempt_id'] for row in result['targets']] == attempts
+        assert all(row['evaluation']['reason'] == 'MISSING_REFERENCE' for row in result['targets'])
+        assert all(row['evaluation']['experimental_score'] is None for row in result['targets'])
+    finally:
+        artifacts.close()

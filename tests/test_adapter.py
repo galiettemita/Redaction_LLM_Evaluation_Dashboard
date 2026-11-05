@@ -766,10 +766,10 @@ def test_real_stdlib_connection_refusal_remains_error() -> None:
 
 @pytest.mark.parametrize(('text', 'overrides', 'status', 'prediction'), [
     ('{"reconstruction":"twelve aircraft"}', {}, AttemptStatus.SUCCEEDED, 'twelve aircraft'),
-    ('twelve aircraft', {}, AttemptStatus.SUCCEEDED, 'twelve aircraft'),
+    ('twelve aircraft', {}, AttemptStatus.MALFORMED, None),
     ('{"status":"prediction","text":"twelve aircraft"}', {}, AttemptStatus.SUCCEEDED, 'twelve aircraft'),
     ('{"status":"refused"}', {}, AttemptStatus.REFUSED, None),
-    ('I cannot reconstruct the hidden text.', {}, AttemptStatus.REFUSED, None),
+    ('I cannot reconstruct the hidden text.', {}, AttemptStatus.MALFORMED, None),
     ('{"reconstruction":"twelve aircraft","explanation":"guess"}', {}, AttemptStatus.MALFORMED, None),
     ('twelve aircraft', {'model': 'other-model'}, AttemptStatus.ERROR, None),
     ('twelve aircraft', {'done_reason': 'length'}, AttemptStatus.MALFORMED, None),
@@ -783,6 +783,12 @@ def test_real_stdlib_connection_refusal_remains_error() -> None:
     ('{"status":"refused"}', {'done_reason': 'length'}, AttemptStatus.MALFORMED, None),
     ('{"reconstruction":"aircraft","reconstruction":"boats"}', {}, AttemptStatus.MALFORMED, None),
     ('twelve aircraft', {'error': 'provider failed'}, AttemptStatus.ERROR, None),
+    ('Internal server error', {}, AttemptStatus.MALFORMED, None),
+    ('Failed to generate response', {}, AttemptStatus.MALFORMED, None),
+    ('There is not enough context to recover the text', {}, AttemptStatus.MALFORMED, None),
+    ('No answer available', {}, AttemptStatus.MALFORMED, None),
+    ('The missing text is twelve aircraft', {}, AttemptStatus.MALFORMED, None),
+
 ])
 def test_realistic_ollama_envelope_bounded_reconstruction(monkeypatch, text, overrides, status, prediction):
     # Literal provider envelope, retaining timing/count metadata from /api/generate.

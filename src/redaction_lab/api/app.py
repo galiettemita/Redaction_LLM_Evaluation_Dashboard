@@ -131,6 +131,13 @@ class LocalApi:
 
     def _evaluate(self, version_id, pair):
         """Only the explicit process command writes evidence; never replace a result."""
+        if pair and pair.reference_version_id:
+            reference_job = self._job_for_version(pair.reference_version_id)
+            if reference_job.status in {ProcessingStatus.ACCEPTED, ProcessingStatus.PROCESSING}:
+                # An unavailable runtime, lost claim, or concurrent reference worker
+                # leaves truth pending. Do not freeze a terminal MISSING_REFERENCE
+                # record that would prevent a later explicit process from evaluating.
+                return
         version = self.store.get_version(version_id)
         source_id, run = self.predictions._stored_run(version_id)
         if run is None:
