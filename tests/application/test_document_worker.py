@@ -87,3 +87,34 @@ def test_caller_worker_injection_is_rejected_and_cannot_mark_reference_ready(tmp
         assert connection.execute(
             "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='canonical_sources'"
         ).fetchone()[0] == 0
+
+
+def test_reference_completion_persists_isolated_evidence_without_prediction_source(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    from hashlib import sha256
+    from redaction_lab.application.worker_protocol import WorkerRequest, WORKER_PROTOCOL_VERSION, process_request
+    _, reference = make_synthetic_pair("two_boxes", tmp_path / "fixture")
+    artifacts = ArtifactStore(tmp_path / "artifacts", tmp_path / "temporary")
+    store = ApplicationStore(tmp_path / "app.sqlite3", backup_directory=tmp_path / "backups")
+    accepted = UploadService(artifacts, store).accept(project_id="project", role=DocumentRole.REFERENCE,
+                                                     chunks=[reference.read_bytes()])
+
+    class IsolatedSyntheticWorker:
+        def ensure_available(self):
+            pass
+
+        def process(self, pdf_bytes, *, project_id, role):
+            request = WorkerRequest(protocol_version=WORKER_PROTOCOL_VERSION, request_nonce="a" * 32,
+                                    project_id=project_id, role=role, input_sha256=sha256(pdf_bytes).hexdigest(),
+                                    byte_count=len(pdf_bytes))
+            return SimpleNamespace(response=process_request(request, pdf_bytes), image_digest="sha256:" + "b" * 64)
+
+    monkeypatch.setattr("redaction_lab.application.document_worker.ApplicationPdfWorker", IsolatedSyntheticWorker)
+    assert DocumentWorker(store, artifacts).run_once(owner="worker")
+    assert store.get_job(accepted.job_id).status is ProcessingStatus.READY
+    source = store.reference_source(accepted.version_id)
+    assert "Agent Cedar" in source.canonical_text
+    assert source.input_sha256 == sha256(reference.read_bytes()).hexdigest()
+    assert store.get_version(accepted.version_id).source_id is None
+    with store.connect() as connection:
+        assert not connection.execute("SELECT 1 FROM sqlite_master WHERE name='canonical_sources'").fetchone()

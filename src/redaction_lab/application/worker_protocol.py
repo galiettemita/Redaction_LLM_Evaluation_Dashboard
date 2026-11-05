@@ -29,7 +29,8 @@ from redaction_lab.prediction_source import (
 )
 
 
-WORKER_PROTOCOL_VERSION = "pdf-worker-v1"
+WORKER_PROTOCOL_VERSION = "pdf-worker-v2"
+REFERENCE_CANONICALIZER_VERSION = "safe-exact-visible-text-v1"
 MAX_HEADER_BYTES = 4096
 MAX_RESPONSE_BYTES = MAX_WORKER_RESPONSE_BYTES
 
@@ -80,6 +81,9 @@ class WorkerResponse(_StrictModel):
     canonicalizer_version: str | None = None
     canonical_text: str | None = None
     canonical_hash: Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")] | None = None
+    reference_text: str | None = None
+    reference_hash: Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")] | None = None
+    reference_canonicalizer_version: Annotated[str, Field(min_length=1)] | None = None
     targets: tuple[WorkerTargetObservation, ...] = ()
     reason_code: Annotated[str, Field(pattern=r"^[A-Z0-9_]{1,64}$")] | None = None
 
@@ -89,6 +93,20 @@ class WorkerResponse(_StrictModel):
             raise ValueError("unsupported worker protocol version")
         if len(self.targets) > MAX_TARGETS:
             raise ValueError("worker target count exceeds limit")
+        reference_fields = (self.reference_text, self.reference_hash, self.reference_canonicalizer_version)
+        if self.status != WorkerStatus.PROCESSABLE or self.role is not DocumentRole.REFERENCE:
+            if any(value is not None for value in reference_fields):
+                raise ValueError("reference evidence is only valid for processable reference responses")
+        elif any(value is None for value in reference_fields):
+            raise ValueError("processable reference response requires complete reference material")
+        else:
+            assert self.reference_text is not None
+            if len(self.reference_text.encode("utf-8")) > MAX_CANONICAL_TEXT_BYTES:
+                raise ValueError("reference text exceeds limit")
+            if sha256(self.reference_text.encode("utf-8")).hexdigest() != self.reference_hash:
+                raise ValueError("reference canonical hash mismatch")
+            if self.reference_canonicalizer_version != REFERENCE_CANONICALIZER_VERSION:
+                raise ValueError("unsupported reference canonicalizer")
         if self.status == WorkerStatus.PROCESSABLE:
             if self.page_count < 1 or self.reason_code is not None:
                 raise ValueError("processable response has invalid disposition fields")
@@ -219,7 +237,26 @@ def process_request(request: WorkerRequest, pdf_bytes: bytes) -> WorkerResponse:
     if page_count > request.max_pages:
         return WorkerResponse(**_base(request, status=WorkerStatus.UNSUPPORTED, page_count=0, reason_code="PAGE_LIMIT"))
     if request.role is DocumentRole.REFERENCE:
-        return WorkerResponse(**_base(request, status=WorkerStatus.PROCESSABLE, page_count=page_count))
+        # These helpers parse only inside this isolated executable, never on the host.
+        from redaction_lab.reference import _reference_document, _safe_exact_reference_text
+
+        parsed = _reference_document(
+            pdf_bytes, project_id=request.project_id,
+            reference_document_version_id="worker-reference",
+            reference_canonical_version_id="worker-reference-canonical",
+        )
+        text = _safe_exact_reference_text(pdf_bytes, parsed[0]) if parsed else None
+        if text is None:
+            return WorkerResponse(**_base(request, status=WorkerStatus.UNSUPPORTED,
+                                          page_count=page_count, reason_code="REFERENCE_EXTRACTION_FAILED"))
+        if len(text.encode("utf-8")) > MAX_CANONICAL_TEXT_BYTES:
+            return WorkerResponse(**_base(request, status=WorkerStatus.UNSUPPORTED,
+                                          page_count=page_count, reason_code="REFERENCE_TEXT_LIMIT"))
+        return WorkerResponse(
+            **_base(request, status=WorkerStatus.PROCESSABLE, page_count=page_count),
+            reference_text=text, reference_hash=sha256(text.encode("utf-8")).hexdigest(),
+            reference_canonicalizer_version=REFERENCE_CANONICALIZER_VERSION,
+        )
 
     detection = detect_targets(
         pdf_bytes,

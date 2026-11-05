@@ -76,6 +76,9 @@ def _response(pdf: bytes, nonce: str) -> bytes:
         "canonicalizer_version": None,
         "canonical_text": None,
         "canonical_hash": None,
+        "reference_text": "synthetic visible reference",
+        "reference_hash": sha256(b"synthetic visible reference").hexdigest(),
+        "reference_canonicalizer_version": "safe-exact-visible-text-v1",
         "targets": [],
         "reason_code": None,
     }

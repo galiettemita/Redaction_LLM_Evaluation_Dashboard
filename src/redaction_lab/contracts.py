@@ -219,6 +219,16 @@ class ReferenceMapping(FrozenRecord):
     mapping_method_version: NonEmptyStr
     provenance: NonEmptyStr
 
+    @property
+    def is_experimental(self) -> bool:
+        return self.provenance == "USER_SUPPLIED_EXPERIMENTAL"
+
+    @property
+    def explanation(self) -> str:
+        if self.is_experimental and self.status is ReferenceStatus.CONFIRMED:
+            return "Unique complete reference span aligned experimentally; not scientifically validated."
+        return f"Reference alignment status: {self.status.value}."
+
     @model_validator(mode="after")
     def enforce_truth_availability(self) -> ReferenceMapping:
         if self.status is not ReferenceStatus.CONFIRMED:

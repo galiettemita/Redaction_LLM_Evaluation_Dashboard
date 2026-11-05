@@ -74,15 +74,15 @@
 - Consumes: `WorkerRequest`, `WorkerResponse`, `CanonicalRedactedDocument`, `ReferenceMapping`, uploaded `document_pairs`.
 - Produces: `StoredReferenceSource`, `ApplicationStore.reference_source(version_id)`, worker protocol `pdf-worker-v2`, and `align_experimental_reference(redacted, reference_text, ...) -> list[ReferenceMapping]` with provenance `USER_SUPPLIED_EXPERIMENTAL`.
 
-- [ ] **Step 1: Add failing protocol tests requiring bounded canonical reference text/hash/version only for processable REFERENCE responses and forbidding it for failures/redacted-only misuse.**
-- [ ] **Step 2: Run focused protocol tests and confirm failures are caused by missing v2 fields/validation.**
-- [ ] **Step 3: Implement worker v2 extraction and strict response bounds without exposing annotations or changing redacted prediction material.**
-- [ ] **Step 4: Add failing migration/store/worker tests for immutable reference-source persistence, pair lookup, crash recovery, tamper rejection, and no Task-4 source binding.**
-- [ ] **Step 5: Run focused persistence tests and confirm the new records are absent.**
-- [ ] **Step 6: Implement additive migration, persistence, recovery, and reference worker completion.**
-- [ ] **Step 7: Add failing reference tests for unique complete spans, repeated anchors, partial revelation, mismatch, page shifts, and prompt-like reference text.**
-- [ ] **Step 8: Implement `align_experimental_reference` by reusing the existing conservative text-first core while keeping verified synthetic `align_reference` behavior unchanged.**
-- [ ] **Step 9: Run focused tests, then the full Python suite; commit `feat: persist isolated experimental reference evidence`.**
+- [x] **Step 1: Add failing protocol tests requiring bounded canonical reference text/hash/version only for processable REFERENCE responses and forbidding it for failures/redacted-only misuse.**
+- [x] **Step 2: Run focused protocol tests and confirm failures are caused by missing v2 fields/validation.**
+- [x] **Step 3: Implement worker v2 extraction and strict response bounds without exposing annotations or changing redacted prediction material.**
+- [x] **Step 4: Add failing migration/store/worker tests for immutable reference-source persistence, pair lookup, crash recovery, tamper rejection, and no Task-4 source binding.**
+- [x] **Step 5: Run focused persistence tests and confirm the new records are absent.**
+- [x] **Step 6: Implement additive migration, persistence, recovery, and reference worker completion.**
+- [x] **Step 7: Add failing reference tests for unique complete spans, repeated anchors, partial revelation, mismatch, page shifts, and prompt-like reference text.**
+- [x] **Step 8: Implement `align_experimental_reference` by reusing the existing conservative text-first core while keeping verified synthetic `align_reference` behavior unchanged.**
+- [x] **Step 9: Run focused tests, then the full Python suite; commit `feat: persist isolated experimental reference evidence`.**
 
 ### Task 3: Versioned automatic experimental scoring and aggregation
 

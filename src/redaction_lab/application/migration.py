@@ -46,7 +46,10 @@ class MigrationResult:
 
 
 _MIGRATION_PATH = Path(__file__).with_name("migrations") / "0001.sql"
-MIGRATIONS = (Migration(1, _MIGRATION_PATH.read_text(encoding="utf-8")),)
+MIGRATIONS = (
+    Migration(1, _MIGRATION_PATH.read_text(encoding="utf-8")),
+    Migration(2, _MIGRATION_PATH.with_name("0002.sql").read_text(encoding="utf-8")),
+)
 _FILE_FLAGS = os.O_RDWR | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
 _HELPER_PROTOCOL = "redaction-lab-sqlite-migration-v1"
 _HELPER_ARGUMENT = "--isolated-sqlite-migration-helper"

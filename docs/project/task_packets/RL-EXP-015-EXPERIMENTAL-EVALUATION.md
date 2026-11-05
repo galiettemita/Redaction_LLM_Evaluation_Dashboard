@@ -18,10 +18,12 @@ Task 2 source/tests:
 - `src/redaction_lab/application/document_worker.py`
 - `src/redaction_lab/application/application_store.py`
 - `src/redaction_lab/application/migrations/0002.sql` (new additive migration)
+- `src/redaction_lab/application/migration.py` (necessary migration-registry scope correction under RL-OPS-002: register additive 0002 only; all gates unchanged)
 - `src/redaction_lab/reference.py`
 - `src/redaction_lab/contracts.py`
 - `tests/application/test_worker_protocol.py`
 - `tests/application/test_document_worker.py`
+- `tests/application/test_isolation.py` (necessary v2 response-fixture compatibility correction under RL-OPS-002 only; hardening assertions unchanged)
 - `tests/application/test_application_store.py`
 - `tests/application/test_migrations.py`
 - `tests/test_reference.py`
@@ -68,10 +70,10 @@ Task 4 implements exact v0.3 flat attempt rows, nested experimental mapping/eval
 
 ## Acceptance checklist (plan Tasks 2–4)
 
-- [ ] Task 2 RED: reference-only bounded visible text/hash/version and strict role/failure validation tests fail for missing v2 behavior.
-- [ ] Task 2 GREEN: immutable reference persistence, additive migration/backup, crash recovery, pair lookup, tamper rejection and no prediction-source binding pass.
-- [ ] Task 2 adversarial mappings: unique exact span, repeated/one-sided anchors, partial revelation, wrong document, changed pagination and prompt-like reference instructions preserve correct experimental/null states; verified synthetic behavior unchanged.
-- [ ] Task 2 focused/full Python suite passes; commit `feat: persist isolated experimental reference evidence`.
+- [x] Task 2 RED: reference-only bounded visible text/hash/version and strict role/failure validation tests fail for missing v2 behavior.
+- [x] Task 2 GREEN: immutable reference persistence, additive migration/backup, crash recovery, pair lookup, tamper rejection and no prediction-source binding pass.
+- [x] Task 2 adversarial mappings: unique exact span, repeated/one-sided anchors, partial revelation, wrong document, changed pagination and prompt-like reference instructions preserve correct experimental/null states; verified synthetic behavior unchanged.
+- [x] Task 2 focused/full Python suite passes; commit `feat: persist isolated experimental reference evidence`.
 - [ ] Task 3 RED/GREEN: exact match, invalid/empty input, repetition, paraphrase/role-reversal limitations, unsupported additions, number/date/negation caps and exact rounding verified.
 - [ ] Task 3 persistence: deterministic identities, version dispatch, legacy qualitative reopening, tamper rejection and immutable scores pass; verified scores always null.
 - [ ] Task 3 summaries: eligible denominator independent of outcome, unknown truth, refusal/timeout/malformed/error, zero denominators, equal-target document/equal-document model means and no cross-model blend pass.
