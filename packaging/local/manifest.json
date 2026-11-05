@@ -1,28 +1,31 @@
 {
   "schema_version": 1,
-  "package_version": "0.2.0-web008",
-  "api_version": "0.2",
-  "supported_platform": {"system": "Darwin", "machine": "arm64"},
+  "package_version": "0.3.0-ux016",
+  "api_version": "0.3",
+  "supported_platform": {
+    "system": "Darwin",
+    "machine": "arm64"
+  },
   "python_version": "3.12.14",
   "host": "127.0.0.1",
   "default_port": 8765,
   "frontend": {
     "dist_path": "web/dist",
     "assets": {
-      "index.html": {
-        "sha256": "ec263a9100e23363eab5ff019f14c87a83133ff4a3f56b6400242856e539076e",
-        "byte_size": 567,
-        "content_type": "text/html; charset=utf-8"
+      "assets/index-BLtu4W5Q.js": {
+        "sha256": "b91e280a07aa9a00a93f1d656cbd1a9ae5d8bcdb2a542c79ce9df75599aa14d5",
+        "byte_size": 224234,
+        "content_type": "text/javascript; charset=utf-8"
       },
-      "assets/index-cs0q5swb.css": {
-        "sha256": "f9558242c5506edadbfb433d023544e9ed93642dbfde2629217e100845b55706",
-        "byte_size": 7054,
+      "assets/index-DOfTYw_4.css": {
+        "sha256": "93b1e6178c23c09e35b4b9a84888a4c32f5a1c92cabe6b80611ec792ecd6d1e4",
+        "byte_size": 7483,
         "content_type": "text/css; charset=utf-8"
       },
-      "assets/index-aQq_IaFa.js": {
-        "sha256": "cafc2c373b5e3210a462c16eb67f818d669a7322e8d3a8ac2c9d9f48f72142cc",
-        "byte_size": 218846,
-        "content_type": "text/javascript; charset=utf-8"
+      "index.html": {
+        "sha256": "dae74ea9d466bbfe73b06c86fd4d05d79c386ae8cf4c7ba0536a94b003fa50b4",
+        "byte_size": 567,
+        "content_type": "text/html; charset=utf-8"
       }
     }
   },
@@ -58,8 +61,8 @@
   "delivery_status": {
     "candidate_distribution_status": "DISTRIBUTABLE",
     "frontend_available": true,
-    "frontend_source_api_version": "0.2",
-    "frontend_bundle_api_version": "0.2",
+    "frontend_source_api_version": "0.3",
+    "frontend_bundle_api_version": "0.3",
     "offline_prerequisite_bundle_available": false,
     "recipient_acceptance": "NOT_RUN",
     "inference_available": false,

@@ -20,9 +20,9 @@ LOCAL = ROOT / "packaging" / "local"
 HTTP = build_opener(ProxyHandler({}))
 CHROME = Path("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")
 GENUINE_ASSETS = {
-    "/": ("web/dist/index.html", "ec263a9100e23363eab5ff019f14c87a83133ff4a3f56b6400242856e539076e"),
-    "/assets/index-cs0q5swb.css": ("web/dist/assets/index-cs0q5swb.css", "f9558242c5506edadbfb433d023544e9ed93642dbfde2629217e100845b55706"),
-    "/assets/index-aQq_IaFa.js": ("web/dist/assets/index-aQq_IaFa.js", "cafc2c373b5e3210a462c16eb67f818d669a7322e8d3a8ac2c9d9f48f72142cc"),
+    "/assets/index-BLtu4W5Q.js": ("web/dist/assets/index-BLtu4W5Q.js", "b91e280a07aa9a00a93f1d656cbd1a9ae5d8bcdb2a542c79ce9df75599aa14d5"),
+    "/assets/index-DOfTYw_4.css": ("web/dist/assets/index-DOfTYw_4.css", "93b1e6178c23c09e35b4b9a84888a4c32f5a1c92cabe6b80611ec792ecd6d1e4"),
+    "/": ("web/dist/index.html", "dae74ea9d466bbfe73b06c86fd4d05d79c386ae8cf4c7ba0536a94b003fa50b4"),
 }
 
 
@@ -349,7 +349,7 @@ def test_synthetic_loopback_api_upload_fail_closed_and_restart(package, tmp_path
         process.communicate(timeout=5)
 
 
-def test_existing_chrome_cli_rejects_old_bundle_against_v03_api(package, tmp_path):
+def test_existing_chrome_cli_renders_experimental_workspace_against_v03_api(package, tmp_path):
     if not CHROME.is_file():
         pytest.skip("Existing Google Chrome CLI is unavailable")
     with socket.socket() as reservation:
@@ -367,20 +367,15 @@ def test_existing_chrome_cli_rejects_old_bundle_against_v03_api(package, tmp_pat
         assert browser.returncode == 0, browser.stderr
         assert "<title>Redaction Lab — local document workspace</title>" in browser.stdout
         assert "Every passage. Clear uncertainty." in browser.stdout
-        assert 'id="runtime-title">Local service connected</h2>' not in browser.stdout
-        assert 'The local service could not be checked.' in browser.stdout
-        assert "Unqualified work fails closed without a substitute prediction." not in browser.stdout
-        assert "No verified or experimental score is available." in browser.stdout
-        assert 'id="demo-title">Experimental text-only demo</h2>' in browser.stdout
-        assert "Plausible guesses are not proven correct." in browser.stdout
-        assert 'id="demo-text"' in browser.stdout
-        assert "Manually entered demo text" in browser.stdout
-        assert "Generate demo candidates" in browser.stdout
-        assert "Clear text and remove results" in browser.stdout
-        assert "Uploaded PDFs and references never fill this field." in browser.stdout
-        # Initial rendering must not invent candidates before manual submission.
-        assert "Unvalidated candidate phrases" not in browser.stdout
-        assert 'class="demo-marker"' not in browser.stdout
+        assert 'id="runtime-title">Local service connected</h2>' in browser.stdout
+        assert "EXPERIMENTAL — NOT SCIENTIFICALLY VALIDATED" in browser.stdout
+        assert "Verified accuracy remains unknown." in browser.stdout
+        assert "Qwen2.5 1.5B" in browser.stdout
+        assert "select the PDF again" in browser.stdout
+        assert 'id="demo-text"' not in browser.stdout
+        assert "Generate demo candidates" not in browser.stdout
+        assert "Status refresh failed" not in browser.stdout
+        assert "API v0.3" in browser.stdout
     finally:
         process.terminate()
         process.communicate(timeout=5)

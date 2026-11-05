@@ -23,19 +23,23 @@ Implement plan Task 5 after the API v0.3 contract is published, consuming RL-EXP
 - `tests/packaging/test_local_static.py` only for necessary asset/contract acceptance updates
 - this checklist, design/plan checklists and unique RL-UX-016 handoff(s)
 
+Lead-approved Task 5 scope amendment (2026-11-05, RL-OPS-002): `src/redaction_lab/api/static.py` may add only `frame-src blob:` to the CSP so the browser can embed a currently selected local PDF. Keep `default-src` and `object-src` at none and every other boundary unchanged; assert the exact policy in `tests/packaging/test_local_static.py`.
+
+Lead-approved test-only amendment: `tests/packaging/test_local_preflight.py` may update the expected frontend inventory and replace temporary v0.3 rejection/demo assertions with positive v0.3 browser acceptance. No other preflight semantics change.
+
 Frontend manifest writes and Task 6 launch/manifest writes must be sequential with fresh reads. Use isolated writing scope; never reset another agent's checkout. Rebuild from pinned dependencies, verify integrity/lifecycle/license prerequisites before any free install, audit and preserve deterministic packaging. No new model/provider/runtime or scientific method is introduced.
 
 ## Acceptance checklist (plan Task 5)
 
-- [ ] RED: strict v0.3 contract tests reject numeric verified scores, missing experimental method/scale/provenance, inconsistent IDs/counts, unsafe payloads and incompatible grouped summaries; permit multiple attempt rows sharing a target with distinct model/configuration identity.
-- [ ] RED: workspace tests cover file-object URL lifecycle/revocation, PDF release toggle, keyboard target selection, technical states, persistent action errors, read-only reconnect, experimental labels and counts.
-- [ ] GREEN: document workspace includes upload/saved-document recovery, large local PDF viewer, target/page selection and per-model predictions; reference toggle preserves target selection and uses browser object URLs for selected files.
-- [ ] Restore limitation is explicit: persisted results recover after refresh, but local PDF preview requires selecting the file again. No claim that document bytes were recovered from the server.
-- [ ] Target/document/model experimental cards display `EXPERIMENTAL — NOT SCIENTIFICALLY VALIDATED`, method/scale, subscores, critical-detail warnings, eligible/scored/unknown/excluded/technical counts and denominators. Empty/unknown remains null/Accuracy unknown.
-- [ ] Refusal, timeout, malformed output, provider error, unknown truth and processing error have distinct friendly copy; action errors survive status refresh. Technical failure is not a factual error.
-- [ ] Rule-based temporary candidate generation is absent from the primary product. Only genuine installed Qwen is advertised; one-model limitation and unvalidated lexical agreement are clear.
-- [ ] Same-origin client uses only its current loopback or controlled HTTPS origin with relative requests; no arbitrary backend override, credentials in assets, redirects or direct Ollama access.
-- [ ] Node suite, TypeScript typecheck, accessibility interactions, production build and audit pass. Packaging/static checks confirm exact asset manifest binding.
+- [x] RED: strict v0.3 contract tests reject numeric verified scores, missing experimental method/scale/provenance, inconsistent IDs/counts, unsafe payloads and incompatible grouped summaries; permit multiple attempt rows sharing a target with distinct model/configuration identity.
+- [x] RED: workspace tests cover file-object URL lifecycle/revocation, PDF release toggle, keyboard target selection, technical states, persistent action errors, read-only reconnect, experimental labels and counts.
+- [x] GREEN: document workspace includes upload/saved-document recovery, large local PDF viewer, target/page selection and per-model predictions; reference toggle preserves target selection and uses browser object URLs for selected files.
+- [x] Restore limitation is explicit: persisted results recover after refresh, but local PDF preview requires selecting the file again. No claim that document bytes were recovered from the server.
+- [x] Target/document/model experimental cards display `EXPERIMENTAL — NOT SCIENTIFICALLY VALIDATED`, method/scale, subscores, critical-detail warnings, eligible/scored/unknown/excluded/technical counts and denominators. Empty/unknown remains null/Accuracy unknown.
+- [x] Refusal, timeout, malformed output, provider error, unknown truth and processing error have distinct friendly copy; action errors survive status refresh. Technical failure is not a factual error.
+- [x] Rule-based temporary candidate generation is absent from the primary product. Only genuine installed Qwen is advertised; one-model limitation and unvalidated lexical agreement are clear.
+- [x] Same-origin client uses only its current loopback or controlled HTTPS origin with relative requests; no arbitrary backend override, credentials in assets, redirects or direct Ollama access.
+- [x] Node suite, TypeScript typecheck, accessibility interactions, production build and audit pass. Packaging/static checks confirm exact asset manifest binding.
 - [ ] Browser acceptance covers upload, view toggle, process, progress/results, selection, labels, errors and refresh/reconnect without duplicate attempt creation.
 - [ ] Commit `feat: ship experimental document evaluation workspace`; exact-candidate independent review and unique handoff published.
 

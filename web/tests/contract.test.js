@@ -7,7 +7,7 @@ let api;
 try { api = await import('../src/api.ts'); } catch (error) {
   if (error.code !== 'ERR_MODULE_NOT_FOUND') throw error;
 }
-const health = { api_version: '0.2', state: 'DEGRADED', runtime_qualified: false, mode: 'local' };
+const health = { api_version: '0.3', state: 'DEGRADED', runtime_qualified: false, mode: 'local' };
 const upload = { pair_id: 'pair-1', project_id: 'project-1', redacted: {
   version_id: 'version-1', job_id: 'job-1', sha256: 'a'.repeat(64), byte_size: 9, status: 'ACCEPTED'
 }, reference: null, truth_status: 'UNKNOWN' };
@@ -15,10 +15,10 @@ const document = { version_id: 'version-1', role: 'REDACTED', sha256: 'a'.repeat
   processing_status: 'ACCEPTED', page_count: null, job_id: 'job-1', reason_code: null, source_id: null };
 const job = { job_id: 'job-1', version_id: 'version-1', status: 'ACCEPTED', reason_code: null, source_id: null };
 const result = { version_id: 'version-1', status: 'PENDING', targets: [],
-  summaries: { target: null, document: null, model: null }, score_status: 'NONE',
+  summaries: { target: [], document: [], model: [] }, progress: {total: 0, pending: 0, running: 0, terminal: 0}, counts: {requested: 0, eligible: 0, scored: 0, unknown: 0, excluded: 0, technical_failures: 0}, score_status: 'NONE',
   verified_score: null, experimental_score: null, truth_status: 'UNKNOWN' };
 const pdf = () => new File(['%PDF-test'], 'synthetic.pdf', { type: 'application/pdf' });
-function response(body, status = 200, version = '0.2') {
+function response(body, status = 200, version = '0.3') {
   return new Response(JSON.stringify(body), { status, headers: {
     'Content-Type': 'application/json', 'X-Redaction-Lab-API': version
   } });
@@ -27,7 +27,7 @@ function client(transport) {
   assert.ok(api, 'Frontend API implementation is missing');
   return api.createApi('http://127.0.0.1:8765', transport);
 }
-test('accepts the local v0.2 health shape without upgrading runtime readiness', async () => {
+test('accepts the local v0.3 health shape without upgrading runtime readiness', async () => {
   assert.deepEqual(await client(async () => response(health)).health(), health);
 });
 test('rejects non-string health state instead of coercing JSON arrays into readiness', async () => {
@@ -125,7 +125,7 @@ test('never retries a failed write or reveals raw transport errors', async () =>
 });
 test('rejects missing or incompatible contract headers and malformed JSON', async () => {
   for (const transport of [async () => response(health, 200, '0.1'),
-    async () => new Response('broken', { headers: { 'X-Redaction-Lab-API': '0.2', 'Content-Type': 'application/json' } }),
+    async () => new Response('broken', { headers: { 'X-Redaction-Lab-API': '0.3', 'Content-Type': 'application/json' } }),
     async () => new Response(JSON.stringify(health), { headers: { 'Content-Type': 'text/html' } })]) {
     await assert.rejects(() => client(transport).health(), /contract/i);
   }
@@ -153,12 +153,12 @@ test('rejects numeric scores, fabricated targets and promoted reference truth', 
     await assert.rejects(() => local.results('version-1'), /contract/i);
   }
 });
-test('accepts exact v0.2 model-attempt provenance while preserving null scores', async () => {
+test('accepts exact v0.3 model-attempt provenance while preserving null scores', async () => {
   const target = { target_id: 'target-1', target_version: 'target-v1', page_index: 0,
-    normalized_bbox: [0.1, 0.2, 0.3, 0.4], attempt_id: 'attempt-1', attempt_status: 'SUCCEEDED',
+    normalized_bbox: [0.1, 0.3, 0.3, 0.4], attempt_id: 'attempt-1', attempt_status: 'SUCCEEDED',
     prediction: '<script>inert prediction text</script>', model_id: 'model-1', provider_model_id: 'model-1',
-    model_config_id: 'config-1', request_hash: 'b'.repeat(64), response_hash: 'c'.repeat(64) };
-  const value = { ...result, status: 'AVAILABLE', targets: [target] };
+    model_config_id: 'config-1', request_hash: 'b'.repeat(64), response_hash: 'c'.repeat(64), mapping: null, evaluation: null };
+  const value = { ...result, status: 'AVAILABLE', targets: [target], progress: {total: 1, pending: 0, running: 0, terminal: 1}, counts: {requested: 1, eligible: 0, scored: 0, unknown: 1, excluded: 0, technical_failures: 0} };
   const received = await client(async () => response(value)).results('version-1');
   assert.deepEqual(received.targets, [target]);
   const view = api.presentResults(received);
@@ -190,4 +190,109 @@ test('status refresh does not accept unsafe IDs or replay POST', async () => {
   const local = client(async () => { calls++; return response(document); });
   await assert.rejects(() => local.document('../unsafe'), /identifier/i);
   assert.equal(calls, 0);
+});
+
+// Hand-derived single scored cell: every agreement component is exactly one.
+function scoredResult() {
+  const counts = {requested: 1, eligible: 1, scored: 1, unknown: 0, excluded: 0, technical_failures: 0};
+  const evaluation = {evaluation_id: 'eval-1', schema_version: 'experimental-text-agreement-evidence-v1',
+    method_id: 'experimental-text-agreement-v1', scale: '0–100 text agreement', score_status: 'EXPERIMENTAL',
+    experimental_score: 100, verified_score: null, reason: null, prediction_hash: 'a'.repeat(64), reference_hash: 'b'.repeat(64),
+    subscores: {normalized_exact_match: true, token_precision: 1, token_recall: 1, token_f1: 1, ordered_token_agreement: 1, character_trigram_f1: 1, critical_detail_agreement: 1}, warnings: [], applied_caps: []};
+  const mapping = {mapping_id: 'mapping-1', mapping_version: 'mapping-v1', reference_document_version_id: 'ref-1',
+    mapping_method_version: 'text-first-experimental-reference-v1', provenance: 'USER_SUPPLIED_EXPERIMENTAL',
+    status: 'CONFIRMED', scoreability: 'SCOREABLE', exact_revealed_text: 'twelve aircraft', reference_token_locator: 'tokens:4:6',
+    redacted_canonical_hash: 'c'.repeat(64), reference_canonical_hash: 'd'.repeat(64), explanation: 'Unique complete span supported by both surrounding anchors.'};
+  const row = {target_id: 'target-1', target_version: 'target-v1', page_index: 0, normalized_bbox: [0.1, 0.2, 0.3, 0.4],
+    attempt_id: 'attempt-1', attempt_status: 'SUCCEEDED', prediction: 'twelve aircraft', model_id: 'qwen2.5:1.5b',
+    provider_model_id: 'qwen2.5:1.5b', model_config_id: 'config-1', request_hash: 'a'.repeat(64), response_hash: 'b'.repeat(64), mapping, evaluation};
+  const common = {summary_id: 'summary-target', schema_version: 'experimental-summary-v1', model_id: row.model_id,
+    model_config_id: row.model_config_id, method_id: evaluation.method_id, scale: evaluation.scale, score_status: 'EXPERIMENTAL',
+    experimental_score: 100, verified_score: null, counts, denominator: 1, member_ids: ['eval-1']};
+  return {...result, status: 'AVAILABLE', targets: [row], score_status: 'EXPERIMENTAL', counts,
+    progress: {total: 1, pending: 0, running: 0, terminal: 1}, summaries: {
+      target: [{...common, target_id: 'target-1', target_version: 'target-v1'}],
+      document: [{...common, summary_id: 'summary-doc', document_version_id: 'version-1'}],
+      model: [{...common, summary_id: 'summary-model', member_ids: ['summary-doc'], document_version_ids: ['version-1'], document_count: 1}]}};
+}
+test('accepts numeric experimental evidence at all three levels with verified null', async () => {
+  const value = scoredResult();
+  assert.deepEqual(await client(async () => response(value)).results('version-1'), value);
+});
+test('multiple models may share target identity but never attempt or comparison-cell identity', async () => {
+  const value = scoredResult(); value.summaries = {target: [], document: [], model: []};
+  value.targets.push({...structuredClone(value.targets[0]), attempt_id: 'attempt-2', model_id: 'model-2', provider_model_id: 'model-2', model_config_id: 'config-2', evaluation: {...value.targets[0].evaluation, evaluation_id: 'eval-2'}});
+  value.counts = {requested: 2, eligible: 2, scored: 2, unknown: 0, excluded: 0, technical_failures: 0}; value.progress = {total: 2, pending: 0, running: 0, terminal: 2};
+  assert.equal((await client(async () => response(value)).results('version-1')).targets.length, 2);
+  for (const change of [{attempt_id: 'attempt-1'}, {model_id: 'qwen2.5:1.5b', provider_model_id: 'qwen2.5:1.5b', model_config_id: 'config-1'}]) {
+    const bad = structuredClone(value); Object.assign(bad.targets[1], change);
+    await assert.rejects(() => client(async () => response(bad)).results('version-1'), /contract/i);
+  }
+});
+test('fails closed on invalid experimental evidence, counts, progress and grouped membership', async () => {
+  const mutations = [
+    v => v.targets[0].evaluation.verified_score = 0,
+    v => delete v.targets[0].evaluation.method_id,
+    v => delete v.targets[0].evaluation.scale,
+    v => delete v.targets[0].mapping.provenance,
+    v => v.targets[0].evaluation.subscores.token_f1 = 1.1,
+    v => v.targets[0].evaluation.experimental_score = 101,
+    v => v.targets[0].mapping.exact_revealed_text = null,
+    v => v.targets[0].mapping.target_id = 'another-target',
+    v => v.targets[0].evaluation.reason = 'PARTIAL_REFERENCE',
+    v => v.targets[0].mapping.status = 'PARTIAL',
+    v => v.targets[0].evaluation.applied_caps = [60],
+    v => v.counts.scored = 0,
+    v => v.counts.eligible = 0,
+    v => v.counts.technical_failures = 1,
+    v => v.progress.terminal = 0,
+    v => v.summaries.document[0].model_id = 'other-model',
+    v => v.summaries.target[0].target_version = 'other-version',
+    v => v.summaries.document[0].member_ids = ['missing-evaluation'],
+    v => v.summaries.document[0].counts.scored = 0,
+    v => v.summaries.model[0].document_count = 2,
+    v => v.summaries.model[0].verified_score = 100,
+    v => v.summaries.model[0].denominator = 0,
+  ];
+  for (const mutate of mutations) {
+    const value = scoredResult(); mutate(value);
+    await assert.rejects(() => client(async () => response(value)).results('version-1'), /contract/i);
+  }
+});
+test('zero denominator and failed attempts preserve unknown rather than zero', async () => {
+  const value = scoredResult(); const row = value.targets[0];
+  row.attempt_status = 'TIMEOUT'; row.prediction = null; row.response_hash = null;
+  row.evaluation = {...row.evaluation, score_status: 'NONE', experimental_score: null, reason: 'TIMEOUT', prediction_hash: null, subscores: null};
+  value.counts = {requested: 1, eligible: 1, scored: 0, unknown: 0, excluded: 0, technical_failures: 1};
+  value.score_status = 'NONE';
+  for (const level of Object.values(value.summaries)) for (const summary of level) Object.assign(summary, {score_status: 'NONE', experimental_score: null, denominator: 0, counts: value.counts});
+  assert.equal((await client(async () => response(value)).results('version-1')).summaries.model[0].experimental_score, null);
+  value.summaries.model[0].experimental_score = 0;
+  await assert.rejects(() => client(async () => response(value)).results('version-1'), /contract/i);
+});
+test('HTTPS is permitted only for the current browser origin and still uses relative requests', async () => {
+  const previous = globalThis.location;
+  globalThis.location = {origin: 'https://controlled.example'};
+  try {
+    let requested;
+    assert.deepEqual(await api.createApi('https://controlled.example', async path => {requested = path; return response(health);}).health(), health);
+    assert.equal(requested, '/api/v1/health');
+    assert.throws(() => api.createApi('https://other.example'));
+    assert.throws(() => api.createApi('http://127.0.0.1:8765'));
+  } finally { if (previous === undefined) delete globalThis.location; else globalThis.location = previous; }
+});
+test('accepts each persisted unknown mapping state and rejects invented states', async () => {
+  for (const status of ['ABSENT', 'PARTIAL', 'AMBIGUOUS', 'UNREADABLE', 'CONFLICTING']) {
+    const value = scoredResult(); const row = value.targets[0];
+    Object.assign(row.mapping, {status, scoreability: 'NOT_SCOREABLE', exact_revealed_text: null, reference_token_locator: null});
+    Object.assign(row.evaluation, {score_status: 'NONE', experimental_score: null, subscores: null, reference_hash: null, reason: 'PARTIAL_REFERENCE'});
+    value.score_status = 'NONE'; value.counts = {requested: 1, eligible: 0, scored: 0, unknown: 1, excluded: 0, technical_failures: 0};
+    value.summaries = {target: [], document: [], model: []};
+    assert.equal((await client(async () => response(value)).results('version-1')).targets[0].mapping.exact_revealed_text, null);
+    row.mapping.status = 'MADE_UP'; await assert.rejects(() => client(async () => response(value)).results('version-1'), /contract/i);
+  }
+});
+test('summary truth and technical counts remain bound to their member attempts', async () => {
+  const value = scoredResult(); value.summaries.document[0].counts = {requested: 2, eligible: 1, scored: 1, unknown: 1, excluded: 0, technical_failures: 1};
+  await assert.rejects(() => client(async () => response(value)).results('version-1'), /contract/i);
 });

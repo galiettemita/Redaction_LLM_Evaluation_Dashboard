@@ -166,12 +166,12 @@ Task 4 implementation evidence: full Python suite 856 passed; genuine prompt-v2 
 - Consumes: API v0.3 `Health`, `Snapshot`, target attempts, mappings, experimental evaluations, and summaries.
 - Produces: redacted/reference local PDF viewer, target selection, comparison/results panels, persistent experimental labels, friendly state rendering, and accessible interactions.
 
-- [ ] **Step 1: Add failing contract tests accepting only the exact v0.3 experimental shapes, multiple attempts per target/model identity, progress, null denominators, and rejecting numeric verified scores or missing method labels.**
-- [ ] **Step 2: Add failing workspace tests for file-object URL lifecycle, release toggle, keyboard target selection, error persistence after refresh, technical-state copy, reconnect without POST, and score labels/counts.**
-- [ ] **Step 3: Run Node tests and confirm failures describe the absent v0.3 workspace.**
-- [ ] **Step 4: Implement strict API parsing and the document-centered workspace; remove the rule-based demo from the primary product.**
-- [ ] **Step 5: Run Node tests, typecheck, accessibility interaction checks, production build, and audit.**
-- [ ] **Step 6: Rebind exact `web/dist` assets in `packaging/local/manifest.json`; run packaging/static tests.**
+- [x] **Step 1: Add failing contract tests accepting only the exact v0.3 experimental shapes, multiple attempts per target/model identity, progress, null denominators, and rejecting numeric verified scores or missing method labels.**
+- [x] **Step 2: Add failing workspace tests for file-object URL lifecycle, release toggle, keyboard target selection, error persistence after refresh, technical-state copy, reconnect without POST, and score labels/counts.**
+- [x] **Step 3: Run Node tests and confirm failures describe the absent v0.3 workspace.**
+- [x] **Step 4: Implement strict API parsing and the document-centered workspace; remove the rule-based demo from the primary product.**
+- [x] **Step 5: Run Node tests, typecheck, accessibility interaction checks, production build, and audit.**
+- [x] **Step 6: Rebind exact `web/dist` assets in `packaging/local/manifest.json`; run packaging/static tests.**
 - [ ] **Step 7: Commit `feat: ship experimental document evaluation workspace`.**
 
 ### Task 6: Owner-only authenticated gateway, launch evidence, and delivery

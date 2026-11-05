@@ -59,12 +59,12 @@ def test_committed_manifest_serves_the_reviewed_frontend_byte_for_byte():
     manifest = read_local_manifest(ROOT)
     app = create_static_app(None, ROOT, manifest["frontend"])
     expected = {
+        "/assets/index-BLtu4W5Q.js": ("web/dist/assets/index-BLtu4W5Q.js", "text/javascript; charset=utf-8", 224234,
+              "b91e280a07aa9a00a93f1d656cbd1a9ae5d8bcdb2a542c79ce9df75599aa14d5"),
+        "/assets/index-DOfTYw_4.css": ("web/dist/assets/index-DOfTYw_4.css", "text/css; charset=utf-8", 7483,
+              "93b1e6178c23c09e35b4b9a84888a4c32f5a1c92cabe6b80611ec792ecd6d1e4"),
         "/": ("web/dist/index.html", "text/html; charset=utf-8", 567,
-              "ec263a9100e23363eab5ff019f14c87a83133ff4a3f56b6400242856e539076e"),
-        "/assets/index-cs0q5swb.css": ("web/dist/assets/index-cs0q5swb.css", "text/css; charset=utf-8", 7054,
-              "f9558242c5506edadbfb433d023544e9ed93642dbfde2629217e100845b55706"),
-        "/assets/index-aQq_IaFa.js": ("web/dist/assets/index-aQq_IaFa.js", "text/javascript; charset=utf-8", 218846,
-              "cafc2c373b5e3210a462c16eb67f818d669a7322e8d3a8ac2c9d9f48f72142cc"),
+              "dae74ea9d466bbfe73b06c86fd4d05d79c386ae8cf4c7ba0536a94b003fa50b4"),
     }
     assert app.frontend_available is True
     for route, (relative, mime, size, digest) in expected.items():
@@ -98,7 +98,7 @@ def test_exact_asset_bytes_mime_length_and_bodyless_head(bundle, path, body, mim
     assert result["headers"]["X-Frame-Options"] == "DENY"
     assert result["headers"]["Referrer-Policy"] == "no-referrer"
     csp = result["headers"]["Content-Security-Policy"]
-    assert "default-src 'none'" in csp
+    assert csp == "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; font-src 'self'; frame-src blob:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
     assert "script-src 'self'" in csp
     assert "connect-src 'self'" in csp
     assert "frame-ancestors 'none'" in csp
