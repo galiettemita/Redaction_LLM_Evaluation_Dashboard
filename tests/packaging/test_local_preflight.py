@@ -307,7 +307,7 @@ def test_synthetic_loopback_api_upload_fail_closed_and_restart(package, tmp_path
                 connection.sendall(raw)
                 reply = connection.recv(4096)
                 assert reply.split(b"\r\n")[0].split()[1] == b"400"
-        assert health == {"api_version": "0.2", "state": "DEGRADED", "runtime_qualified": False, "mode": "local"}
+        assert health == {"api_version": "0.3", "state": "DEGRADED", "runtime_qualified": False, "mode": "local"}
         status, _ = request(base + "/api/v1/health", headers={"Host": "localhost"})
         assert status == 400
         status, _ = request(base + "/api/v1/health", headers={"Origin": "https://example.org"})
@@ -349,7 +349,7 @@ def test_synthetic_loopback_api_upload_fail_closed_and_restart(package, tmp_path
         process.communicate(timeout=5)
 
 
-def test_existing_chrome_cli_renders_the_genuine_same_origin_application(package, tmp_path):
+def test_existing_chrome_cli_rejects_old_bundle_against_v03_api(package, tmp_path):
     if not CHROME.is_file():
         pytest.skip("Existing Google Chrome CLI is unavailable")
     with socket.socket() as reservation:
@@ -367,8 +367,9 @@ def test_existing_chrome_cli_renders_the_genuine_same_origin_application(package
         assert browser.returncode == 0, browser.stderr
         assert "<title>Redaction Lab — local document workspace</title>" in browser.stdout
         assert "Every passage. Clear uncertainty." in browser.stdout
-        assert 'id="runtime-title">Local service connected</h2>' in browser.stdout
-        assert "Unqualified work fails closed without a substitute prediction." in browser.stdout
+        assert 'id="runtime-title">Local service connected</h2>' not in browser.stdout
+        assert 'The local service could not be checked.' in browser.stdout
+        assert "Unqualified work fails closed without a substitute prediction." not in browser.stdout
         assert "No verified or experimental score is available." in browser.stdout
         assert 'id="demo-title">Experimental text-only demo</h2>' in browser.stdout
         assert "Plausible guesses are not proven correct." in browser.stdout

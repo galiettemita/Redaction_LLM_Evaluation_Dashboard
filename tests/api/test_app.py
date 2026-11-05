@@ -127,9 +127,9 @@ def test_health_is_versioned_and_truthfully_degraded(tmp_path: Path) -> None:
         artifacts.close()
 
     assert status == 200
-    assert headers["X-Redaction-Lab-API"] == "0.2"
+    assert headers["X-Redaction-Lab-API"] == "0.3"
     assert payload == {
-        "api_version": "0.2",
+        "api_version": "0.3",
         "state": "DEGRADED",
         "runtime_qualified": False,
         "mode": "local",
@@ -213,7 +213,9 @@ def test_results_remain_pending_with_null_scores_and_no_fabricated_targets(
         "version_id": uploaded["redacted"]["version_id"],
         "status": "PENDING",
         "targets": [],
-        "summaries": {"target": None, "document": None, "model": None},
+        "progress": {"total": 0, "pending": 0, "running": 0, "terminal": 0},
+        "counts": {"requested": 0, "eligible": 0, "scored": 0, "unknown": 0, "excluded": 0, "technical_failures": 0},
+        "summaries": {"target": [], "document": [], "model": []},
         "score_status": "NONE",
         "verified_score": None,
         "experimental_score": None,
@@ -258,7 +260,7 @@ def test_v02_result_payload_exposes_only_revalidated_attempt_provenance() -> Non
     assert result["score_status"] == "NONE"
     assert result["verified_score"] is None
     assert result["experimental_score"] is None
-    assert result["summaries"] == {"target": None, "document": None, "model": None}
+    assert result["summaries"] == {"target": [], "document": [], "model": []}
 
 
 def test_unverified_runtime_returns_503_without_claiming_job_or_creating_source(
@@ -310,74 +312,44 @@ def test_unverified_runtime_returns_503_without_claiming_job_or_creating_source(
     assert source_count_after == source_count_before
 
 
-def test_ready_job_can_explicitly_resume_after_model_runtime_recovers(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_ready_job_can_explicitly_resume_after_model_runtime_recovers(tmp_path, monkeypatch):
+    from redaction_lab.fixtures import make_synthetic_pair
+    from redaction_lab.application.inference_runtime import VerifiedInferenceRuntime
+    from redaction_lab.adapters.ollama import OllamaAdapter
+    from redaction_lab.application.worker_protocol import WorkerRequest, process_request
     app, store, artifacts = _app(tmp_path)
+    redacted, _ = make_synthetic_pair('two_boxes', tmp_path / 'fixture')
+    class PdfTransport:
+        def ensure_available(self):
+            pass
+        def process(self, pdf_bytes, *, project_id, role):
+            request = WorkerRequest(protocol_version=WORKER_PROTOCOL_VERSION,
+                request_nonce='a'*32, project_id=project_id, role=role,
+                input_sha256=sha256(pdf_bytes).hexdigest(), byte_count=len(pdf_bytes))
+            return WorkerObservation(response=process_request(request, pdf_bytes), image_digest='sha256:'+'a'*64)
+    monkeypatch.setattr('redaction_lab.application.document_worker.ApplicationPdfWorker', PdfTransport)
+    def unavailable(self):
+        raise InferenceRuntimeUnavailable('synthetic unavailable')
+    monkeypatch.setattr('redaction_lab.application.prediction_service.InferenceRuntime.verified', unavailable)
     try:
-        _, _, uploaded = _upload(app)
-        job_id = uploaded["redacted"]["job_id"]
-        claimed = store.claim_next(owner="synthetic-document-worker", now=datetime.now(UTC))
-        assert claimed is not None
-        store.record_runtime(
-            job_id,
-            owner="synthetic-document-worker",
-            request_nonce="a" * 32,
-            protocol_version="pdf-worker-v1",
-            image_digest="sha256:" + "b" * 64,
-            page_count=1,
-        )
-        version = store.get_version(uploaded["redacted"]["version_id"])
-        with store.connect() as connection:
-            connection.execute(
-                """INSERT INTO canonical_sources (
-                    source_id, source_version, project_id, source_sha256, role,
-                    redacted_document_version_id, detector_version,
-                    canonicalizer_version, canonical_document_version_id,
-                    canonical_hash, canonical_json, targets_json, ingested_at, provenance
-                ) VALUES (?, ?, ?, ?, 'REDACTED', ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (
-                    "source-synthetic-ready", "synthetic-api-test", version.project_id,
-                    version.sha256, version.version_id, "synthetic-detector",
-                    "synthetic-canonicalizer", "canonical-synthetic-ready", "c" * 64,
-                    "{}", "[]", datetime.now(UTC).isoformat(), "synthetic-api-test",
-                ),
-            )
-        store.complete_job(
-            job_id,
-            owner="synthetic-document-worker",
-            status=ProcessingStatus.READY,
-            page_count=1,
-            source_id="source-synthetic-ready",
-            reason_code=None,
-        )
-
-        async def unavailable(version_id):
-            raise InferenceRuntimeUnavailable("synthetic unavailable")
-
-        monkeypatch.setattr(app.predictions, "run", unavailable)
-        blocked_status, _, blocked = _request(
-            app, "POST", f"/api/v1/jobs/{job_id}/process"
-        )
-        calls = []
-
-        async def recovered(version_id):
-            calls.append(version_id)
-            return ()
-
-        monkeypatch.setattr(app.predictions, "run", recovered)
-        resumed_status, _, resumed = _request(
-            app, "POST", f"/api/v1/jobs/{job_id}/process"
-        )
+        _, _, uploaded = _upload(app, redacted=redacted.read_bytes())
+        path = f"/api/v1/jobs/{uploaded['redacted']['job_id']}/process"
+        blocked_status, _, blocked = _request(app, 'POST', path)
+        assert blocked_status == 503 and blocked['error']['code'] == 'MODEL_RUNTIME_UNVERIFIED'
+        assert blocked['status'] == 'READY'
+        adapter = OllamaAdapter(endpoint='http://127.0.0.1:11434', model_id='qwen2.5:1.5b-instruct-q4_K_M', model_config_id='test-v2')
+        async def transport(*args):
+            return b'{"model":"qwen2.5:1.5b-instruct-q4_K_M","response":"{\\"status\\":\\"refused\\"}","done":true,"done_reason":"stop"}'
+        monkeypatch.setattr(adapter, '_stdlib_transport', transport)
+        monkeypatch.setattr('redaction_lab.application.prediction_service.InferenceRuntime.verified', lambda self: VerifiedInferenceRuntime(
+            adapter=adapter, model_id=adapter.model_id, model_config_id=adapter.model_config_id, model_manifest_digest='sha256:'+'b'*64))
+        resumed_status, _, resumed = _request(app, 'POST', path)
+        assert resumed_status == 200 and resumed['status'] == 'READY'
+        result = _request(app, 'GET', f"/api/v1/results/{uploaded['redacted']['version_id']}")[2]
+        assert len(result['targets']) == 2
+        assert all(row['attempt_status'] == 'REFUSED' for row in result['targets'])
     finally:
         artifacts.close()
-
-    assert blocked_status == 503
-    assert blocked["error"]["code"] == "MODEL_RUNTIME_UNVERIFIED"
-    assert blocked["status"] == "READY"
-    assert resumed_status == 200
-    assert resumed["status"] == "READY"
-    assert calls == [uploaded["redacted"]["version_id"]]
 
 
 def test_process_request_rejects_nonempty_body_without_claiming_job(
@@ -707,7 +679,9 @@ def test_results_preserve_distinct_terminal_processing_outcomes(
         "version_id": uploaded["redacted"]["version_id"],
         "status": result_status,
         "targets": [],
-        "summaries": {"target": None, "document": None, "model": None},
+        "progress": {"total": 0, "pending": 0, "running": 0, "terminal": 0},
+        "counts": {"requested": 0, "eligible": 0, "scored": 0, "unknown": 0, "excluded": 0, "technical_failures": 0},
+        "summaries": {"target": [], "document": [], "model": []},
         "score_status": "NONE",
         "verified_score": None,
         "experimental_score": None,

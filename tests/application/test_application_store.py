@@ -340,3 +340,47 @@ def test_reference_source_sql_replace_cannot_overwrite_committed_evidence(tmp_pa
     with store.connect() as connection:
         with pytest.raises(sqlite3.IntegrityError, match="immutable"):
             connection.execute("INSERT OR REPLACE INTO reference_sources SELECT * FROM reference_sources")
+
+
+def _paired_queue(store):
+    redacted = store.register_upload(project_id='paired', role=DocumentRole.REDACTED,
+        artifact_key='redacted', sha256='a'*64, byte_size=10)
+    reference = store.register_upload(project_id='paired', role=DocumentRole.REFERENCE,
+        artifact_key='reference', sha256='b'*64, byte_size=10)
+    store.create_pair(project_id='paired', redacted_version_id=redacted.version_id, reference_version_id=reference.version_id)
+    later = store.register_upload(project_id='paired', role=DocumentRole.REDACTED,
+        artifact_key='later', sha256='c'*64, byte_size=10)
+    return redacted, reference, later
+
+
+def test_explicit_paired_reference_can_precede_later_redacted_only_after_terminal_pair(tmp_path):
+    store = _store(tmp_path)
+    redacted, reference, later = _paired_queue(store)
+    now = datetime.now(UTC)
+    assert store.claim_next(owner='worker', now=now, expected_job_id=reference.job_id) is None
+    job = store.claim_next(owner='worker', now=now, expected_job_id=redacted.job_id)
+    assert job.job_id == redacted.job_id
+    assert store.claim_next(owner='other', now=now, expected_job_id=reference.job_id) is None
+    store.complete_job(job.job_id, owner='worker', status=ProcessingStatus.NO_REDACTIONS,
+        page_count=1, source_id=None, reason_code='NO_SUPPORTED_TARGETS')
+    claimed = store.claim_next(owner='worker', now=now, expected_job_id=reference.job_id)
+    assert claimed is not None and claimed.job_id == reference.job_id
+    assert store.get_job(later.job_id).status is ProcessingStatus.ACCEPTED
+
+
+def test_explicit_reference_and_normal_redacted_claim_race_has_one_winner(tmp_path):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier
+    store = _store(tmp_path)
+    redacted, reference, later = _paired_queue(store)
+    job = store.claim_next(owner='first', now=datetime.now(UTC))
+    store.complete_job(job.job_id, owner='first', status=ProcessingStatus.NO_REDACTIONS,
+        page_count=1, source_id=None, reason_code='NO_SUPPORTED_TARGETS')
+    barrier = Barrier(2)
+    def claim(expected):
+        barrier.wait()
+        return store.claim_next(owner=str(expected), now=datetime.now(UTC), expected_job_id=expected)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        claims = list(pool.map(claim, (reference.job_id, later.job_id)))
+    assert sum(value is not None for value in claims) == 1
+    assert sum(store.get_job(key).status is ProcessingStatus.PROCESSING for key in (reference.job_id, later.job_id)) == 1

@@ -389,8 +389,22 @@ class ApplicationStore:
                 connection.commit()
                 return None
             if expected_job_id is not None and row["job_id"] != expected_job_id:
-                connection.commit()
-                return None
+                # A deliberate pair workflow may finish its reference before the next
+                # redacted upload. The transaction above still excludes every worker.
+                row = connection.execute(
+                    """SELECT r.job_id FROM application_jobs r
+                       JOIN document_pairs p ON p.reference_version_id=r.document_version_id
+                           AND p.project_id=r.project_id
+                       JOIN application_jobs d ON d.document_version_id=p.redacted_version_id
+                           AND d.project_id=p.project_id
+                       WHERE r.job_id=? AND r.role='REFERENCE' AND r.status='ACCEPTED'
+                           AND d.role='REDACTED'
+                           AND d.status IN ('READY','NO_REDACTIONS','UNSUPPORTED','FAILED')
+                       LIMIT 1""", (expected_job_id,),
+                ).fetchone()
+                if row is None:
+                    connection.commit()
+                    return None
             connection.execute(
                 "UPDATE application_jobs SET status='PROCESSING', owner=?, updated_at=? WHERE job_id=?",
                 (owner, now.isoformat(), row["job_id"]),

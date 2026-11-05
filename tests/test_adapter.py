@@ -762,3 +762,57 @@ def test_real_stdlib_connection_refusal_remains_error() -> None:
     response = asyncio.run(adapter.predict(_manifest()))
 
     assert response.status is AttemptStatus.ERROR
+
+
+@pytest.mark.parametrize(('text', 'overrides', 'status', 'prediction'), [
+    ('{"reconstruction":"twelve aircraft"}', {}, AttemptStatus.SUCCEEDED, 'twelve aircraft'),
+    ('twelve aircraft', {}, AttemptStatus.SUCCEEDED, 'twelve aircraft'),
+    ('{"status":"prediction","text":"twelve aircraft"}', {}, AttemptStatus.SUCCEEDED, 'twelve aircraft'),
+    ('{"status":"refused"}', {}, AttemptStatus.REFUSED, None),
+    ('I cannot reconstruct the hidden text.', {}, AttemptStatus.REFUSED, None),
+    ('{"reconstruction":"twelve aircraft","explanation":"guess"}', {}, AttemptStatus.MALFORMED, None),
+    ('twelve aircraft', {'model': 'other-model'}, AttemptStatus.ERROR, None),
+    ('twelve aircraft', {'done_reason': 'length'}, AttemptStatus.MALFORMED, None),
+    ('twelve aircraft', {'done': False}, AttemptStatus.MALFORMED, None),
+    ('Here is my reconstruction: twelve aircraft', {}, AttemptStatus.MALFORMED, None),
+    ('The hidden text could be twelve aircraft because the context suggests it.', {}, AttemptStatus.MALFORMED, None),
+    ('```json\n{"reconstruction":"twelve aircraft"}\n```', {}, AttemptStatus.MALFORMED, None),
+    ('x'*4097, {}, AttemptStatus.MALFORMED, None),
+    ('{"reconstruction":"' + 'x'*4097 + '"}', {}, AttemptStatus.MALFORMED, None),
+    ('twelve aircraft', {'eval_count': True}, AttemptStatus.MALFORMED, None),
+    ('{"status":"refused"}', {'done_reason': 'length'}, AttemptStatus.MALFORMED, None),
+    ('{"reconstruction":"aircraft","reconstruction":"boats"}', {}, AttemptStatus.MALFORMED, None),
+    ('twelve aircraft', {'error': 'provider failed'}, AttemptStatus.ERROR, None),
+])
+def test_realistic_ollama_envelope_bounded_reconstruction(monkeypatch, text, overrides, status, prediction):
+    # Literal provider envelope, retaining timing/count metadata from /api/generate.
+    payload = {'model': 'local-model', 'created_at': '2026-11-05T20:00:00Z',
+        'response': text, 'done': True, 'done_reason': 'stop', 'context': [1, 2, 3],
+        'total_duration': 1800000000, 'load_duration': 350000000,
+        'prompt_eval_count': 63, 'prompt_eval_duration': 90000000,
+        'eval_count': 12, 'eval_duration': 1300000000, **overrides}
+    async def transport(*args):
+        return json.dumps(payload).encode()
+    adapter = OllamaAdapter(endpoint='http://127.0.0.1:11434', model_id='local-model', model_config_id='config-v2')
+    monkeypatch.setattr(adapter, '_stdlib_transport', transport)
+    response = asyncio.run(adapter.predict(_manifest()))
+    assert response.status is status
+    assert response.prediction == prediction
+
+
+def test_prompt_v2_uses_model_template_and_json_generation():
+    adapter = OllamaAdapter(endpoint='http://127.0.0.1:11434', model_id='local-model', model_config_id='config-v2')
+    manifest = _manifest().model_copy(update={'prompt_version': 'prompt-v2'})
+    payload = json.loads(adapter.prepare(manifest).body)
+    assert payload['raw'] is False
+    assert payload['format'] == 'json'
+    assert 'reconstruction' in payload['prompt']
+
+
+@pytest.mark.parametrize('answer', ['null', 'true', '42', 'I do not know', 'This is an explanation', 'I think twelve aircraft'])
+def test_plain_fallback_rejects_json_scalars_and_conversational_prose(monkeypatch, answer):
+    async def transport(*args):
+        return json.dumps({'model': 'local-model', 'response': answer, 'done': True, 'done_reason': 'stop'}).encode()
+    adapter = OllamaAdapter(endpoint='http://127.0.0.1:11434', model_id='local-model', model_config_id='v2')
+    monkeypatch.setattr(adapter, '_stdlib_transport', transport)
+    assert asyncio.run(adapter.predict(_manifest())).status is AttemptStatus.MALFORMED

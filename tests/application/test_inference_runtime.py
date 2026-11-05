@@ -1108,3 +1108,44 @@ def test_runtime_lock_rejects_mutable_or_redirected_file(tmp_path, mutation) -> 
         target = path
     with pytest.raises(InferenceRuntimeUnavailable):
         InferenceRuntime._read_lock(target)
+
+
+def test_explicit_runtime_root_resolves_locked_inventory_under_one_owner_root(tmp_path, monkeypatch):
+    root = tmp_path / 'owned-runtime'
+    root.mkdir(mode=0o700)
+    monkeypatch.setenv('REDACTION_LAB_RUNTIME_ROOT', str(root))
+    assert InferenceRuntime._resolve_locked_path('runtime/model-runtime/models') == root / 'model-runtime/models'
+
+
+@pytest.mark.parametrize('kind', ['relative', 'missing', 'symlink', 'group_write', 'wrong_owner'])
+def test_configured_runtime_root_fails_closed(tmp_path, monkeypatch, kind):
+    root = tmp_path / 'owned-runtime'
+    root.mkdir(mode=0o700)
+    configured = str(root)
+    if kind == 'relative':
+        configured = 'relative/runtime'
+    elif kind == 'missing':
+        configured = str(tmp_path / 'missing')
+    elif kind == 'symlink':
+        link = tmp_path / 'alias'
+        link.symlink_to(root, target_is_directory=True)
+        configured = str(link)
+    elif kind == 'group_write':
+        root.chmod(0o770)
+    else:
+        monkeypatch.setattr(os, 'geteuid', lambda: 123456)
+    monkeypatch.setenv('REDACTION_LAB_RUNTIME_ROOT', configured)
+    with pytest.raises(InferenceRuntimeUnavailable):
+        InferenceRuntime._resolve_locked_path('runtime/model-runtime/models')
+
+
+def test_configured_root_does_not_weaken_inventory_digest_checks(tmp_path, monkeypatch):
+    root = tmp_path / 'owned-runtime'
+    root.mkdir(mode=0o700)
+    models = root / 'models'
+    models.mkdir(mode=0o700)
+    (models / 'blob').write_bytes(b'tampered')
+    monkeypatch.setenv('REDACTION_LAB_RUNTIME_ROOT', str(root))
+    resolved = InferenceRuntime._resolve_locked_path('runtime/models')
+    with pytest.raises(InferenceRuntimeUnavailable, match='digest mismatch'):
+        InferenceRuntime._assert_file_inventory(resolved, {'blob': 'sha256:'+'a'*64}, {}, label='models')

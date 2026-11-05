@@ -133,15 +133,18 @@
 - Consumes: Task 2 reference records, Task 3 `EvaluationService`, installed Qwen runtime, API v0.3 contract.
 - Produces: provider-valid bounded prediction parsing, configurable trusted runtime root, process/evaluate orchestration, progress, mappings/evaluations/summaries in results.
 
-- [ ] **Step 1: Add failing adapter tests using realistic Ollama envelopes for valid JSON reconstruction, bounded plain reconstruction fallback, refusal, extra keys, wrong model, truncation, and malformed output.**
-- [ ] **Step 2: Run adapter tests and verify the valid real-provider cases currently become MALFORMED.**
-- [ ] **Step 3: Implement prompt v2 and strict bounded parsing without treating provider errors or arbitrary prose as success.**
-- [ ] **Step 4: Add failing runtime tests for one explicit absolute runtime root with owner/no-symlink/no-group-write checks and fail-closed default behavior.**
-- [ ] **Step 5: Implement configurable trusted runtime-root resolution without weakening file inventory/digest checks.**
-- [ ] **Step 6: Add failing API/E2E tests for reference-first processing, one attempt per target, evaluation creation only after terminal prediction, progress counts, experimental result shapes, null cases, reference absence from manifests, and GET-only reconnect.**
-- [ ] **Step 7: Implement API v0.3 orchestration and result serialization; preserve v0.2 stored-record compatibility.**
+- [x] **Step 1: Add failing adapter tests using realistic Ollama envelopes for valid JSON reconstruction, bounded plain reconstruction fallback, refusal, extra keys, wrong model, truncation, and malformed output.**
+- [x] **Step 2: Run adapter tests and verify the valid real-provider cases currently become MALFORMED.**
+- [x] **Step 3: Implement prompt v2 and strict bounded parsing without treating provider errors or arbitrary prose as success.**
+- [x] **Step 4: Add failing runtime tests for one explicit absolute runtime root with owner/no-symlink/no-group-write checks and fail-closed default behavior.**
+- [x] **Step 5: Implement configurable trusted runtime-root resolution without weakening file inventory/digest checks.**
+- [x] **Step 6: Add failing API/E2E tests for reference-first processing, one attempt per target, evaluation creation only after terminal prediction, progress counts, experimental result shapes, null cases, reference absence from manifests, and GET-only reconnect.**
+- [x] **Step 7: Implement API v0.3 orchestration and result serialization; preserve v0.2 stored-record compatibility.**
 - [ ] **Step 8: Run focused tests, full Python suite, and a genuine synthetic Qwen canary after Task 6's v2 worker requalification prerequisite; require at least one persisted SUCCEEDED prediction before claiming Task 4 acceptance.**
-- [ ] **Step 9: Commit `feat: connect genuine inference to experimental evaluation`.**
+- [x] **Step 9: Commit `feat: connect genuine inference to experimental evaluation`.**
+
+
+Task 4 implementation evidence: full Python suite 856 passed; genuine prompt-v2 Qwen canary persisted one SUCCEEDED attempt using an authentic previously-qualified v1 isolated PDF source, with replay/reopen stability and cleanup. Step 8 remains open only for Task 6 v2 PDF/reference runtime requalification and full combined canary. This is not a v2 runtime acceptance claim.
 
 ### Task 5: Document-centered experimental React workspace
 

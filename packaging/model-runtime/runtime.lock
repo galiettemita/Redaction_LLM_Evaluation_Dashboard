@@ -77,6 +77,6 @@
   "ollama_version": "0.40.13",
   "model_id": "qwen2.5:1.5b-instruct-q4_K_M",
   "provider_model_id": "qwen2.5:1.5b-instruct-q4_K_M",
-  "model_config_id": "ollama-0.40.13-qwen2.5-1.5b-q4_K_M-ctx32768-out1024-raw-noshift",
+  "model_config_id": "ollama-0.40.13-qwen2.5-1.5b-q4_K_M-ctx32768-out1024-json-template-v2-noshift",
   "model_manifest_digest": "sha256:65ec06548149b04c096a120e4a6da9d4017ea809c91734ea5631e89f96ddc57b"
 }

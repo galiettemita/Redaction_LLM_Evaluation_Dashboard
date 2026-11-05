@@ -281,3 +281,140 @@ def test_two_reference_pairs_and_required_only_upload_complete_without_leakage(
         assert "12 paper stars" not in manifest.canonical_redacted_text
         assert "ALPHA BRAVO" not in manifest.canonical_redacted_text
         assert "REFERENCE" not in manifest.canonical_redacted_text
+
+
+def test_v03_process_persists_reference_evaluations_and_get_is_read_only(tmp_path, monkeypatch):
+    import sqlite3
+    from redaction_lab.adapters.ollama import OllamaAdapter
+    from redaction_lab.application.document_worker import DocumentWorker
+    from redaction_lab.application.application_store import ProcessingStatus
+    from reportlab.pdfgen.canvas import Canvas
+    from reportlab.pdfbase.pdfmetrics import stringWidth
+    def paired_pdf(hidden):
+        buffer = BytesIO()
+        canvas = Canvas(buffer, pagesize=(612, 792), invariant=1)
+        canvas.setFont('Helvetica', 11)
+        lines = [(700, 'The courier ', 'Agent Cedar', ' arrived at dawn.'),
+                (660, 'The package held ', '12 paper stars', ' during transit.')]
+        for y, prefix, secret, suffix in lines:
+            canvas.drawString(72, y, prefix + secret + suffix)
+        if hidden:
+            for y, prefix, secret, suffix in lines:
+                canvas.setFillColorRGB(0, 0, 0)
+                canvas.rect(72 + stringWidth(prefix, 'Helvetica', 11)-1, y-3,
+                    stringWidth(secret, 'Helvetica', 11)+2, 14, fill=1, stroke=0)
+        canvas.save()
+        return buffer.getvalue()
+    redacted, reference = tmp_path / 'redacted.pdf', tmp_path / 'reference.pdf'
+    redacted.write_bytes(paired_pdf(True))
+    reference.write_bytes(paired_pdf(False))
+    artifacts = ArtifactStore(tmp_path / 'artifacts', tmp_path / 'temporary')
+    store = ApplicationStore(tmp_path / 'app.sqlite3', backup_directory=tmp_path / 'backups')
+    app = create_app(UploadService(artifacts, store))
+    monkeypatch.setattr('redaction_lab.application.document_worker.ApplicationPdfWorker', InProcessSyntheticPdfWorker)
+    adapter = OllamaAdapter(endpoint='http://127.0.0.1:11434', model_id='qwen2.5:1.5b-instruct-q4_K_M', model_config_id='synthetic-envelope-v2')
+    async def transport(endpoint, body, timeout):
+        assert 'Agent Cedar' not in body.decode()
+        assert '12 paper stars' not in body.decode()
+        return b'{"model":"qwen2.5:1.5b-instruct-q4_K_M","created_at":"2026-11-05T20:00:00Z","response":"{\\"reconstruction\\":\\"Agent Cedar\\"}","done":true,"done_reason":"stop","prompt_eval_count":63,"eval_count":12,"total_duration":1800000000}'
+    monkeypatch.setattr(adapter, '_stdlib_transport', transport)
+    monkeypatch.setattr('redaction_lab.application.prediction_service.InferenceRuntime.verified', lambda self: _verified(adapter))
+    try:
+        receipt = _upload(app, 'experimental', redacted.read_bytes(), reference.read_bytes())
+        # A second accepted pair cannot starve the first pair's reference.
+        other = _upload(app, 'queued', redacted.read_bytes(), reference.read_bytes())
+        version_id = receipt['redacted']['version_id']
+        assert DocumentWorker(store, artifacts).run_once(owner='test', expected_job_id=receipt['redacted']['job_id'])
+        asyncio.run(app.predictions.run(version_id))
+        before = _request(app, 'GET', f'/api/v1/results/{version_id}')[1]
+        assert all(row.get('evaluation') is None for row in before['targets'])
+        assert before['progress'] == {'total': 2, 'pending': 0, 'running': 0, 'terminal': 2}
+        status, _ = _request(app, 'POST', f"/api/v1/jobs/{receipt['redacted']['job_id']}/process")
+        assert status == 200
+        assert store.get_version(receipt['reference']['version_id']).processing_state is ProcessingStatus.READY
+        result = _request(app, 'GET', f'/api/v1/results/{version_id}')[1]
+        assert result['counts'] == {'requested': 2, 'eligible': 2, 'scored': 2, 'unknown': 0, 'excluded': 0, 'technical_failures': 0}
+        assert result['score_status'] == 'EXPERIMENTAL'
+        assert result['verified_score'] is None and result['truth_status'] == 'UNKNOWN'
+        assert any(row['evaluation']['experimental_score'] == 100 for row in result['targets'])
+        assert all(row['mapping']['provenance'] == 'USER_SUPPLIED_EXPERIMENTAL' for row in result['targets'])
+        assert all(row['evaluation']['schema_version'] == 'experimental-text-agreement-evidence-v1' for row in result['targets'])
+        assert len(result['summaries']['target']) == 2
+        assert len(result['summaries']['document']) == len(result['summaries']['model']) == 1
+        assert result['summaries']['model'][0]['denominator'] == 1
+        with sqlite3.connect(store.path) as connection:
+            snapshot = tuple(connection.iterdump())
+        def forbidden(*args, **kwargs):
+            raise AssertionError('GET dispatched or evaluated')
+        monkeypatch.setattr(app.predictions, 'run', forbidden)
+        monkeypatch.setattr('redaction_lab.application.evaluation_service.EvaluationService.evaluate_attempt', forbidden)
+        assert _request(app, 'GET', f'/api/v1/results/{version_id}')[1] == result
+        with sqlite3.connect(store.path) as connection:
+            assert tuple(connection.iterdump()) == snapshot
+        reopened = create_app(UploadService(artifacts, ApplicationStore(store.path, backup_directory=tmp_path / 'backups')))
+        assert _request(reopened, 'GET', f'/api/v1/results/{version_id}')[1] == result
+        assert store.get_job(other['redacted']['job_id']).status is ProcessingStatus.ACCEPTED
+    finally:
+        artifacts.close()
+
+
+def test_v03_reference_failure_keeps_success_and_unknown_null_evidence(tmp_path, monkeypatch):
+    redacted, _ = make_synthetic_pair('two_boxes', tmp_path / 'fixture')
+    artifacts = ArtifactStore(tmp_path / 'artifacts', tmp_path / 'temporary')
+    store = ApplicationStore(tmp_path / 'app.sqlite3', backup_directory=tmp_path / 'backups')
+    app = create_app(UploadService(artifacts, store))
+    adapter = SyntheticPredictionAdapter()
+    monkeypatch.setattr('redaction_lab.application.document_worker.ApplicationPdfWorker', InProcessSyntheticPdfWorker)
+    monkeypatch.setattr('redaction_lab.application.prediction_service.InferenceRuntime.verified', lambda self: _verified(adapter))
+    try:
+        receipt = _upload(app, 'bad-reference', redacted.read_bytes(), b'%PDF-invalid-reference')
+        status, _ = _request(app, 'POST', f"/api/v1/jobs/{receipt['redacted']['job_id']}/process")
+        assert status == 200
+        result = _request(app, 'GET', f"/api/v1/results/{receipt['redacted']['version_id']}")[1]
+        assert result['counts'] == {'requested': 2, 'eligible': 0, 'scored': 0, 'unknown': 2, 'excluded': 0, 'technical_failures': 1}
+        assert {row['attempt_status'] for row in result['targets']} == {'SUCCEEDED', 'MALFORMED'}
+        assert all(row['evaluation']['experimental_score'] is None for row in result['targets'])
+        assert all(row['mapping'] is None for row in result['targets'])
+        first_ids = [row['evaluation']['evaluation_id'] for row in result['targets']]
+        assert _request(app, 'POST', f"/api/v1/jobs/{receipt['redacted']['job_id']}/process")[0] == 200
+        repeated = _request(app, 'GET', f"/api/v1/results/{receipt['redacted']['version_id']}")[1]
+        assert [row['evaluation']['evaluation_id'] for row in repeated['targets']] == first_ids
+        assert len(adapter.manifests) == 2
+    finally:
+        artifacts.close()
+
+
+def test_v03_interrupted_run_reconnect_is_read_only_and_explicit_resume_is_one_shot(tmp_path, monkeypatch):
+    from redaction_lab.application.application_store import ProcessingStatus
+    redacted, reference = make_synthetic_pair('two_boxes', tmp_path / 'fixture')
+    artifacts = ArtifactStore(tmp_path / 'artifacts', tmp_path / 'temporary')
+    store = ApplicationStore(tmp_path / 'app.sqlite3', backup_directory=tmp_path / 'backups')
+    app = create_app(UploadService(artifacts, store))
+    adapter = SyntheticPredictionAdapter()
+    monkeypatch.setattr('redaction_lab.application.document_worker.ApplicationPdfWorker', InProcessSyntheticPdfWorker)
+    monkeypatch.setattr('redaction_lab.application.prediction_service.InferenceRuntime.verified', lambda self: _verified(adapter))
+    try:
+        receipt = _upload(app, 'interruption', redacted.read_bytes(), reference.read_bytes())
+        async def crash(manifest):
+            # Real reference persistence must precede dispatch, even with an interrupted provider.
+            assert store.get_version(receipt['reference']['version_id']).processing_state is ProcessingStatus.READY
+            assert store.reference_source(receipt['reference']['version_id']) is not None
+            raise RuntimeError('synthetic provider interruption')
+        with monkeypatch.context() as crash_patch:
+            crash_patch.setattr(adapter, 'predict', crash)
+            assert _request(app, 'POST', f"/api/v1/jobs/{receipt['redacted']['job_id']}/process")[0] == 500
+        path = f"/api/v1/results/{receipt['redacted']['version_id']}"
+        interrupted = _request(app, 'GET', path)[1]
+        assert interrupted['progress'] == {'total': 2, 'pending': 1, 'running': 0, 'terminal': 1}
+        assert len(interrupted['targets']) == 1 and interrupted['targets'][0]['attempt_status'] == 'IN_DOUBT'
+        assert interrupted['targets'][0]['evaluation'] is None
+        assert _request(app, 'GET', path)[1] == interrupted
+        assert len(adapter.manifests) == 0
+        assert _request(app, 'POST', f"/api/v1/jobs/{receipt['redacted']['job_id']}/process")[0] == 200
+        complete = _request(app, 'GET', path)[1]
+        assert complete['progress'] == {'total': 2, 'pending': 0, 'running': 0, 'terminal': 2}
+        assert complete['counts']['requested'] == 2 and complete['counts']['technical_failures'] == 1
+        assert len(adapter.manifests) == 1
+        assert sum(s['counts']['requested'] for s in complete['summaries']['document']) == 2
+    finally:
+        artifacts.close()
