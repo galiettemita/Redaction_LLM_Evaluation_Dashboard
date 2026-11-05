@@ -1,4 +1,10 @@
-# E0072 — 2026-11-05 — experimental product completion authorized
+# E0072 — 2026-11-05 — experimental application ready for final review
+
+Completion Tasks 1–5 passed scoped reviews on `codex/finish-app`; Task 6 implementation `1630c31` adds an exact-host/HTTPS-origin Basic-auth gateway on loopback, private launch configuration, shared runtime attestation, offline v2 worker qualification and authenticated API-to-UI mapping identity projection. No runtime download or paid resource was used. The new image has independent source/dependency/license inventories, SBOM, protocol/isolation/failure/deadline/restart evidence; prior v1 qualification is not inherited.
+
+Final implementation verification: 943 Python tests, 55 Node tests, typecheck/build and npm audit zero. Real synthetic PDF → Qwen → experimental evaluation produced two eligible successful answers with scores 0 and 8.3, document/model 4.2, verified null; missing/mismatched/ambiguous/unreadable/partially hidden truth stayed null for affected targets. Mounted Chrome covered upload, result rendering, keyboard focus, file/effect cleanup, error persistence and same-attempt recovery through local TLS. All 14 retained genuine prediction inputs excluded the reference-only marker. [Task 6 handoff](handoffs/RL-EXP-015-lead-20261105T220700Z-task6.md) records exact identities and limitations. Task 6/whole-branch review, normal integration and final external authenticated link remain pending; no push, merge or external tunnel occurred in this implementer phase.
+
+## E0072 — 2026-11-05 — experimental product completion authorized
 
 Recorded owner direction as [DEC-023](DECISIONS.md#dec-023--automatic-experimental-evaluation-and-controlled-demonstration): genuine local Qwen, explicitly unvalidated experimental text agreement before formal scientific validation, and a temporary owner-only authenticated HTTPS demonstration. Published [API v0.3](API_CONTRACT_V0_3.md), [experimental backend packet](task_packets/RL-EXP-015-EXPERIMENTAL-EVALUATION.md), [workspace packet](task_packets/RL-UX-016-EXPERIMENTAL-WORKSPACE.md), [controlled-link/runtime-v2 packet](task_packets/RL-LINK-017-CONTROLLED-DEMO.md), completion design and implementation plan. Updated current state to the inspected integrated v0.2 baseline and retained explicit unknown scientific/recipient/delivery gates.
 

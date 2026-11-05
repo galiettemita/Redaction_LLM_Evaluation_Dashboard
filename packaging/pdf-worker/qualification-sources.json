@@ -102,7 +102,7 @@
       }
     },
     "runtime_qualification_scope": "Reference-host synthetic-only engineering qualification; no scientific or recipient-device acceptance.",
-    "last_restart_check_utc": "2026-11-05T22:07:00Z"
+    "last_restart_check_utc": "2026-11-05T22:06:19.643299+00:00"
   },
   "python_dependencies": [
     [

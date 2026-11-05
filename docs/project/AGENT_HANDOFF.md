@@ -4,6 +4,8 @@ This file is the Lead-maintained routing/index record. Each specialist writes a 
 
 ## Initial inbox
 
+| E0072 / Task 6 experimental application acceptance | Task 6 implementer -> Lead controller / QA / Security | IMPLEMENTED; READY_FOR_REVIEW; NOT MERGED OR DEPLOYED | [Task 6 handoff](handoffs/RL-EXP-015-lead-20261105T220700Z-task6.md): gateway/launch/v2 qualification at `1630c31`, 943 Python + 55 Node, genuine scores and conservative nulls, real mounted Chrome acceptance. Review the exact candidate and whole branch before normal integration and final external authenticated HTTPS launch. |
+
 | E0072 / DEC-023 experimental completion | Owner -> Codex Lead / Backend / Frontend / QA | AUTHORIZED; TASK 1 DOCUMENTED, NOT INDEPENDENTLY VERIFIED | Read [API v0.3](API_CONTRACT_V0_3.md), [design](../superpowers/specs/2026-11-05-experimental-product-completion-design.md), [plan/checklist](../superpowers/plans/2026-11-05-experimental-product-completion.md), [RL-EXP-015](task_packets/RL-EXP-015-EXPERIMENTAL-EVALUATION.md), [RL-UX-016](task_packets/RL-UX-016-EXPERIMENTAL-WORKSPACE.md) and [RL-LINK-017](task_packets/RL-LINK-017-CONTROLLED-DEMO.md). Experimental-only numeric permission; verified null, scientific/private-data/cost gates remain. Task 6 v2 runtime qualification precedes live Task 4 canary. [Task 1 documentation handoff](handoffs/RL-EXP-015-lead-20261105T161401Z-task1.md). |
 
 The newest applicable epoch controls active work. Older rows below are historical routing evidence, not claims that their restrictions or unstarted states override DEC-023/E0072. No recipient ACK or active agent is presumed.
