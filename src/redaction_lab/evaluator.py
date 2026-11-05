@@ -311,6 +311,23 @@ def verify_evaluation_bindings(
     )
     if expected != actual:
         raise EvaluationBindingError("evaluation does not match Task-4 provenance")
+    from redaction_lab.contracts import ExperimentalEvaluationRecord
+    if isinstance(record, ExperimentalEvaluationRecord):
+        attempt = resolved.attempt
+        expected_details = (
+            attempt.project_id, attempt.target_id, attempt.target_version, attempt.status,
+            attempt.model_id, attempt.model_config_id, attempt.provider_model_id,
+            resolved.source.redacted_document_version_id,
+            sha256(attempt.prediction.encode()).hexdigest() if attempt.prediction is not None else None,
+            experimental_prediction_protocol(resolved.run),
+        )
+        actual_details = (
+            record.project_id, record.target_id, record.target_version, record.attempt_status,
+            record.model_id, record.model_config_id, record.provider_model_id,
+            record.redacted_document_version_id, record.prediction_hash, record.prediction_protocol_id,
+        )
+        if actual_details != expected_details:
+            raise EvaluationBindingError('experimental evaluation provenance binding mismatch')
     verify_evaluation_identity(record)
 
 
@@ -543,3 +560,79 @@ def evaluate_attempt(
     final = record.model_copy(update={"evaluation_id": evaluation_id})
     verify_evaluation_bindings(final, resolved)
     return final
+
+
+def experimental_prediction_protocol(run):
+    return _digest('prediction-protocol', {
+        'experiment_condition': run.experiment_condition, 'prompt_id': run.prompt_id,
+        'prompt_version': run.prompt_version, 'settings': run.settings.model_dump(mode='json'),
+        'attempt_policy': run.attempt_policy, 'context_policy': run.context_policy,
+        'common_context_budget': run.common_context_budget, 'tool_permissions': run.tool_permissions,
+    })
+
+
+def evaluate_experimental_attempt(
+    resolved: ResolvedAttempt, mapping: ReferenceMapping | None, *, created_at: datetime,
+):
+    """Trusted internal caller only; application service obtains stored reference evidence.
+
+    This separate path never grants synthetic verified trust or invokes a judge.
+    """
+    from redaction_lab.contracts import ExperimentalEvaluationRecord
+    from redaction_lab.experimental_scoring import score_text_agreement, METHOD_ID
+
+    _task4_target(resolved)
+    attempt, source, run = resolved.attempt, resolved.source, resolved.run
+    if mapping is not None:
+        mapping = ReferenceMapping.model_validate(mapping.model_dump())
+        if not mapping.is_experimental:
+            raise EvaluationBindingError('experimental channel requires experimental mapping')
+        if (mapping.project_id, mapping.target_id, mapping.target_version,
+            mapping.redacted_document_version_id) != (
+                attempt.project_id, attempt.target_id, attempt.target_version,
+                source.redacted_document_version_id):
+            raise EvaluationBindingError('experimental mapping target binding mismatch')
+        if mapping.redacted_canonical_hash not in (None, source.canonical_document.canonical_hash):
+            raise EvaluationBindingError('experimental mapping canonical hash mismatch')
+        if mapping.redacted_canonical_version_id not in (None, source.canonical_document.canonical_document_version_id):
+            raise EvaluationBindingError('experimental mapping canonical version mismatch')
+    eligible = mapping is not None and mapping.scoreability is ReferenceScoreability.SCOREABLE
+    evidence = None
+    reason = None
+    if attempt.status is not AttemptStatus.SUCCEEDED:
+        reason = f'TECHNICAL_{attempt.status.value}'
+    elif not eligible:
+        reason = f'{mapping.status.value}_REFERENCE' if mapping else 'MISSING_REFERENCE'
+    else:
+        try:
+            evidence = score_text_agreement(mapping.exact_revealed_text, attempt.prediction)
+        except ValueError:
+            reason = 'INVALID_SCORING_INPUT'
+    protocol = experimental_prediction_protocol(run)
+    candidate = ExperimentalEvaluationRecord(
+        evaluation_id='pending',
+        evaluation_series_key=_digest('experimental-series', {
+            'attempt_id': attempt.attempt_id, 'mapping': mapping.model_dump(mode='json') if mapping else None,
+            'method_id': METHOD_ID, 'schema': 'experimental-text-agreement-evidence-v1',
+        }),
+        project_id=attempt.project_id, attempt_id=attempt.attempt_id, attempt_status=attempt.status,
+        job_id=resolved.job.job_id, source_id=source.source_id, source_version=source.source_version,
+        source_sha256=source.source_sha256, run_id=run.run_id, run_version=run.run_version,
+        run_digest=resolved.run_digest, manifest_id=resolved.manifest.manifest_id,
+        manifest_version=resolved.manifest.manifest_version, manifest_digest=resolved.manifest_digest,
+        canonical_document_hash=source.canonical_document.canonical_hash,
+        attempt_request_hash=attempt.request_hash, attempt_response_hash=attempt.response_hash,
+        target_id=attempt.target_id, target_version=attempt.target_version,
+        redacted_document_version_id=source.redacted_document_version_id,
+        model_id=attempt.model_id, model_config_id=attempt.model_config_id,
+        provider_model_id=attempt.provider_model_id, prediction_protocol_id=protocol,
+        mapping=mapping, eligible=eligible,
+        prediction_hash=sha256(attempt.prediction.encode()).hexdigest() if attempt.prediction is not None else None,
+        reference_hash=sha256(mapping.exact_revealed_text.encode()).hexdigest() if eligible else None,
+        score_status=ScoreStatus.EXPERIMENTAL if evidence else ScoreStatus.NONE,
+        experimental_score=evidence.experimental_score if evidence else None,
+        evidence=evidence, reason=reason, created_at=created_at,
+    )
+    record = candidate.model_copy(update={'evaluation_id': _digest('evaluation', _record_identity_payload(candidate))})
+    verify_evaluation_bindings(record, resolved)
+    return record

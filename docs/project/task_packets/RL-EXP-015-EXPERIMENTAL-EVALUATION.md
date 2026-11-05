@@ -74,10 +74,10 @@ Task 4 implements exact v0.3 flat attempt rows, nested experimental mapping/eval
 - [x] Task 2 GREEN: immutable reference persistence, additive migration/backup, crash recovery, pair lookup, tamper rejection and no prediction-source binding pass.
 - [x] Task 2 adversarial mappings: unique exact span, repeated/one-sided anchors, partial revelation, wrong document, changed pagination and prompt-like reference instructions preserve correct experimental/null states; verified synthetic behavior unchanged.
 - [x] Task 2 focused/full Python suite passes; commit `feat: persist isolated experimental reference evidence`.
-- [ ] Task 3 RED/GREEN: exact match, invalid/empty input, repetition, paraphrase/role-reversal limitations, unsupported additions, number/date/negation caps and exact rounding verified.
-- [ ] Task 3 persistence: deterministic identities, version dispatch, legacy qualitative reopening, tamper rejection and immutable scores pass; verified scores always null.
-- [ ] Task 3 summaries: eligible denominator independent of outcome, unknown truth, refusal/timeout/malformed/error, zero denominators, equal-target document/equal-document model means and no cross-model blend pass.
-- [ ] Task 3 focused/full Python suite passes; commit `feat: add transparent experimental accuracy scoring`.
+- [x] Task 3 RED/GREEN: exact match, invalid/empty input, repetition, paraphrase/role-reversal limitations, unsupported additions, number/date/negation caps and exact rounding verified.
+- [x] Task 3 persistence: deterministic identities, version dispatch, legacy qualitative reopening, tamper rejection and immutable scores pass; verified scores always null.
+- [x] Task 3 summaries: eligible denominator independent of outcome, unknown truth, refusal/timeout/malformed/error, zero denominators, equal-target document/equal-document model means and no cross-model blend pass.
+- [x] Task 3 focused/full Python suite passes; commit `feat: add transparent experimental accuracy scoring`.
 - [ ] Task 4 RED/GREEN: realistic valid Ollama JSON/bounded reconstruction, refusal, extra keys, wrong model, truncation and malformed handling verified.
 - [ ] Task 4 runtime root: explicit absolute owner-controlled root works only with no-symlink/ownership/permission/inventory checks; unsafe/default unqualified paths fail closed.
 - [ ] Task 4 API/E2E: paired processing, one attempt, evaluation only after terminal prediction, progress counts, exact v0.3 shapes, reference absence from manifests, nulls and GET/reconnect idempotence pass.

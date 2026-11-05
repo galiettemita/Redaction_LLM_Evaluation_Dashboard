@@ -11,6 +11,8 @@ import sqlite3
 
 from redaction_lab.contracts import (
     EvaluationRecord,
+    ExperimentalEvaluationRecord,
+    ExperimentalSummary,
     ReferenceMapping,
     SummaryExclusion,
     SummaryExclusionReason,
@@ -22,6 +24,7 @@ from redaction_lab.contracts import (
 from redaction_lab.evaluator import (
     build_source_fact_record,
     evaluate_attempt,
+    evaluate_experimental_attempt,
     verify_evaluation_bindings,
 )
 from redaction_lab.judges.base import FactJudge, SourceFact, SourceFactRecord
@@ -83,6 +86,21 @@ class EvaluationStore:
                     payload_json TEXT NOT NULL,
                     created_at TEXT NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS experimental_summaries (
+                    summary_id TEXT PRIMARY KEY,
+                    project_id TEXT NOT NULL,
+                    payload_json TEXT NOT NULL
+                );
+                CREATE TRIGGER IF NOT EXISTS experimental_summaries_no_replace
+                BEFORE INSERT ON experimental_summaries
+                WHEN EXISTS (SELECT 1 FROM experimental_summaries WHERE summary_id=NEW.summary_id)
+                BEGIN SELECT RAISE(ABORT, 'experimental summaries are immutable'); END;
+                CREATE TRIGGER IF NOT EXISTS experimental_summaries_no_update
+                BEFORE UPDATE ON experimental_summaries
+                BEGIN SELECT RAISE(ABORT, 'experimental summaries are immutable'); END;
+                CREATE TRIGGER IF NOT EXISTS experimental_summaries_no_delete
+                BEFORE DELETE ON experimental_summaries
+                BEGIN SELECT RAISE(ABORT, 'experimental summaries are immutable'); END;
                 CREATE TABLE IF NOT EXISTS summary_members (
                     summary_id TEXT NOT NULL REFERENCES summaries(summary_id),
                     ordinal INTEGER NOT NULL,
@@ -100,6 +118,10 @@ class EvaluationStore:
                 CREATE TRIGGER IF NOT EXISTS source_fact_records_no_delete
                 BEFORE DELETE ON source_fact_records
                 BEGIN SELECT RAISE(ABORT, 'source fact records are immutable'); END;
+                CREATE TRIGGER IF NOT EXISTS evaluations_no_replace BEFORE INSERT ON evaluations
+                WHEN EXISTS (SELECT 1 FROM evaluations WHERE evaluation_id = NEW.evaluation_id
+                             OR evaluation_series_key = NEW.evaluation_series_key)
+                BEGIN SELECT RAISE(ABORT, 'evaluations are immutable'); END;
                 CREATE TRIGGER IF NOT EXISTS evaluations_no_update BEFORE UPDATE ON evaluations
                 BEGIN SELECT RAISE(ABORT, 'evaluations are immutable'); END;
                 CREATE TRIGGER IF NOT EXISTS evaluations_no_delete BEFORE DELETE ON evaluations
@@ -232,6 +254,23 @@ class EvaluationStore:
             rubric_version=rubric_version,
             created_at=datetime.now(UTC),
         )
+        return self._persist_evaluation(candidate)
+
+    def evaluate_experimental_and_store(
+        self, *, project_id: str, attempt_id: str, mapping: ReferenceMapping | None,
+    ) -> ExperimentalEvaluationRecord:
+        resolved = self.run_store.resolve_attempt(attempt_id, project_id=project_id)
+        candidate = evaluate_experimental_attempt(resolved, mapping, created_at=datetime.now(UTC))
+        return self._persist_evaluation(candidate)
+
+    @staticmethod
+    def _decode_evaluation(payload: str):
+        schema = json.loads(payload).get('evidence_schema_version')
+        cls = ExperimentalEvaluationRecord if schema == 'experimental-text-agreement-evidence-v1' else EvaluationRecord
+        return cls.model_validate_json(payload)
+
+    def _persist_evaluation(self, candidate):
+        project_id = candidate.project_id
         connection = self._connect()
         try:
             connection.execute("BEGIN IMMEDIATE")
@@ -241,7 +280,7 @@ class EvaluationStore:
                 (candidate.evaluation_series_key,),
             ).fetchone()
             if existing is not None:
-                stored = EvaluationRecord.model_validate_json(existing[0])
+                stored = self._decode_evaluation(existing[0])
                 if stored.evaluation_id != candidate.evaluation_id:
                     raise ValueError(
                         "evaluation series already has different immutable evidence"
@@ -287,7 +326,7 @@ class EvaluationStore:
             raise KeyError(evaluation_id)
         if row["project_id"] != project_id:
             raise ValueError("evaluation project identity mismatch")
-        record = EvaluationRecord.model_validate_json(row["payload_json"])
+        record = self._decode_evaluation(row["payload_json"])
         if (
             record.evaluation_id != row["evaluation_id"]
             or record.evaluation_series_key != row["evaluation_series_key"]
@@ -634,3 +673,99 @@ class EvaluationStore:
         ):
             raise ValueError("summary is stale for expected compatibility profile")
         return stored
+
+    def list_experimental_evaluations(self, *, project_id: str, attempt_id: str | None = None):
+        """Read persisted evidence only. No evaluation or provider invocation."""
+        with self._connect() as connection:
+            rows = connection.execute(
+                'SELECT evaluation_id FROM evaluations WHERE project_id=? AND (? IS NULL OR attempt_id=?) ORDER BY created_at, evaluation_id',
+                (project_id, attempt_id, attempt_id),
+            ).fetchall()
+        records = tuple(self.get_evaluation(row[0], project_id=project_id) for row in rows)
+        return tuple(r for r in records if isinstance(r, ExperimentalEvaluationRecord))
+
+    def _validate_experimental_summary(self, summary):
+        from redaction_lab.summary import build_experimental_summary, build_experimental_model_summary
+        summary = ExperimentalSummary.model_validate(summary.model_dump())
+        for cell in summary.cells:
+            job = self.run_store.job(cell.intent_id)
+            source = self.run_store.source(job.source_id)
+            if (job.manifest.project_id, job.manifest.target_id, job.manifest.target_version,
+                job.manifest.model_id, source.redacted_document_version_id) != (
+                cell.profile.project_id, cell.target_id, cell.target_version,
+                cell.profile.model_id, cell.document_version_id):
+                raise ValueError('summary requested intent binding mismatch')
+            if job.model_config_id is not None and job.model_config_id != cell.profile.model_config_id:
+                raise ValueError('summary model configuration binding mismatch')
+            from redaction_lab.evaluator import experimental_prediction_protocol
+            runs = self.run_store.runs_for_source(source.source_id, project_id=cell.profile.project_id)
+            run = next(r for r in runs if r.run_id == job.manifest.run_id)
+            if experimental_prediction_protocol(run) != cell.profile.prediction_protocol_id:
+                raise ValueError('summary prediction protocol binding mismatch')
+            if cell.status not in {'PENDING', 'RUNNING', 'IN_DOUBT'}:
+                resolved = self.run_store.resolve_attempt(job.attempt_id, project_id=cell.profile.project_id)
+                if (resolved.attempt.provider_model_id != cell.profile.provider_model_id
+                        or resolved.attempt.status.value != cell.status):
+                    raise ValueError('summary terminal provider/status binding mismatch')
+            if cell.evaluation is not None:
+                stored = self.get_evaluation(cell.evaluation.evaluation_id, project_id=summary.profile.project_id)
+                if stored != cell.evaluation or stored.job_id != cell.intent_id:
+                    raise ValueError('summary evaluation integrity mismatch')
+        if summary.summary_level is SummaryLevel.MODEL:
+            documents = tuple(self.get_experimental_summary(member, project_id=summary.profile.project_id)
+                              for member in summary.member_ids)
+            rebuilt = build_experimental_model_summary(documents)
+        else:
+            rebuilt = build_experimental_summary(summary.cells, summary_level=summary.summary_level,
+                excluded_candidate_ids=summary.excluded_candidate_ids,
+                profile=summary.profile, scope_id=summary.scope_id)
+        if rebuilt != summary:
+            raise ValueError('experimental summary integrity mismatch')
+        return summary
+
+    def store_experimental_summary(self, summary: ExperimentalSummary) -> ExperimentalSummary:
+        summary = self._validate_experimental_summary(summary)
+        connection = self._connect()
+        try:
+            connection.execute('BEGIN IMMEDIATE')
+            row = connection.execute('SELECT payload_json FROM experimental_summaries WHERE summary_id=?',
+                                     (summary.summary_id,)).fetchone()
+            if row is None:
+                connection.execute('INSERT INTO experimental_summaries VALUES (?,?,?)',
+                                   (summary.summary_id, summary.profile.project_id, summary.model_dump_json()))
+            elif ExperimentalSummary.model_validate_json(row[0]) != summary:
+                raise ValueError('experimental summary identity collision')
+            connection.commit()
+        except Exception:
+            connection.rollback()
+            raise
+        finally:
+            connection.close()
+        return summary
+
+    def get_experimental_summary(self, summary_id: str, *, project_id: str) -> ExperimentalSummary:
+        with self._connect() as connection:
+            row = connection.execute('SELECT * FROM experimental_summaries WHERE summary_id=?', (summary_id,)).fetchone()
+        if row is None:
+            raise KeyError(summary_id)
+        summary = ExperimentalSummary.model_validate_json(row['payload_json'])
+        if row['project_id'] != project_id or summary.profile.project_id != project_id or summary.summary_id != summary_id:
+            raise ValueError('experimental summary row identity mismatch')
+        # Verify digest before recursively resolving document members, preventing
+        # malformed cyclic memberships from causing unbounded recursion.
+        from redaction_lab.summary import _experimental_identity
+        if summary.summary_id != _experimental_identity(summary.model_dump(mode='json', exclude={'summary_id'})):
+            raise ValueError('experimental summary identity mismatch')
+        if summary.summary_level is SummaryLevel.MODEL:
+            with self._connect() as connection:
+                for member in summary.member_ids:
+                    payload = connection.execute('SELECT payload_json FROM experimental_summaries WHERE summary_id=?', (member,)).fetchone()
+                    if payload is None or json.loads(payload[0]).get('summary_level') != 'DOCUMENT':
+                        raise ValueError('model summary must reference stored documents')
+        return self._validate_experimental_summary(summary)
+
+    def list_experimental_summaries(self, *, project_id: str):
+        with self._connect() as connection:
+            rows = connection.execute('SELECT summary_id FROM experimental_summaries WHERE project_id=? ORDER BY summary_id',
+                                      (project_id,)).fetchall()
+        return tuple(self.get_experimental_summary(row[0], project_id=project_id) for row in rows)

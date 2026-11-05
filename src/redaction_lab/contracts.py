@@ -6,10 +6,12 @@ from datetime import datetime
 from enum import StrEnum
 from hashlib import sha256
 import json
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, FiniteFloat, StringConstraints
 from pydantic import model_validator
+
+from redaction_lab.experimental_scoring import ExperimentalScore
 
 
 NonEmptyStr = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
@@ -950,3 +952,185 @@ class JobState(FrozenRecord):
     error_code: NonEmptyStr | None = None
     created_at: datetime
     updated_at: datetime
+
+
+# Additive schema: legacy EvaluationRecord serialization and identity stay frozen.
+class ExperimentalEvaluationRecord(FrozenRecord):
+    evaluation_id: NonEmptyStr
+    evidence_schema_version: Literal['experimental-text-agreement-evidence-v1'] = 'experimental-text-agreement-evidence-v1'
+    method_id: Literal['experimental-text-agreement-v1'] = 'experimental-text-agreement-v1'
+    scale: Literal['0–100 text agreement'] = '0–100 text agreement'
+    evaluation_series_key: NonEmptyStr
+    project_id: NonEmptyStr
+    attempt_id: NonEmptyStr
+    attempt_status: AttemptStatus
+    job_id: NonEmptyStr
+    source_id: NonEmptyStr
+    source_version: NonEmptyStr
+    source_sha256: Sha256
+    run_id: NonEmptyStr
+    run_version: NonEmptyStr
+    run_digest: Sha256
+    manifest_id: NonEmptyStr
+    manifest_version: NonEmptyStr
+    manifest_digest: Sha256
+    canonical_document_hash: Sha256
+    attempt_request_hash: Sha256
+    attempt_response_hash: Sha256 | None
+    target_id: NonEmptyStr
+    target_version: NonEmptyStr
+    redacted_document_version_id: NonEmptyStr
+    model_id: NonEmptyStr
+    model_config_id: NonEmptyStr
+    provider_model_id: NonEmptyStr | None
+    prediction_protocol_id: NonEmptyStr
+    mapping: ReferenceMapping | None
+    prediction_hash: Sha256 | None
+    reference_hash: Sha256 | None
+    eligible: bool
+    score_status: Literal[ScoreStatus.NONE, ScoreStatus.EXPERIMENTAL]
+    experimental_score: Annotated[float, Field(ge=0, le=100, allow_inf_nan=False)] | None
+    verified_score: None = None
+    evidence: ExperimentalScore | None
+    reason: NonEmptyStr | None
+    created_at: datetime
+
+    @property
+    def source_fact_record_id(self) -> None:
+        return None
+
+    @model_validator(mode='after')
+    def experimental_only(self):
+        mapping = self.mapping
+        if mapping is not None:
+            if not mapping.is_experimental:
+                raise ValueError('only USER_SUPPLIED_EXPERIMENTAL mappings use this schema')
+            if (mapping.project_id, mapping.target_id, mapping.target_version,
+                mapping.redacted_document_version_id) != (
+                self.project_id, self.target_id, self.target_version,
+                self.redacted_document_version_id):
+                raise ValueError('experimental mapping target binding mismatch')
+            if mapping.redacted_canonical_hash not in (None, self.canonical_document_hash):
+                raise ValueError('experimental mapping canonical binding mismatch')
+        eligible = mapping is not None and mapping.scoreability is ReferenceScoreability.SCOREABLE
+        if self.eligible != eligible:
+            raise ValueError('eligibility must reflect complete experimental mapping')
+        expected_hash = (sha256(mapping.exact_revealed_text.encode()).hexdigest()
+                         if eligible else None)
+        if self.reference_hash != expected_hash:
+            raise ValueError('experimental reference hash mismatch')
+        if self.evidence is None:
+            if self.experimental_score is not None or self.score_status is not ScoreStatus.NONE or self.reason is None:
+                raise ValueError('unknown evaluation requires null score and reason')
+        elif (not eligible or self.attempt_status is not AttemptStatus.SUCCEEDED
+              or self.score_status is not ScoreStatus.EXPERIMENTAL or self.reason is not None
+              or self.experimental_score != self.evidence.experimental_score
+              or self.reference_hash != self.evidence.reference_hash
+              or self.prediction_hash != self.evidence.prediction_hash):
+            raise ValueError('experimental evidence requires complete successful bound inputs')
+        return self
+
+
+class ExperimentalSummaryProfile(FrozenRecord):
+    project_id: NonEmptyStr
+    model_id: NonEmptyStr
+    model_config_id: NonEmptyStr
+    provider_model_id: NonEmptyStr | None
+    prediction_protocol_id: NonEmptyStr
+    method_id: Literal['experimental-text-agreement-v1'] = 'experimental-text-agreement-v1'
+
+
+class ExperimentalSummaryCell(FrozenRecord):
+    """A durable requested target/model cell, including unfinished intents."""
+    intent_id: NonEmptyStr
+    profile: ExperimentalSummaryProfile
+    document_version_id: NonEmptyStr
+    target_id: NonEmptyStr
+    target_version: NonEmptyStr
+    status: Literal['PENDING', 'RUNNING', 'IN_DOUBT', 'SUCCEEDED', 'REFUSED', 'TIMEOUT', 'MALFORMED', 'ERROR']
+    mapping: ReferenceMapping | None = None
+    evaluation: ExperimentalEvaluationRecord | None = None
+
+    @classmethod
+    def from_evaluation(cls, record: ExperimentalEvaluationRecord):
+        return cls(
+            intent_id=record.job_id,
+            profile=ExperimentalSummaryProfile(
+                project_id=record.project_id, model_id=record.model_id,
+                model_config_id=record.model_config_id, provider_model_id=record.provider_model_id,
+                prediction_protocol_id=record.prediction_protocol_id,
+            ), document_version_id=record.redacted_document_version_id,
+            target_id=record.target_id, target_version=record.target_version,
+            status=record.attempt_status.value, mapping=record.mapping, evaluation=record,
+        )
+
+    @property
+    def eligible(self) -> bool:
+        return self.mapping is not None and self.mapping.scoreability is ReferenceScoreability.SCOREABLE
+
+    @model_validator(mode='after')
+    def bind_cell(self):
+        if self.mapping is not None and (
+            not self.mapping.is_experimental
+            or (self.mapping.project_id, self.mapping.target_id, self.mapping.target_version,
+                self.mapping.redacted_document_version_id) !=
+               (self.profile.project_id, self.target_id, self.target_version, self.document_version_id)
+        ):
+            raise ValueError('summary mapping target binding mismatch')
+        if self.evaluation is not None:
+            record = self.evaluation
+            if (record.project_id, record.model_id, record.model_config_id,
+                record.provider_model_id, record.prediction_protocol_id,
+                record.target_id, record.target_version, record.redacted_document_version_id,
+                record.attempt_status.value, record.mapping) != (
+                self.profile.project_id, self.profile.model_id, self.profile.model_config_id,
+                self.profile.provider_model_id, self.profile.prediction_protocol_id,
+                self.target_id, self.target_version, self.document_version_id, self.status, self.mapping):
+                raise ValueError('summary evaluation binding mismatch')
+        return self
+
+
+class ExperimentalCounts(FrozenRecord):
+    requested: NonNegativeInt
+    eligible: NonNegativeInt
+    scored: NonNegativeInt
+    unknown: NonNegativeInt
+    excluded: NonNegativeInt
+    technical_failures: NonNegativeInt
+
+    @model_validator(mode='after')
+    def consistent_counts(self):
+        if (self.requested != self.eligible + self.unknown or self.scored > self.eligible
+                or self.technical_failures > self.requested):
+            raise ValueError('inconsistent experimental counts')
+        return self
+
+
+class ExperimentalSummary(FrozenRecord):
+    summary_id: NonEmptyStr
+    schema_version: Literal['experimental-summary-v1'] = 'experimental-summary-v1'
+    scale: Literal['0–100 text agreement'] = '0–100 text agreement'
+    summary_level: SummaryLevel
+    profile: ExperimentalSummaryProfile
+    scope_id: NonEmptyStr
+    target_version: NonEmptyStr | None = None
+    document_version_ids: tuple[NonEmptyStr, ...]
+    document_count: NonNegativeInt
+    score_status: Literal[ScoreStatus.NONE, ScoreStatus.EXPERIMENTAL]
+    experimental_score: Annotated[float, Field(ge=0, le=100, allow_inf_nan=False)] | None
+    verified_score: None = None
+    counts: ExperimentalCounts
+    denominator: NonNegativeInt
+    member_ids: tuple[NonEmptyStr, ...]
+    excluded_candidate_ids: tuple[NonEmptyStr, ...]
+    cells: tuple[ExperimentalSummaryCell, ...]
+
+    @model_validator(mode='after')
+    def score_channel(self):
+        if (self.experimental_score is None) != (self.score_status is ScoreStatus.NONE):
+            raise ValueError('experimental summary score channel mismatch')
+        if (self.denominator == 0) != (self.experimental_score is None):
+            raise ValueError('zero denominator requires unknown score')
+        if self.document_count != len(self.document_version_ids):
+            raise ValueError('document count mismatch')
+        return self

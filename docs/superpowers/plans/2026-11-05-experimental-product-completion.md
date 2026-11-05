@@ -104,14 +104,14 @@
 - Consumes: successful immutable attempts and `USER_SUPPLIED_EXPERIMENTAL` scoreable mappings from Task 2.
 - Produces: `score_text_agreement(reference: str, prediction: str) -> ExperimentalScore`, experimental evidence schema `experimental-text-agreement-evidence-v1`, target evaluations, and document/model summaries.
 
-- [ ] **Step 1: Write failing pure-scoring tests for exact match, empty/invalid input, paraphrase limitation, repetitions, role reversal warning, unsupported additions, and changed number/date/negation caps.**
-- [ ] **Step 2: Run the scoring tests and verify they fail because the module/API is absent.**
-- [ ] **Step 3: Implement the exact versioned formula, subscores, warnings, hashes, caps, and one-decimal rounding.**
-- [ ] **Step 4: Write failing contract/store tests proving experimental numbers are permitted only under the new schema while legacy qualitative records reopen unchanged and verified scores remain null.**
-- [ ] **Step 5: Implement the new schema dispatch, deterministic identity, immutable persistence, and tamper detection.**
-- [ ] **Step 6: Write failing service/summary tests for eligible targets, unknown truth, refusal/timeout/malformed/error, zero denominators, equal-target document aggregation, equal-document model aggregation, and no cross-model blend.**
-- [ ] **Step 7: Implement `EvaluationService` and versioned experimental summaries; GET paths remain read-only.**
-- [ ] **Step 8: Run focused tests and the full Python suite; commit `feat: add transparent experimental accuracy scoring`.**
+- [x] **Step 1: Write failing pure-scoring tests for exact match, empty/invalid input, paraphrase limitation, repetitions, role reversal warning, unsupported additions, and changed number/date/negation caps.**
+- [x] **Step 2: Run the scoring tests and verify they fail because the module/API is absent.**
+- [x] **Step 3: Implement the exact versioned formula, subscores, warnings, hashes, caps, and one-decimal rounding.**
+- [x] **Step 4: Write failing contract/store tests proving experimental numbers are permitted only under the new schema while legacy qualitative records reopen unchanged and verified scores remain null.**
+- [x] **Step 5: Implement the new schema dispatch, deterministic identity, immutable persistence, and tamper detection.**
+- [x] **Step 6: Write failing service/summary tests for eligible targets, unknown truth, refusal/timeout/malformed/error, zero denominators, equal-target document aggregation, equal-document model aggregation, and no cross-model blend.**
+- [x] **Step 7: Implement `EvaluationService` and versioned experimental summaries; GET paths remain read-only.**
+- [x] **Step 8: Run focused tests and the full Python suite; commit `feat: add transparent experimental accuracy scoring`.**
 
 ### Task 4: Genuine model reliability, API v0.3, and durable workflow
 

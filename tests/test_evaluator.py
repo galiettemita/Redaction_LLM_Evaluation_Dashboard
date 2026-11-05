@@ -670,3 +670,60 @@ def test_local_nli_boundary_is_disabled_without_import_or_inference() -> None:
             ),
             "prediction",
         )
+
+
+def test_experimental_evaluator_rejects_nonexperimental_and_wrong_target(tmp_path):
+    from test_evaluation_store import _experimental_inputs, PROJECT_ID, NOW
+    from redaction_lab.evaluator import evaluate_experimental_attempt
+    inputs, mapping = _experimental_inputs(tmp_path)
+    resolved = inputs[1].resolve_attempt(inputs[5].attempt_id, project_id=PROJECT_ID)
+    for bad_mapping in (inputs[6], mapping.model_copy(update={'target_version': 'other'})):
+        with pytest.raises(ValueError):
+            evaluate_experimental_attempt(resolved, bad_mapping, created_at=NOW)
+
+
+@pytest.mark.parametrize('status', ['REFUSED', 'TIMEOUT', 'MALFORMED', 'ERROR'])
+def test_experimental_failed_attempt_has_eligible_null_score(tmp_path, status):
+    from dataclasses import replace
+    from test_evaluation_store import _experimental_inputs, PROJECT_ID, NOW
+    from redaction_lab.contracts import AttemptStatus
+    from redaction_lab.evaluator import evaluate_experimental_attempt
+    inputs, mapping = _experimental_inputs(tmp_path)
+    resolved = inputs[1].resolve_attempt(inputs[5].attempt_id, project_id=PROJECT_ID)
+    resolved = replace(resolved, attempt=resolved.attempt.model_copy(update={
+        'status': AttemptStatus(status), 'prediction': None,
+    }))
+    record = evaluate_experimental_attempt(resolved, mapping, created_at=NOW)
+    assert record.experimental_score is None
+    assert record.verified_score is None
+    assert record.eligible is True
+    assert record.reason == 'TECHNICAL_' + status
+
+
+@pytest.mark.parametrize('status', ['ABSENT', 'PARTIAL', 'AMBIGUOUS', 'UNREADABLE', 'CONFLICTING'])
+def test_experimental_unreliable_reference_never_becomes_zero(tmp_path, status):
+    from test_evaluation_store import _experimental_inputs, PROJECT_ID, NOW
+    from redaction_lab.contracts import ReferenceMapping
+    from redaction_lab.evaluator import evaluate_experimental_attempt
+    inputs, mapping = _experimental_inputs(tmp_path)
+    resolved = inputs[1].resolve_attempt(inputs[5].attempt_id, project_id=PROJECT_ID)
+    unknown = ReferenceMapping.model_validate({**mapping.model_dump(),
+        'status': status, 'scoreability': 'NOT_SCOREABLE', 'exact_revealed_text': None,
+    })
+    record = evaluate_experimental_attempt(resolved, unknown, created_at=NOW)
+    assert record.experimental_score is None
+    assert record.eligible is False
+    assert record.reason == status + '_REFERENCE'
+
+
+def test_experimental_binding_validates_model_identity_not_only_record_digest(tmp_path):
+    from test_evaluation_store import _experimental_inputs, PROJECT_ID, NOW
+    from redaction_lab.evaluator import (evaluate_experimental_attempt, verify_evaluation_bindings,
+                                        _digest, _record_identity_payload)
+    inputs, mapping = _experimental_inputs(tmp_path)
+    resolved = inputs[1].resolve_attempt(inputs[5].attempt_id, project_id=PROJECT_ID)
+    record = evaluate_experimental_attempt(resolved, mapping, created_at=NOW)
+    changed = record.model_copy(update={'model_config_id': 'wrong-model-config'})
+    changed = changed.model_copy(update={'evaluation_id': _digest('evaluation', _record_identity_payload(changed))})
+    with pytest.raises(ValueError, match='provenance|binding'):
+        verify_evaluation_bindings(changed, resolved)

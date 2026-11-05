@@ -1007,3 +1007,98 @@ def test_store_reopens_immutable_v2_summary_without_reinterpreting_it(tmp_path) 
     assert reopened == legacy
     assert reopened.summary_schema_version == "qualitative-summary-evidence-v2"
     assert before == after
+
+
+def _experimental_inputs(tmp_path):
+    # Trusted-caller fixture: the same exact synthetic span with the Task-4
+    # target/source identifiers and explicit experimental provenance.
+    from redaction_lab.contracts import ReferenceMapping
+    inputs = _authoritative_inputs(tmp_path)
+    source = inputs[2]
+    target = source.targets[0]
+    mapping = ReferenceMapping.model_validate({**inputs[6].model_dump(),
+        'mapping_id': 'synthetic-experimental-mapping',
+        'provenance': 'USER_SUPPLIED_EXPERIMENTAL',
+        'target_id': target.target_id, 'target_version': target.target_version,
+        'redacted_document_version_id': source.redacted_document_version_id,
+        'redacted_canonical_version_id': source.canonical_document.canonical_document_version_id,
+        'redacted_canonical_hash': source.canonical_document.canonical_hash,
+    })
+    return inputs, mapping
+
+
+def test_experimental_numeric_evidence_persists_without_changing_legacy(tmp_path):
+    inputs, mapping = _experimental_inputs(tmp_path)
+    store = EvaluationStore(inputs[0])
+    legacy = _evaluate(store, inputs)
+    original_payload = legacy.model_dump_json()
+    record = store.evaluate_experimental_and_store(
+        project_id=PROJECT_ID, attempt_id=inputs[5].attempt_id, mapping=mapping,
+    )
+    assert record.experimental_score == 100.0
+    assert record.verified_score is None
+    assert record.score_status is ScoreStatus.EXPERIMENTAL
+    reopened = EvaluationStore(inputs[0])
+    assert reopened.get_evaluation(record.evaluation_id, project_id=PROJECT_ID) == record
+    assert reopened.get_evaluation(legacy.evaluation_id, project_id=PROJECT_ID).model_dump_json() == original_payload
+    assert reopened.evaluate_experimental_and_store(
+        project_id=PROJECT_ID, attempt_id=inputs[5].attempt_id, mapping=mapping,
+    ) == record
+
+
+def test_experimental_persistence_rejects_tampering_and_replacement(tmp_path):
+    inputs, mapping = _experimental_inputs(tmp_path)
+    store = EvaluationStore(inputs[0])
+    record = store.evaluate_experimental_and_store(
+        project_id=PROJECT_ID, attempt_id=inputs[5].attempt_id, mapping=mapping,
+    )
+    with sqlite3.connect(inputs[0]) as conn:
+        row = conn.execute('SELECT * FROM evaluations WHERE evaluation_id=?', (record.evaluation_id,)).fetchone()
+        with pytest.raises(sqlite3.IntegrityError):
+            conn.execute('INSERT OR REPLACE INTO evaluations VALUES (?,?,?,?,?,?,?,?,?)', row)
+        conn.execute('DROP TRIGGER evaluations_no_update')
+        payload = json.loads(record.model_dump_json())
+        payload['evidence']['experimental_score'] = 90.0
+        payload['experimental_score'] = 90.0
+        conn.execute('UPDATE evaluations SET payload_json=? WHERE evaluation_id=?', (json.dumps(payload), record.evaluation_id))
+    with pytest.raises(ValueError, match='identity|integrity'):
+        store.get_evaluation(record.evaluation_id, project_id=PROJECT_ID)
+
+
+def test_experimental_summary_reopen_and_tamper_detection(tmp_path):
+    from redaction_lab.contracts import ExperimentalSummaryCell
+    from redaction_lab.summary import build_experimental_summary, build_experimental_model_summary
+    inputs, mapping = _experimental_inputs(tmp_path)
+    store = EvaluationStore(inputs[0])
+    record = store.evaluate_experimental_and_store(project_id=PROJECT_ID, attempt_id=inputs[5].attempt_id, mapping=mapping)
+    document = build_experimental_summary((ExperimentalSummaryCell.from_evaluation(record),), summary_level='DOCUMENT')
+    store.store_experimental_summary(document)
+    model = build_experimental_model_summary((document,))
+    store.store_experimental_summary(model)
+    reopened = EvaluationStore(inputs[0])
+    assert reopened.get_experimental_summary(model.summary_id, project_id=PROJECT_ID) == model
+    with sqlite3.connect(inputs[0]) as conn:
+        row = conn.execute('SELECT * FROM experimental_summaries WHERE summary_id=?', (model.summary_id,)).fetchone()
+        with pytest.raises(sqlite3.IntegrityError):
+            conn.execute('INSERT OR REPLACE INTO experimental_summaries VALUES (?,?,?)', row)
+        conn.execute('DROP TRIGGER experimental_summaries_no_update')
+        payload = model.model_dump(mode='json')
+        payload['experimental_score'] = 90.0
+        conn.execute('UPDATE experimental_summaries SET payload_json=? WHERE summary_id=?', (json.dumps(payload), model.summary_id))
+    with pytest.raises(ValueError, match='integrity|identity'):
+        reopened.get_experimental_summary(model.summary_id, project_id=PROJECT_ID)
+
+
+@pytest.mark.parametrize('field', ['model_config_id', 'provider_model_id', 'prediction_protocol_id'])
+def test_experimental_unscored_summary_cannot_spoof_frozen_model_config(tmp_path, field):
+    from redaction_lab.contracts import ExperimentalSummaryCell
+    from redaction_lab.summary import build_experimental_summary
+    inputs, mapping = _experimental_inputs(tmp_path)
+    store = EvaluationStore(inputs[0])
+    record = store.evaluate_experimental_and_store(project_id=PROJECT_ID, attempt_id=inputs[5].attempt_id, mapping=mapping)
+    cell = ExperimentalSummaryCell.from_evaluation(record)
+    cell = ExperimentalSummaryCell.model_validate({**cell.model_dump(), 'evaluation': None,
+        'profile': {**cell.profile.model_dump(), field: 'spoofed'}})
+    summary = build_experimental_summary((cell,), summary_level='DOCUMENT')
+    with pytest.raises(ValueError, match='configuration|binding'):
+        store.store_experimental_summary(summary)

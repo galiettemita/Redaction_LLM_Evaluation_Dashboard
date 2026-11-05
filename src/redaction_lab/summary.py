@@ -13,6 +13,7 @@ from redaction_lab.contracts import (
     EvaluationRecord,
     ReferenceScoreability,
     ReferenceStatus,
+    ScoreStatus,
     SummaryLevel,
     SummaryExclusion,
     SummaryRequest,
@@ -1014,3 +1015,111 @@ def assert_comparable_summaries(*summaries: SummarySnapshot) -> None:
         ):
             if getattr(summary, field) != getattr(first, field):
                 raise SummaryCompatibilityError(f"incompatible {field}")
+
+
+# Experimental summaries are a separate versioned family; legacy aggregation
+# and identity semantics above remain unchanged.
+def _experimental_identity(payload):
+    return 'experimental-summary-' + sha256(json.dumps(
+        payload, sort_keys=True, separators=(',', ':'), ensure_ascii=False,
+    ).encode()).hexdigest()
+
+
+def _experimental_counts(cells, excluded):
+    from redaction_lab.contracts import ExperimentalCounts
+    eligible = sum(cell.eligible for cell in cells)
+    return ExperimentalCounts(
+        requested=len(cells), eligible=eligible,
+        scored=sum(cell.evaluation is not None and cell.evaluation.experimental_score is not None for cell in cells),
+        unknown=len(cells)-eligible, excluded=len(excluded),
+        technical_failures=sum(cell.status in {'IN_DOUBT', 'REFUSED', 'TIMEOUT', 'MALFORMED', 'ERROR'} for cell in cells),
+    )
+
+
+def _finish_experimental_summary(**kwargs):
+    from redaction_lab.contracts import ExperimentalSummary
+    candidate = ExperimentalSummary(summary_id='pending', **kwargs)
+    return candidate.model_copy(update={'summary_id': _experimental_identity(
+        candidate.model_dump(mode='json', exclude={'summary_id'}))})
+
+
+def build_experimental_summary(cells, *, summary_level, excluded_candidate_ids=(), profile=None, scope_id=None):
+    """Equal-target mean for a single target/document and exact model protocol.
+
+    Caller supplies durable intents; no attempts or truth are fabricated here.
+    Empty unsupported-only scopes require their explicit profile and document ID.
+    """
+    from redaction_lab.contracts import ExperimentalSummaryCell
+    level = SummaryLevel(summary_level)
+    if level not in (SummaryLevel.TARGET, SummaryLevel.DOCUMENT):
+        raise ValueError('model summaries require document members')
+    cells = tuple(sorted((ExperimentalSummaryCell.model_validate(cell.model_dump()) for cell in cells),
+                         key=lambda cell: (cell.document_version_id, cell.target_id, cell.target_version, cell.intent_id)))
+    if not cells and (profile is None or scope_id is None or level is SummaryLevel.TARGET):
+        raise ValueError('empty document summary requires profile and scope')
+    profile = profile or cells[0].profile
+    if any(cell.profile != profile for cell in cells):
+        raise ValueError('incompatible experimental model/configuration/protocol')
+    if len({(c.document_version_id, c.target_id, c.target_version) for c in cells}) != len(cells):
+        raise ValueError('duplicate experimental target cell')
+    if len({c.intent_id for c in cells}) != len(cells):
+        raise ValueError('duplicate experimental intent')
+    documents = {c.document_version_id for c in cells}
+    if len(documents) > 1:
+        raise ValueError('document summary cannot mix document versions')
+    if level is SummaryLevel.TARGET and len(cells) != 1:
+        raise ValueError('target summary requires exactly one cell')
+    expected_scope = cells[0].target_id if level is SummaryLevel.TARGET else (cells[0].document_version_id if cells else scope_id)
+    if scope_id is not None and scope_id != expected_scope:
+        raise ValueError('summary scope mismatch')
+    mappings = [c.mapping for c in cells if c.mapping is not None]
+    for field in ('reference_document_version_id', 'reference_canonical_version_id',
+                  'reference_canonical_hash', 'mapping_method_version', 'mapping_version',
+                  'redacted_canonical_version_id', 'redacted_canonical_hash'):
+        values = {getattr(m, field) for m in mappings if getattr(m, field) is not None}
+        if len(values) > 1:
+            raise ValueError('incompatible experimental reference or canonical versions')
+    excluded = tuple(sorted(set(excluded_candidate_ids)))
+    scores = [c.evaluation.experimental_score for c in cells
+              if c.evaluation is not None and c.evaluation.experimental_score is not None]
+    return _finish_experimental_summary(
+        summary_level=level, profile=profile, scope_id=expected_scope,
+        target_version=cells[0].target_version if level is SummaryLevel.TARGET else None,
+        document_version_ids=tuple(sorted(documents)) if cells else (scope_id,), document_count=1,
+        score_status=ScoreStatus.EXPERIMENTAL if scores else ScoreStatus.NONE,
+        experimental_score=round(sum(scores)/len(scores), 1) if scores else None,
+        counts=_experimental_counts(cells, excluded), denominator=len(scores),
+        member_ids=tuple(sorted(c.evaluation.evaluation_id if c.evaluation else c.intent_id for c in cells)),
+        excluded_candidate_ids=excluded, cells=cells,
+    )
+
+
+def build_experimental_model_summary(documents):
+    """Equal-document mean within one compatible selected document set."""
+    documents = tuple(sorted(documents, key=lambda d: d.scope_id))
+    if not documents:
+        raise ValueError('model summary requires a declared document set')
+    profile = documents[0].profile
+    if any(d.summary_level is not SummaryLevel.DOCUMENT or d.profile != profile for d in documents):
+        raise ValueError('incompatible experimental document summary')
+    if len({d.scope_id for d in documents}) != len(documents):
+        raise ValueError('duplicate document summary')
+    for document in documents:
+        rebuilt = build_experimental_summary(document.cells, summary_level='DOCUMENT',
+            excluded_candidate_ids=document.excluded_candidate_ids, profile=document.profile, scope_id=document.scope_id)
+        if rebuilt != document:
+            raise ValueError('document summary integrity mismatch')
+    mappings = [c.mapping for d in documents for c in d.cells if c.mapping is not None]
+    if len({m.mapping_method_version for m in mappings}) > 1:
+        raise ValueError('incompatible experimental mapping methods')
+    cells = tuple(c for d in documents for c in d.cells)
+    excluded = tuple(sorted({e for d in documents for e in d.excluded_candidate_ids}))
+    scores = [d.experimental_score for d in documents if d.experimental_score is not None]
+    return _finish_experimental_summary(
+        summary_level=SummaryLevel.MODEL, profile=profile, scope_id=profile.model_id,
+        document_version_ids=tuple(d.scope_id for d in documents), document_count=len(documents),
+        score_status=ScoreStatus.EXPERIMENTAL if scores else ScoreStatus.NONE,
+        experimental_score=round(sum(scores)/len(scores), 1) if scores else None,
+        counts=_experimental_counts(cells, excluded), denominator=len(scores),
+        member_ids=tuple(d.summary_id for d in documents), excluded_candidate_ids=excluded, cells=cells,
+    )
