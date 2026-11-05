@@ -143,9 +143,8 @@ export default function App({ api }: { api: ReturnType<typeof createApi> }) {
               <p id="project-help" className="hint">A local label using letters, numbers, hyphens or underscores.</p>
               <label htmlFor="redacted">Redacted PDF <span className="required">Required</span></label>
               <input id="redacted" type="file" accept=".pdf,application/pdf" required onChange={e => choose(e.target.files?.[0] ?? null, 'redacted')} aria-describedby="file-help" />
-              <label htmlFor="reference">Matching reference PDF <span className="optional">Optional</span></label>
-              <input id="reference" type="file" accept=".pdf,application/pdf" onChange={e => choose(e.target.files?.[0] ?? null, 'reference')} aria-describedby="reference-help file-help" />
-              <p id="reference-help" className="hint">Adding a reference does not establish trustworthy revealed text or verified accuracy.</p>
+              <label htmlFor="reference">Matching reference PDF</label>
+              <input id="reference" type="file" accept=".pdf,application/pdf" onChange={e => choose(e.target.files?.[0] ?? null, 'reference')} aria-describedby="file-help" />
               <p id="file-help" className="hint">PDF only · 25 MiB per file · up to 100 pages at processing. Use synthetic or explicitly authorized documents.</p>
               <button type="submit" disabled={!redacted || !health}>Upload documents</button>
             </fieldset>

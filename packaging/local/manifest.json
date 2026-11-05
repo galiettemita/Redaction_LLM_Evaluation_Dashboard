@@ -10,7 +10,7 @@
     "dist_path": "web/dist",
     "assets": {
       "index.html": {
-        "sha256": "ec263a9100e23363eab5ff019f14c87a83133ff4a3f56b6400242856e539076e",
+        "sha256": "10a6d3c8de1165e7c70da67cf1cffee0bdb7b7058c144a33b361fee34124fe87",
         "byte_size": 567,
         "content_type": "text/html; charset=utf-8"
       },
@@ -19,9 +19,9 @@
         "byte_size": 7054,
         "content_type": "text/css; charset=utf-8"
       },
-      "assets/index-aQq_IaFa.js": {
-        "sha256": "cafc2c373b5e3210a462c16eb67f818d669a7322e8d3a8ac2c9d9f48f72142cc",
-        "byte_size": 218846,
+      "assets/index-CZ4NaQiR.js": {
+        "sha256": "252a0426b8525ac55c97419a6050271738aa4ab72086265379527777b9ec6566",
+        "byte_size": 218623,
         "content_type": "text/javascript; charset=utf-8"
       }
     }

@@ -60,11 +60,11 @@ def test_committed_manifest_serves_the_reviewed_frontend_byte_for_byte():
     app = create_static_app(None, ROOT, manifest["frontend"])
     expected = {
         "/": ("web/dist/index.html", "text/html; charset=utf-8", 567,
-              "ec263a9100e23363eab5ff019f14c87a83133ff4a3f56b6400242856e539076e"),
+              "10a6d3c8de1165e7c70da67cf1cffee0bdb7b7058c144a33b361fee34124fe87"),
         "/assets/index-cs0q5swb.css": ("web/dist/assets/index-cs0q5swb.css", "text/css; charset=utf-8", 7054,
               "f9558242c5506edadbfb433d023544e9ed93642dbfde2629217e100845b55706"),
-        "/assets/index-aQq_IaFa.js": ("web/dist/assets/index-aQq_IaFa.js", "text/javascript; charset=utf-8", 218846,
-              "cafc2c373b5e3210a462c16eb67f818d669a7322e8d3a8ac2c9d9f48f72142cc"),
+        "/assets/index-CZ4NaQiR.js": ("web/dist/assets/index-CZ4NaQiR.js", "text/javascript; charset=utf-8", 218623,
+              "252a0426b8525ac55c97419a6050271738aa4ab72086265379527777b9ec6566"),
     }
     assert app.frontend_available is True
     for route, (relative, mime, size, digest) in expected.items():

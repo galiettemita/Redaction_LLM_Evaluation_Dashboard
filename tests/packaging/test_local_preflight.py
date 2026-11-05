@@ -20,9 +20,9 @@ LOCAL = ROOT / "packaging" / "local"
 HTTP = build_opener(ProxyHandler({}))
 CHROME = Path("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")
 GENUINE_ASSETS = {
-    "/": ("web/dist/index.html", "ec263a9100e23363eab5ff019f14c87a83133ff4a3f56b6400242856e539076e"),
+    "/": ("web/dist/index.html", "10a6d3c8de1165e7c70da67cf1cffee0bdb7b7058c144a33b361fee34124fe87"),
     "/assets/index-cs0q5swb.css": ("web/dist/assets/index-cs0q5swb.css", "f9558242c5506edadbfb433d023544e9ed93642dbfde2629217e100845b55706"),
-    "/assets/index-aQq_IaFa.js": ("web/dist/assets/index-aQq_IaFa.js", "cafc2c373b5e3210a462c16eb67f818d669a7322e8d3a8ac2c9d9f48f72142cc"),
+    "/assets/index-CZ4NaQiR.js": ("web/dist/assets/index-CZ4NaQiR.js", "252a0426b8525ac55c97419a6050271738aa4ab72086265379527777b9ec6566"),
 }
 
 
