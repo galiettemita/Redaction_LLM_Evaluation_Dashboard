@@ -52,3 +52,12 @@ Preserve R01–R12 and DEC-001–DEC-023 within DEC-023's explicit experimental-
 Behavior changes require red-green-refactor evidence, focused/full permitted regressions, exact-candidate independent automated QA/security and experimental-semantics review, correction and re-review before normal non-force integration. Self-review is not independent review. No automated reviewer grants D03–D06, institutional permission or scientific/release validation. Stop only affected work for unsafe reference leakage, unexplained score/version changes, scope/contract conflicts, unqualified runtime, essential missing credentials, paid-resource need, private-data need, destructive action or unresolved Critical security risk; continue independent safe work. Record any necessary bounded scope amendment before writes.
 
 Rollback: stop affected services if necessary, revert additive task commits normally, retain original immutable attempts/evaluations and restore a verified pre-migration backup only through the documented safe migration recovery path. Do not overwrite later evidence or roll old validators forward silently. Publish a unique task handoff under `docs/project/handoffs/` using every field in [AGENT_HANDOFF](../AGENT_HANDOFF.md#handoff-template-all-fields-required-explicit-not-applicable-is-valid), with exact artifacts/commits, tests run/unrun, decisions, blockers, affected consumers and next action. Live integration HEAD must be rechecked before consequential writes, runtime calls and final review.
+
+## Independent-review correction round 1
+
+- [x] Reproduce and fix technical-failure summary membership/count binding, including pending and unresolved terminal members.
+- [x] Reproduce and reject contradictory immutable target geometry and nested evaluation provenance.
+- [x] Correction `1f964db00656fafb364a127dcec6b6ba5f4eed71`: focused contract 34 passed; Node 55 passed; typecheck/build/repeated exact asset hashes; audit zero; packaging 100 passed; full Python 865 passed.
+- [ ] Exact-candidate independent re-review; mounted-interaction acceptance remains Task 6.
+
+Evidence: [RL-UX-016-frontend-20261105T211620Z-task5-fix1.md](../handoffs/RL-UX-016-frontend-20261105T211620Z-task5-fix1.md).
