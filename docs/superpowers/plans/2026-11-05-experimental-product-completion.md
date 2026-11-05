@@ -172,7 +172,7 @@ Task 4 implementation evidence: full Python suite 856 passed; genuine prompt-v2 
 - [x] **Step 4: Implement strict API parsing and the document-centered workspace; remove the rule-based demo from the primary product.**
 - [x] **Step 5: Run Node tests, typecheck, accessibility interaction checks, production build, and audit.**
 - [x] **Step 6: Rebind exact `web/dist` assets in `packaging/local/manifest.json`; run packaging/static tests.**
-- [ ] **Step 7: Commit `feat: ship experimental document evaluation workspace`.**
+- [x] **Step 7: Commit `feat: ship experimental document evaluation workspace`.**
 
 ### Task 6: Owner-only authenticated gateway, launch evidence, and delivery
 

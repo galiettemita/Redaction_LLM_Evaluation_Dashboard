@@ -1,7 +1,7 @@
 # RL-UX-016 — Experimental document workspace
 
 Baseline integration SHA: `cb0fa4f1242ae8bf12afb084bc9475017040b784` (live GitHub main, 2026-11-05 UTC). Epoch: E0072.
-Accountable owner: Codex Engineering Lead; delegated implementers report exact candidates to Lead. State: ACTIVE / AUTHORIZED FOR BOUNDED ENGINEERING, NOT IMPLEMENTED OR VERIFIED by this record.
+Accountable owner: Codex Engineering Lead; delegated implementers report exact candidates to Lead. State: IMPLEMENTED / READY_FOR_REVIEW; independent exact-candidate review and combined runtime browser acceptance remain open. Not scientifically VERIFIED, MERGED or DEPLOYED.
 Authority: owner clarification dated 2026-11-05, DEC-023 and [RL-OPS-002](RL-OPS-002-AUTONOMOUS-ENGINEERING.md). Read the [design](../../superpowers/specs/2026-11-05-experimental-product-completion-design.md), [implementation plan](../../superpowers/plans/2026-11-05-experimental-product-completion.md), [API v0.3](../API_CONTRACT_V0_3.md) and live integration HEAD before work.
 
 ## Objective and dependencies
@@ -42,6 +42,8 @@ Frontend manifest writes and Task 6 launch/manifest writes must be sequential wi
 - [x] Node suite, TypeScript typecheck, accessibility interactions, production build and audit pass. Packaging/static checks confirm exact asset manifest binding.
 - [ ] Browser acceptance covers upload, view toggle, process, progress/results, selection, labels, errors and refresh/reconnect without duplicate attempt creation.
 - [ ] Commit `feat: ship experimental document evaluation workspace`; exact-candidate independent review and unique handoff published.
+
+Implementation evidence: `9da3065819b6086425f4d14a48ba8f095160efc2`; Node 48 passed, typecheck/build/repeat asset hashes passed, npm audit zero vulnerabilities, packaging 100 passed including real Chrome startup, full Python 865 passed. Keyboard/click handlers, release/error transitions, React rendering and actual blob URL revocation are tested. Full genuine upload/process/reconnect browser acceptance remains the combined Task 6 gate; exact-candidate independent review is pending.
 
 ## Common gates, review and rollback
 
