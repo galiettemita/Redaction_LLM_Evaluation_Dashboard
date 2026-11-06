@@ -1,3 +1,9 @@
+# E0072 — 2026-11-06 UTC — reviewed application merged and owner-only link live
+
+[PR #13](https://github.com/galiettemita/Redaction_LLM_Evaluation_Dashboard/pull/13) merged exact independently reviewed candidate `37f7ded` as `67a71ab`. Fresh controller verification passed 956 Python tests, 55 Node tests, typecheck, production build and npm audit with zero vulnerabilities. The final review found no remaining Critical, Important or Minor issue.
+
+Launched the reviewed application, exact-host gateway and authenticated ngrok HTTPS edge using private configuration outside Git. External acceptance: unauthenticated root 401; authenticated root, API health and hashed asset 200; wrong-origin POST 403. A synthetic upload completed two genuine local Qwen attempts with experimental target scores 1.3/1.5 and document/model score 1.4; all verified scores remained null. Two repeated GETs returned identical stored results and attempt IDs. Hostname, credentials, synthetic PDFs and runtime state were not committed. This temporary single-workspace demo works only while the reference Mac and task-owned services remain running; it is not scientific validation, a permanent service, multi-user security, commercial-model coverage or institutional data authorization.
+
 # E0072 — 2026-11-05 local / 2026-11-06 UTC — final review correction wave
 
 Whole-branch review of `9aea516` found whitespace-separated signs could erase numeric contradiction. Correction `9e6c01f` retains ASCII/normalized Unicode signs through whitespace, with literal scorer/evaluator regressions and unchanged stored evidence. Final validation: **956 Python / 55 Node passed**, typecheck/build pass, npm audit zero. Offline image `03db44f` independently requalified including in-container signed-quantity checks and restart; 14 fresh genuine SUCCEEDED attempts and a new mounted Chrome workflow passed. Historical 12 attempts on `954ca79` and two on `f1b8a731` remain distinct and unchanged.

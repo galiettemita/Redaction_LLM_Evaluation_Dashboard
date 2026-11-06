@@ -55,9 +55,9 @@ No arbitrary upstream selection, redirect/proxy feature or Ollama route. Never e
 - [x] Genuine isolated synthetic PDF + local Qwen canary persists at least one SUCCEEDED prediction and one experimental target score, non-null document/model summaries, exact provenance and verified_score null.
 - [x] Missing, mismatched, partial and ambiguous reference canaries remain null/Accuracy unknown; technical outcomes remain distinct; prompt-like reference text is absent from prediction manifests.
 - [x] Browser acceptance covers upload, local viewer toggle, process, truthful progress/results, selection, experimental labels, actionable errors and refresh/reconnect without a second attempt.
-- [ ] Independent exact-candidate whole-branch security/product and experimental-semantics review completed; all Critical/Important findings corrected and affected/full verification rerun. No scientific sign-off invented.
-- [ ] Recheck live main; reconcile overlap, update canonical state, all checklists and unique handoff with actual evidence; commit `docs: record experimental application delivery`.
-- [ ] Push normally, open/integrate reviewed PR under RL-OPS-002, launch app/gateway/ngrok and verify actual HTTPS application access with authentication. Unauthenticated access and wrong-origin mutations fail. Deliver working link privately without committing credentials/hostname.
+- [x] Independent exact-candidate whole-branch security/product and experimental-semantics review completed; all Critical/Important findings corrected and affected/full verification rerun. No scientific sign-off invented.
+- [x] Recheck live main; reconcile overlap, update canonical state, all checklists and unique handoff with actual evidence; commit `docs: record experimental application delivery`.
+- [x] Push normally, open/integrate reviewed PR under RL-OPS-002, launch app/gateway/ngrok and verify actual HTTPS application access with authentication. Unauthenticated access and wrong-origin mutations fail. Deliver working link privately without committing credentials/hostname.
 
 ## Common gates, review and rollback
 
