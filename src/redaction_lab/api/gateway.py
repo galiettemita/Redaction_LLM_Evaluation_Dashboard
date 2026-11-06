@@ -22,20 +22,52 @@ from tempfile import SpooledTemporaryFile
 from threading import BoundedSemaphore
 from typing import Mapping
 
-from redaction_lab.api.http import MAX_UPLOAD_BODY_BYTES
+from redaction_lab.api.http import API_VERSION, MAX_UPLOAD_BODY_BYTES
 
 
 _HOST = re.compile(r"(?=.{1,253}\Z)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}\Z")
 _TOKEN = re.compile(r"[!#$%&'*+.^_`|~0-9A-Za-z-]+\Z")
 _READ_ROUTE = re.compile(r"/(?:api/v1/(?:health|(?:documents|jobs|results)/[A-Za-z0-9_-]{1,256})|assets/[A-Za-z0-9_-]+\.(?:js|css))\Z")
 _PROCESS_ROUTE = re.compile(r"/api/v1/jobs/[A-Za-z0-9_-]{1,256}/process\Z")
-_SINGLETONS = ("Host", "Origin", "Authorization", "Content-Length", "Content-Type", "Expect")
+_SINGLETONS = (
+    "Host", "Origin", "Authorization", "Content-Length", "Content-Type",
+    "Transfer-Encoding", "Expect",
+)
 _RESPONSE_HEADERS = frozenset({
     "content-type", "content-length", "cache-control", "content-security-policy",
     "x-content-type-options", "x-frame-options", "referrer-policy", "x-redaction-lab-api",
 })
 _CHUNK = 64 * 1024
 _MAX_RESPONSE = 16 * 1024 * 1024
+_MAX_CHUNK_SIZE_DIGITS = 16
+
+
+class _RequestBodyError(ValueError):
+    def __init__(self, status: int) -> None:
+        self.status = status
+
+
+def _gateway_error_body(code: str) -> bytes:
+    return json.dumps(
+        {"error": {"code": code, "message": "Request could not be completed"}},
+        separators=(",", ":"),
+    ).encode()
+
+
+def _gateway_error_response(status: int, code: str) -> bytes:
+    body = _gateway_error_body(code)
+    reason = "Service Unavailable" if status == 503 else "Bad Request"
+    return (
+        f"HTTP/1.1 {status} {reason}\r\n"
+        "Content-Type: application/json; charset=utf-8\r\n"
+        f"Content-Length: {len(body)}\r\n"
+        "Connection: close\r\n"
+        "Cache-Control: no-store\r\n"
+        f"X-Redaction-Lab-API: {API_VERSION}\r\n"
+        "X-Content-Type-Options: nosniff\r\n"
+        "Referrer-Policy: no-referrer\r\n"
+        "Strict-Transport-Security: max-age=31536000\r\n\r\n"
+    ).encode() + body
 
 
 @dataclass(frozen=True)
@@ -77,7 +109,7 @@ class GatewayServer(ThreadingHTTPServer):
     def process_request(self, request, client_address):
         if not self._slots.acquire(blocking=False):
             try:
-                request.sendall(b"HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\nConnection: close\r\nCache-Control: no-store\r\n\r\n")
+                request.sendall(_gateway_error_response(503, "GATEWAY_BUSY"))
             finally:
                 self.shutdown_request(request)
             return
@@ -108,13 +140,14 @@ class GatewayHandler(BaseHTTPRequestHandler):
         self._reject(code)
 
     def _reject(self, code):
-        body = json.dumps({"error": {"code": "GATEWAY_REJECTED", "message": "Request could not be completed"}}).encode()
+        body = _gateway_error_body("GATEWAY_REJECTED")
         self.close_connection = True
         self.send_response_only(code)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Connection", "close")
         self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Redaction-Lab-API", API_VERSION)
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "no-referrer")
         self.send_header("Strict-Transport-Security", "max-age=31536000")
@@ -149,7 +182,7 @@ class GatewayHandler(BaseHTTPRequestHandler):
                 or any(_TOKEN.fullmatch(key) is None or any(ord(c) < 32 or ord(c) > 126 for c in value)
                        for key, value in self.headers.raw_items())
                 or any(len(self.headers.get_all(name, [])) > 1 for name in _SINGLETONS)
-                or any(self.headers.get(name) is not None for name in ("Transfer-Encoding", "Expect", "Upgrade"))):
+                or any(self.headers.get(name) is not None for name in ("Expect", "Upgrade"))):
             return self._reject(400)
         if self.headers.get("Host") != self.server.config.public_host:
             return self._reject(400)
@@ -167,34 +200,129 @@ class GatewayHandler(BaseHTTPRequestHandler):
         origin = self.headers.get("Origin")
         if (origin is not None or self.command == "POST") and origin != "https://" + self.server.config.public_host:
             return self._reject(403)
-        raw_length = self.headers.get("Content-Length", "0" if self.command != "POST" else "")
-        if re.fullmatch(r"[0-9]{1,10}", raw_length) is None:
-            return self._reject(400)
-        self.body_length = int(raw_length)
         limit = MAX_UPLOAD_BODY_BYTES if self.path == "/api/v1/documents" and self.command == "POST" else 0
-        if self.body_length > limit:
-            return self._reject(413 if limit else 400)
+        transfer_encoding = self.headers.get("Transfer-Encoding")
+        raw_length = self.headers.get("Content-Length")
+        if transfer_encoding is not None:
+            if (
+                raw_length is not None
+                or transfer_encoding != transfer_encoding.strip()
+                or transfer_encoding.casefold() != "chunked"
+                or limit == 0
+                or self.headers.get_content_type() != "multipart/form-data"
+            ):
+                return self._reject(400)
+            self.body_mode = "chunked"
+            self.body_length = None
+        else:
+            raw_length = raw_length if raw_length is not None else ("0" if self.command != "POST" else "")
+            if re.fullmatch(r"[0-9]{1,10}", raw_length) is None:
+                return self._reject(400)
+            self.body_mode = "fixed"
+            self.body_length = int(raw_length)
+            if self.body_length > limit:
+                return self._reject(413 if limit else 400)
         return True
 
+    def _read_exact(self, size: int) -> bytes:
+        value = bytearray()
+        try:
+            while len(value) < size:
+                chunk = self.rfile.read1(size - len(value))
+                if not chunk:
+                    raise _RequestBodyError(400)
+                value.extend(chunk)
+        except (OSError, ValueError) as error:
+            raise _RequestBodyError(400) from error
+        return bytes(value)
+
+    def _decode_chunked_upload(self, output) -> int:
+        total = 0
+        while True:
+            try:
+                line = self.rfile.readline(_MAX_CHUNK_SIZE_DIGITS + 3)
+            except (OSError, ValueError) as error:
+                raise _RequestBodyError(400) from error
+            if (
+                not line.endswith(b"\r\n")
+                or len(line) > _MAX_CHUNK_SIZE_DIGITS + 2
+                or re.fullmatch(rb"[0-9A-Fa-f]{1,16}\r\n", line) is None
+            ):
+                raise _RequestBodyError(400)
+            size = int(line[:-2], 16)
+            if size == 0:
+                if self._read_exact(2) != b"\r\n":
+                    raise _RequestBodyError(400)
+                return total
+            if size > MAX_UPLOAD_BODY_BYTES - total:
+                raise _RequestBodyError(413)
+            remaining = size
+            while remaining:
+                block = self._read_exact(min(_CHUNK, remaining))
+                output.write(block)
+                total += len(block)
+                remaining -= len(block)
+            if self._read_exact(2) != b"\r\n":
+                raise _RequestBodyError(400)
+
+    @staticmethod
+    def _close_spool(output) -> None:
+        if output is not None:
+            try:
+                output.close()
+            except OSError:
+                pass
+
+    def _prepare_chunked_body(self):
+        output = None
+        try:
+            output = SpooledTemporaryFile(max_size=_CHUNK)
+            length = self._decode_chunked_upload(output)
+            output.seek(0)
+            return output, length
+        except _RequestBodyError:
+            self._close_spool(output)
+            raise
+        except (OSError, ValueError) as error:
+            self._close_spool(output)
+            raise _RequestBodyError(500) from error
+
+    @staticmethod
+    def _send_body(upstream, source, length: int, *, read1: bool) -> None:
+        remaining = length
+        while remaining:
+            size = min(_CHUNK, remaining)
+            chunk = source.read1(size) if read1 else source.read(size)
+            if not chunk:
+                raise _RequestBodyError(400)
+            upstream.send(chunk)
+            remaining -= len(chunk)
+
     def _forward(self):
+        decoded = None
+        body_length = self.body_length
+        if self.body_mode == "chunked":
+            try:
+                decoded, body_length = self._prepare_chunked_body()
+            except _RequestBodyError as error:
+                return self._reject(error.status)
         upstream = HTTPConnection("127.0.0.1", 8765, timeout=300)
         try:
             upstream.putrequest(self.command, self.path, skip_host=True, skip_accept_encoding=True)
             upstream.putheader("Host", "127.0.0.1:8765")
             upstream.putheader("Connection", "close")
-            upstream.putheader("Content-Length", str(self.body_length))
+            upstream.putheader("Content-Length", str(body_length))
             if self.headers.get("Origin") is not None:
                 upstream.putheader("Origin", "http://127.0.0.1:8765")
             if self.headers.get("Content-Type") is not None:
                 upstream.putheader("Content-Type", self.headers["Content-Type"])
             upstream.endheaders()
-            remaining = self.body_length
-            while remaining:
-                chunk = self.rfile.read1(min(_CHUNK, remaining))
-                if not chunk:
-                    return self._reject(400)
-                upstream.send(chunk)
-                remaining -= len(chunk)
+            self._send_body(
+                upstream,
+                decoded if decoded is not None else self.rfile,
+                body_length,
+                read1=decoded is None,
+            )
             response = upstream.getresponse()
             headers = response.getheaders()
             names = [key.lower() for key, _ in headers]
@@ -226,9 +354,12 @@ class GatewayHandler(BaseHTTPRequestHandler):
                 output.seek(0)
                 while chunk := output.read(_CHUNK):
                     self.wfile.write(chunk)
+        except _RequestBodyError as error:
+            self._reject(error.status)
         except (OSError, HTTPException, ValueError):
             self._reject(502)
         finally:
+            self._close_spool(decoded)
             upstream.close()
 
     do_GET = _forward

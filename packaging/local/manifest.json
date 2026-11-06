@@ -48,7 +48,7 @@
   },
   "pdf_worker": {
     "lock_path": "packaging/pdf-worker/runtime.lock",
-    "lock_sha256": "a5b576688a822aa06385cc788489866673f32dee003d77719af7331bd17c4100",
+    "lock_sha256": "3030bf5c3e53b70a35102beaa731b72539f56a2d90c2c0a2915b9060a8f2bfa0",
     "lock_qualified_on_reference_host": true,
     "runtime_qualified": false
   },

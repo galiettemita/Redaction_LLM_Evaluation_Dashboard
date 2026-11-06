@@ -54,11 +54,11 @@
     }
   },
   "worker_image": {
-    "local_image_id": "sha256:03db44f11ea940fff0c75a94dc393aed73095e8ee71307afb4adc3ef0e290e34",
-    "manifest_digest": "sha256:d90c5ec2c01ad84cc2949354e26f9a7140f23f5095956ea2100031904f9850ab",
+    "local_image_id": "sha256:b4e126e3b710050ec2c425a8e2ff322d74cda4f1cdfed282bb62e50ef0574a3a",
+    "manifest_digest": "sha256:873a9a3727020ffbea7590569f888f9fe4bec6ec3bf470f0cfb0c116d5fe16e1",
     "architecture": "arm64",
     "os": "linux",
-    "size": 179907424,
+    "size": 179912035,
     "user": "65532:65532",
     "entrypoint": [
       "python",
@@ -68,7 +68,7 @@
     "protocol_version": "pdf-worker-v2",
     "build_policy": "Exact installed v1 image used only as dependency stage; original pinned base; --pull=never --network=none; isolated 38-file source context; COPY --chmod=0555; independent v2 qualification. No downloads.",
     "dependency_source_image": "sha256:7a78eaf7ef812d354f0abe13f40c6c0a4e3684d94f72002245c5249249bf293b",
-    "source_inventory_sha256": "f11ab0192f3484c5789d4a61b9c302a3be3371985563df899dde1ce8e2d50e76",
+    "source_inventory_sha256": "ae10cdb098b4af29d33e27aaef23be6a9b746edc11223e9ff739ad2e404fac29",
     "installed_inventory": {
       "usr_local_file_count": 3216,
       "usr_local_inventory_sha256": "796918201c671074182df724ba7a42fb59f5628bfbb595897c90be5a8653ddc5",
@@ -84,9 +84,7 @@
       "reference_text_bounds": "PASS",
       "reference_v2_protocol": "PASS",
       "signed_quantity_regression": "PASS",
-      "timeout_cleanup": "PASS",
-      "clean_machine_restart": "PASS",
-      "production_application_attestation": "PASS"
+      "timeout_cleanup": "PASS"
     },
     "protocol_receipts": {
       "REDACTED": {
@@ -109,11 +107,11 @@
       "inventory_scope": "Interpreter executable and standard-library bytes are covered by the separate /usr/local file/link inventory; not a standalone SBOM component."
     },
     "sbom_scope": "55 Alpine OS/APK and installed Python-distribution package entries; package license annotations are incomplete. Separate 21-file license hash inventory does not claim complete license metadata for every component or the interpreter.",
-    "combined_synthetic_acceptance": {
-      "new_image_successful_attempts": 14,
+    "historical_application_acceptance": {
       "historical_successful_attempts_by_image": {
         "sha256:f1b8a731643bc0691849d5f82761a7fe9d7f7e658a2c19eb4e94c3e2c6f54b39": 2,
-        "sha256:954ca79b9c06811911b3d68ceb90a3b7ca85bdb509b1e09b5c17ba7c1c603129": 12
+        "sha256:954ca79b9c06811911b3d68ceb90a3b7ca85bdb509b1e09b5c17ba7c1c603129": 12,
+        "sha256:03db44f11ea940fff0c75a94dc393aed73095e8ee71307afb4adc3ef0e290e34": 14
       },
       "exact_reference_target_scores": [
         0.0,
@@ -129,7 +127,8 @@
       "reference_marker_absent_from_all_28_manifests": true,
       "mounted_browser_workflow": "PASS"
     },
-    "last_restart_check_utc": "2026-11-06T00:03:19.416987+00:00"
+    "current_image_application_acceptance": "PENDING RL-LINK-017 CORRECTION 01 external synthetic acceptance",
+    "last_restart_check_utc": null
   },
   "python_dependencies": [
     [
@@ -209,10 +208,10 @@
     ]
   ],
   "python_package_advisory_check": "PyPI JSON reported zero known vulnerabilities for every exact version at audited_at. The previous Pillow 12.3.0 and pypdf 6.20.0 pins were rejected and replaced before acquisition.",
-  "requalified_at": "2026-11-05T22:41:34Z",
+  "requalified_at": "2026-11-06T15:33:34Z",
   "rebuild_storage": {
     "initial_free_bytes": 13598306304,
-    "minimum_free_bytes_during_successful_build": 14829076480,
+    "minimum_free_bytes_during_successful_build": 10807799808,
     "required_reserve_bytes": 8589934592,
     "projected_incremental_bytes_ceiling": 536870912,
     "dependency_image_unique_cache_bytes_before": 170329968,

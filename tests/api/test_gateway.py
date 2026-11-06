@@ -4,6 +4,7 @@ import base64
 from contextlib import contextmanager
 import importlib
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import json
 import socket
 from threading import Event, Thread
 
@@ -101,6 +102,10 @@ def request(method="GET", path="/", *, headers=(), body=b"", auth=AUTH, host="de
     return int(head.split()[1]), head.decode(), payload
 
 
+def chunks(*values: bytes, terminal: bytes = b"0\r\n\r\n") -> bytes:
+    return b"".join(f"{len(value):x}\r\n".encode() + value + b"\r\n" for value in values) + terminal
+
+
 @pytest.mark.parametrize("key,value", [
     ("REDACTION_LAB_PUBLIC_HOST", ""), ("REDACTION_LAB_PUBLIC_HOST", "https://demo.example.invalid"),
     ("REDACTION_LAB_PUBLIC_HOST", "127.0.0.1"), ("REDACTION_LAB_PUBLIC_HOST", "demo.example.invalid:443"),
@@ -118,6 +123,16 @@ def test_private_configuration_fails_closed(gateway, key, value):
 def test_authentication_precedes_forwarding_and_body_reads(running, upstream, auth):
     status, head, _ = request("POST", "/api/v1/documents", auth=auth,
                               headers=["Content-Length: 1024", "Origin: https://demo.example.invalid"])
+    assert status == 401
+    assert 'WWW-Authenticate: Basic realm="Redaction Lab"' in head
+    assert upstream[0] == []
+
+
+def test_chunked_upload_authentication_precedes_body_reads(running, upstream):
+    status, head, _ = request("POST", "/api/v1/documents", auth="Basic invalid", headers=[
+        "Origin: https://demo.example.invalid", "Transfer-Encoding: chunked",
+        "Content-Type: multipart/form-data; boundary=synthetic",
+    ])
     assert status == 401
     assert 'WWW-Authenticate: Basic realm="Redaction Lab"' in head
     assert upstream[0] == []
@@ -189,6 +204,152 @@ def test_browser_multipart_headers_are_http_headers_not_a_mime_body(running, ups
         f"Content-Length: {len(body)}"])
     assert status == 200
     assert upstream[0][0][2] == body
+
+
+def test_browser_chunked_upload_is_decoded_once_before_fixed_length_forwarding(running, upstream):
+    parts = (
+        b"--synthetic\r\nContent-Disposition: form-data; name=\"project_id\"\r\n\r\nproject-1\r\n",
+        b"--synthetic\r\nContent-Disposition: form-data; name=\"redacted_pdf\"; filename=\"redacted.pdf\"\r\n"
+        b"Content-Type: application/pdf\r\n\r\n%PDF-1.7\nsynthetic\r\n--synthetic--\r\n",
+    )
+    status, _, _ = request("POST", "/api/v1/documents", body=chunks(*parts), headers=[
+        "Origin: https://demo.example.invalid", "Transfer-Encoding: chunked",
+        "Content-Type: multipart/form-data; boundary=synthetic",
+        "Cookie: private", "X-Forwarded-Host: attacker.invalid",
+    ])
+    assert status == 200
+    path, headers, body = upstream[0][0]
+    assert path == "/api/v1/documents" and body == b"".join(parts)
+    assert headers["Content-Length"] == str(len(body))
+    assert "Transfer-Encoding" not in headers
+    assert "Authorization" not in headers and "Cookie" not in headers
+    assert "X-Forwarded-Host" not in headers
+
+
+def test_bytes_after_terminal_chunk_are_discarded_by_connection_close(running, upstream):
+    status, head, _ = request(
+        "POST", "/api/v1/documents", body=chunks(b"synthetic") + b"smuggled", headers=[
+            "Origin: https://demo.example.invalid", "Transfer-Encoding: chunked",
+            "Content-Type: multipart/form-data; boundary=synthetic",
+        ]
+    )
+    assert status == 200
+    assert "Connection: close" in head
+    assert upstream[0][0][2] == b"synthetic"
+
+
+@pytest.mark.parametrize("transfer", [
+    "gzip", "compress", "chunked, gzip", "gzip, chunked", "chunked, chunked", "Chunked ",
+])
+def test_unsupported_or_ambiguous_transfer_codings_never_reach_upstream(running, upstream, transfer):
+    status, _, _ = request("POST", "/api/v1/documents", body=b"0\r\n\r\n", headers=[
+        "Origin: https://demo.example.invalid", f"Transfer-Encoding: {transfer}",
+        "Content-Type: multipart/form-data; boundary=synthetic",
+    ])
+    assert status == 400
+    assert upstream[0] == []
+
+
+@pytest.mark.parametrize("method,path", [
+    ("GET", "/"), ("POST", "/api/v1/jobs/job-1/process"),
+])
+def test_chunked_bodies_are_limited_to_document_uploads(running, upstream, method, path):
+    status, _, _ = request(method, path, body=b"0\r\n\r\n", headers=[
+        "Origin: https://demo.example.invalid", "Transfer-Encoding: chunked",
+        "Content-Type: multipart/form-data; boundary=synthetic",
+    ])
+    assert status == 400
+    assert upstream[0] == []
+
+
+@pytest.mark.parametrize("body", [
+    b"1;extension=value\r\nx\r\n0\r\n\r\n",
+    b"1\r\nx\r\n0\r\nX-Trailer: value\r\n\r\n",
+    b"z\r\nx\r\n0\r\n\r\n",
+    b"00000000000000000\r\n0\r\n\r\n",
+    b"5\r\nabc",
+    b"1\r\nxXX0\r\n\r\n",
+    b"1\r\nx\r\n",
+])
+def test_malformed_chunked_uploads_fail_before_upstream(running, upstream, body):
+    status, _, _ = request("POST", "/api/v1/documents", body=body, headers=[
+        "Origin: https://demo.example.invalid", "Transfer-Encoding: chunked",
+        "Content-Type: multipart/form-data; boundary=synthetic",
+    ])
+    assert status == 400
+    assert upstream[0] == []
+
+
+def test_decoded_chunked_upload_overflow_returns_413_without_upstream(running, upstream, gateway, monkeypatch):
+    monkeypatch.setattr(gateway, "MAX_UPLOAD_BODY_BYTES", 5)
+    status, _, _ = request("POST", "/api/v1/documents", body=chunks(b"abc", b"def"), headers=[
+        "Origin: https://demo.example.invalid", "Transfer-Encoding: chunked",
+        "Content-Type: multipart/form-data; boundary=synthetic",
+    ])
+    assert status == 413
+    assert upstream[0] == []
+
+
+@pytest.mark.parametrize("failure", ["write", "seek"])
+def test_chunked_spool_io_failure_is_closed_and_returns_api_error(
+    running, upstream, gateway, monkeypatch, failure
+):
+    spools = []
+
+    class BrokenSpool:
+        def __init__(self, *, max_size):
+            assert max_size == gateway._CHUNK
+            self.closed = False
+            spools.append(self)
+
+        def write(self, _value):
+            if failure == "write":
+                raise OSError("synthetic spool write failure")
+
+        def seek(self, _offset):
+            if failure == "seek":
+                raise OSError("synthetic spool seek failure")
+
+        def close(self):
+            self.closed = True
+
+    monkeypatch.setattr(gateway, "SpooledTemporaryFile", BrokenSpool)
+    status, head, payload = request(
+        "POST", "/api/v1/documents", body=chunks(b"synthetic"), headers=[
+            "Origin: https://demo.example.invalid", "Transfer-Encoding: chunked",
+            "Content-Type: multipart/form-data; boundary=synthetic",
+        ]
+    )
+    assert status == 500
+    assert "X-Redaction-Lab-API: 0.3" in head
+    assert json.loads(payload)["error"]["code"] == "GATEWAY_REJECTED"
+    assert len(spools) == 1 and spools[0].closed
+    assert upstream[0] == []
+
+
+def test_gateway_rejections_are_bounded_api_v03_errors(running, upstream):
+    status, head, payload = request(host="wrong.invalid")
+    assert status == 400
+    assert "X-Redaction-Lab-API: 0.3" in head
+    assert json.loads(payload) == {
+        "error": {"code": "GATEWAY_REJECTED", "message": "Request could not be completed"}
+    }
+    assert upstream[0] == []
+
+
+def test_connection_limit_rejection_is_a_bounded_api_v03_error(running):
+    for _ in range(8):
+        assert running._slots.acquire(blocking=False)
+    try:
+        status, head, payload = request()
+        assert status == 503
+        assert "X-Redaction-Lab-API: 0.3" in head
+        assert json.loads(payload) == {
+            "error": {"code": "GATEWAY_BUSY", "message": "Request could not be completed"}
+        }
+    finally:
+        for _ in range(8):
+            running._slots.release()
 
 
 def test_oversize_or_static_body_rejected_before_upstream(running, upstream, gateway):

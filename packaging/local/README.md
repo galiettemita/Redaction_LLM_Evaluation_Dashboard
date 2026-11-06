@@ -117,9 +117,15 @@ create a second attempt. Local simulated TLS testing is not that final proof.
 The standard-library gateway has one fixed destination: `127.0.0.1:8765`.
 It listens only on `127.0.0.1:8766`, authenticates before reading an upload, checks
 exact Host and HTTPS Origin (required for POST), allowlists application routes,
-rejects duplicated/ambiguous framing and transfer encoding, and limits active
-connections to eight. Uploads stream in 64 KiB chunks with the API's 50 MiB pair
-plus multipart-overhead limit. Response bodies are bounded; large responses
+rejects duplicated or ambiguous framing, and limits active connections to eight.
+Fixed-length uploads stream directly in 64 KiB chunks. Authenticated exact-origin
+browser uploads may instead use one literal `chunked` transfer coding; the gateway
+strictly decodes the complete multipart body into a private 64 KiB memory/disk
+spool under the API's 50 MiB pair-plus-overhead limit, then forwards only its
+measured `Content-Length`. Conflicting lengths, other codings, extensions,
+trailers, malformed chunks and decoded overflow fail before an application
+connection is opened. Bytes after the terminal chunk are isolated by the
+mandatory connection close and are never forwarded. Response bodies are bounded; large responses
 spill into a private temporary file before complete framing is accepted.
 Redirects, arbitrary destinations and Ollama routes are rejected. Only validated
 requests receive translated local Host/Origin headers; credentials, cookies and
@@ -139,12 +145,16 @@ nosniff, no-referrer and denied outer framing.
 
 - [x] API v0.3 and exact frontend inventory are bound together.
 - [x] Gateway raw-HTTP RED/GREEN tests and launch/auth/shutdown tests pass.
+- [x] Browser chunked uploads, framing ambiguity, spool I/O failure and API-shaped
+      gateway errors are covered by raw-socket regressions.
 - [x] Trusted shared runtime-root checks preserve isolated synthetic storage.
 - [x] Exact v2 image source/dependency/license inventory and protocol/isolation
       canaries independently requalified with no downloads.
 - [x] Full combined genuine model/reference/evaluation and mounted-browser evidence
       on the reference host through a synthetic HTTPS origin mapped to loopback.
-- [ ] Independent exact-candidate whole-branch review and normal integration.
+- [x] Independent exact-candidate correction review passed with no Critical or
+      Important findings.
+- [ ] Normal integration of the browser-upload correction.
 - [ ] Final authenticated external HTTPS acceptance and owner delivery.
 - [ ] Offline prerequisite/runtime bundle and clean second-device acceptance.
 - [ ] Scientific model roster, private-data authority and scoring validation.
