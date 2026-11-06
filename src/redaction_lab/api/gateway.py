@@ -266,6 +266,28 @@ class GatewayHandler(BaseHTTPRequestHandler):
                 raise _RequestBodyError(400)
 
     @staticmethod
+    def _close_spool(output) -> None:
+        if output is not None:
+            try:
+                output.close()
+            except OSError:
+                pass
+
+    def _prepare_chunked_body(self):
+        output = None
+        try:
+            output = SpooledTemporaryFile(max_size=_CHUNK)
+            length = self._decode_chunked_upload(output)
+            output.seek(0)
+            return output, length
+        except _RequestBodyError:
+            self._close_spool(output)
+            raise
+        except (OSError, ValueError) as error:
+            self._close_spool(output)
+            raise _RequestBodyError(500) from error
+
+    @staticmethod
     def _send_body(upstream, source, length: int, *, read1: bool) -> None:
         remaining = length
         while remaining:
@@ -280,12 +302,9 @@ class GatewayHandler(BaseHTTPRequestHandler):
         decoded = None
         body_length = self.body_length
         if self.body_mode == "chunked":
-            decoded = SpooledTemporaryFile(max_size=_CHUNK)
             try:
-                body_length = self._decode_chunked_upload(decoded)
-                decoded.seek(0)
+                decoded, body_length = self._prepare_chunked_body()
             except _RequestBodyError as error:
-                decoded.close()
                 return self._reject(error.status)
         upstream = HTTPConnection("127.0.0.1", 8765, timeout=300)
         try:
@@ -340,8 +359,7 @@ class GatewayHandler(BaseHTTPRequestHandler):
         except (OSError, HTTPException, ValueError):
             self._reject(502)
         finally:
-            if decoded is not None:
-                decoded.close()
+            self._close_spool(decoded)
             upstream.close()
 
     do_GET = _forward

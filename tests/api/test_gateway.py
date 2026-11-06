@@ -226,6 +226,18 @@ def test_browser_chunked_upload_is_decoded_once_before_fixed_length_forwarding(r
     assert "X-Forwarded-Host" not in headers
 
 
+def test_bytes_after_terminal_chunk_are_discarded_by_connection_close(running, upstream):
+    status, head, _ = request(
+        "POST", "/api/v1/documents", body=chunks(b"synthetic") + b"smuggled", headers=[
+            "Origin: https://demo.example.invalid", "Transfer-Encoding: chunked",
+            "Content-Type: multipart/form-data; boundary=synthetic",
+        ]
+    )
+    assert status == 200
+    assert "Connection: close" in head
+    assert upstream[0][0][2] == b"synthetic"
+
+
 @pytest.mark.parametrize("transfer", [
     "gzip", "compress", "chunked, gzip", "gzip, chunked", "chunked, chunked", "Chunked ",
 ])
@@ -275,6 +287,43 @@ def test_decoded_chunked_upload_overflow_returns_413_without_upstream(running, u
         "Content-Type: multipart/form-data; boundary=synthetic",
     ])
     assert status == 413
+    assert upstream[0] == []
+
+
+@pytest.mark.parametrize("failure", ["write", "seek"])
+def test_chunked_spool_io_failure_is_closed_and_returns_api_error(
+    running, upstream, gateway, monkeypatch, failure
+):
+    spools = []
+
+    class BrokenSpool:
+        def __init__(self, *, max_size):
+            assert max_size == gateway._CHUNK
+            self.closed = False
+            spools.append(self)
+
+        def write(self, _value):
+            if failure == "write":
+                raise OSError("synthetic spool write failure")
+
+        def seek(self, _offset):
+            if failure == "seek":
+                raise OSError("synthetic spool seek failure")
+
+        def close(self):
+            self.closed = True
+
+    monkeypatch.setattr(gateway, "SpooledTemporaryFile", BrokenSpool)
+    status, head, payload = request(
+        "POST", "/api/v1/documents", body=chunks(b"synthetic"), headers=[
+            "Origin: https://demo.example.invalid", "Transfer-Encoding: chunked",
+            "Content-Type: multipart/form-data; boundary=synthetic",
+        ]
+    )
+    assert status == 500
+    assert "X-Redaction-Lab-API: 0.3" in head
+    assert json.loads(payload)["error"]["code"] == "GATEWAY_REJECTED"
+    assert len(spools) == 1 and spools[0].closed
     assert upstream[0] == []
 
 
