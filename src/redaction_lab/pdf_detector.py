@@ -42,16 +42,29 @@ _UNSAFE_OPERATORS = {
 }
 _FILL_OPERATORS = {b"f", b"f*", b"B", b"B*"}
 _PARSER_LOG_LOCK = RLock()
+_RECOVERABLE_PARSER_DIAGNOSTICS = frozenset(
+    {
+        (
+            "pypdf._reader",
+            "Xref table not zero-indexed. ID numbers for objects will be corrected.",
+        ),
+    }
+)
 
 
 class _ParserDiagnosticSink(logging.Handler):
     def __init__(self) -> None:
         super().__init__(level=logging.NOTSET)
-        self.seen = False
+        self.unsafe_seen = False
 
     def emit(self, record: logging.LogRecord) -> None:
-        if record.levelno >= logging.WARNING:
-            self.seen = True
+        if record.levelno < logging.WARNING:
+            return
+        diagnostic = (
+            (record.name, record.msg) if isinstance(record.msg, str) else None
+        )
+        if record.args or diagnostic not in _RECOVERABLE_PARSER_DIAGNOSTICS:
+            self.unsafe_seen = True
 
 
 @contextmanager
@@ -475,7 +488,7 @@ def detect_targets(
             reader = PdfReader(BytesIO(pdf_bytes), strict=True)
             page_count = len(reader.pages)
             with pdfplumber.open(BytesIO(pdf_bytes)) as pdf:
-                if diagnostics.seen:
+                if diagnostics.unsafe_seen:
                     return _unsupported(
                         source_sha256,
                         page_count=page_count,
@@ -801,7 +814,7 @@ def detect_targets(
                             reason_code="AMBIGUOUS_TEXT_LAYOUT",
                         )
 
-                if diagnostics.seen:
+                if diagnostics.unsafe_seen:
                     return _unsupported(
                         source_sha256,
                         page_count=page_count,

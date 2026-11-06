@@ -47,6 +47,37 @@ def _pdf_bytes(draw) -> bytes:
     return output.getvalue()
 
 
+def _nonzero_indexed_xref_pdf() -> bytes:
+    """Return a valid one-page PDF whose xref subsection starts at object 1."""
+
+    objects = (
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] "
+        b"/Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>",
+        b"<< /Length 44 >>\nstream\n"
+        b"BT /F1 12 Tf 72 700 Td (Visible text) Tj ET\nendstream",
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    )
+    parts = [b"%PDF-1.4\n"]
+    offsets: list[int] = []
+    for object_number, body in enumerate(objects, start=1):
+        offsets.append(sum(len(part) for part in parts))
+        parts.append(
+            f"{object_number} 0 obj\n".encode("ascii")
+            + body
+            + b"\nendobj\n"
+        )
+    xref_offset = sum(len(part) for part in parts)
+    parts.append(f"xref\n1 {len(objects)}\n".encode("ascii"))
+    parts.extend(f"{offset:010d} 00000 n \n".encode("ascii") for offset in offsets)
+    parts.append(
+        f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\n"
+        f"startxref\n{xref_offset}\n%%EOF\n".encode("ascii")
+    )
+    return b"".join(parts)
+
+
 def _rewrite_page(
     pdf_bytes: bytes,
     *,
@@ -770,6 +801,14 @@ def test_malformed_pdf_is_explicitly_unsupported() -> None:
     assert "not a pdf" not in repr(result)
 
 
+def test_repaired_nonzero_indexed_xref_is_not_treated_as_malformed() -> None:
+    result = _detect(_nonzero_indexed_xref_pdf())
+
+    assert result.status is DetectionStatus.NO_REDACTIONS
+    assert result.reason_code is None
+    assert result.page_count == 1
+
+
 def test_malformed_operands_do_not_leak_through_logs_or_stderr(
     caplog: pytest.LogCaptureFixture, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -783,6 +822,7 @@ def test_malformed_operands_do_not_leak_through_logs_or_stderr(
     captured = capsys.readouterr()
 
     assert result.status is DetectionStatus.UNSUPPORTED
+    assert result.reason_code == "MALFORMED_PDF"
     assert "SYNTHETIC_TRAP_TOKEN" not in caplog.text
     assert "SYNTHETIC_TRAP_TOKEN" not in captured.err
 
