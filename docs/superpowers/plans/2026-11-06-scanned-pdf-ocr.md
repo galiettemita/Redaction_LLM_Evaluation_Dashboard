@@ -62,12 +62,12 @@
 - Consumes: `OcrEngine` from Task 1 and PDF bytes.
 - Produces: `RasterTargetObservation`, `RasterRedactedAnalysis`, `RasterReferenceAnalysis`, `analyze_redacted_scan(...)`, and `analyze_reference_scan(...)` with explicit reason codes and raster detector/canonicalizer versions.
 
-- [ ] Write failing tests using generated scan images for component separation/union, text-flow adjacency, marker order, OCR-word removal inside targets, low confidence, image-dominant/whole-page rejection, pixel/page/target limits, deterministic hashes, and reference line text.
-- [ ] Add failing tests for whole-document safety preflight, residual black regions in a partially revealed reference, top-origin pixel to bottom-origin normalized coordinates, effective crop boundaries, and multiple targets across pages.
-- [ ] Run focused tests and verify the missing raster API is the failure.
-- [ ] Implement page-streamed pypdfium2 rendering, run-length union components, conservative geometry/text-flow validation, and canonical line reconstruction.
-- [ ] Run focused tests; refactor only after all raster tests pass.
-- [ ] Commit the raster backend.
+- [x] Write failing tests using generated scan images for component separation/union, text-flow adjacency, marker order, OCR-word removal inside targets, low confidence, image-dominant/whole-page rejection, pixel/page/target limits, deterministic hashes, and reference line text.
+- [x] Add failing tests for whole-document safety preflight, residual black regions in a partially revealed reference, top-origin pixel to bottom-origin normalized coordinates, effective crop boundaries, and multiple targets across pages.
+- [x] Run focused tests and verify the missing raster API is the failure.
+- [x] Implement page-streamed pypdfium2 rendering, run-length union components, conservative geometry/text-flow validation, and canonical line reconstruction.
+- [x] Run focused tests; refactor only after all raster tests pass.
+- [x] Commit the raster backend.
 
 ### Task 3: Analysis router and worker protocol
 
