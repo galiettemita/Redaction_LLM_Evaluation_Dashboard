@@ -127,8 +127,19 @@
       "reference_marker_absent_from_all_28_manifests": true,
       "mounted_browser_workflow": "PASS"
     },
-    "current_image_application_acceptance": "PENDING RL-LINK-017 CORRECTION 01 external synthetic acceptance",
-    "last_restart_check_utc": null
+    "current_image_application_acceptance": {
+      "successful_attempts": 2,
+      "target_experimental_scores": [
+        1.3,
+        1.5
+      ],
+      "document_and_model_experimental_score": 1.4,
+      "verified_scores": null,
+      "external_chunked_upload": "PASS",
+      "same_attempt_restart_reconnect": "PASS",
+      "scope": "Synthetic reference-host acceptance only; not scientific or recipient-device validation."
+    },
+    "last_restart_check_utc": "2026-11-06T15:48:19Z"
   },
   "python_dependencies": [
     [

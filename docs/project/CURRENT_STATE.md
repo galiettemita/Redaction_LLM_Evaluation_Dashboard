@@ -1,8 +1,8 @@
 # Current state
 
-Updated: 2026-11-05 (America/New_York). Coordination epoch: **E0072**.
+Updated: 2026-11-06 (America/New_York). Coordination epoch: **E0073**.
 Integration branch: `main`. Canonical writer: **Codex Engineering Lead** within standing authority and the owner's bounded completion direction.
-Freshness baseline for this record: live GitHub main `67a71ab0ac33e2a2c6bf0210eccc1c9d1add0524`; resolve live HEAD before action.
+Freshness baseline for this record: live GitHub main `93ae7273d2802f8fe7c487efaa8950109798c053`; resolve live HEAD before action.
 
 ## Read this first
 
@@ -21,6 +21,7 @@ New branch evidence: Tasks 1–5 passed their scoped independent reviews. Task 6
 | [RL-EXP-015](task_packets/RL-EXP-015-EXPERIMENTAL-EVALUATION.md) | IMPLEMENTED; SCOPED REVIEWS PASSED | Tasks 2–4 through `c82f5fc`; combined v2/genuine evaluation acceptance now recorded. Whole-branch review remains. |
 | [RL-UX-016](task_packets/RL-UX-016-EXPERIMENTAL-WORKSPACE.md) | IMPLEMENTED; SCOPED REVIEW PASSED | Task 5 through `a1705f5`; Task 6 completed the deferred mounted Chrome focus/effect/file/error/reconnect evidence. |
 | [RL-LINK-017](task_packets/RL-LINK-017-CONTROLLED-DEMO.md) | MERGED; DEPLOYED EXPERIMENTAL DEMO | PR #13 merged at `67a71ab`; owner-only external HTTPS acceptance passed. Temporary host/credentials remain private and the link depends on the reference Mac remaining awake with the owned services running. |
+| [RL-LINK-017 Correction 01](task_packets/RL-LINK-017-CORRECTION-01-CHUNKED-UPLOAD.md) | MERGED; DEPLOYED | PR #17 merged at `93ae727`; Safari/ngrok chunked multipart uploads now decode through a bounded edge spool into the unchanged fixed-length API. External no-length upload, genuine Qwen processing, API-shaped rejection and restart/reconnect acceptance passed. |
 
 Tasks 2–4 run in dependency order. Task 6's v2 worker rebuild/qualification follows reviewed Task 2 source before the genuine Task 4 canary. Task 5 consumes the frozen v0.3 contract; delivery waits for reviewed application/build. One accountable writer owns each bounded scope; shared-contract/manifest writes remain sequential. No standing scheduler is installed and this table makes no claim that another chat is active.
 
@@ -33,4 +34,4 @@ Tasks 2–4 run in dependency order. Task 6's v2 worker rebuild/qualification fo
 
 ## Next action and completion evidence
 
-The [final review record](handoffs/RL-EXP-015-final-review-9aea516.md) documents the spaced-sign correction and exact-candidate independent acceptance. [PR #13](https://github.com/galiettemita/Redaction_LLM_Evaluation_Dashboard/pull/13) merged the reviewed candidate as `67a71ab`. The [delivery handoff](handoffs/RL-LINK-017-lead-20261106T002131Z-live.md) records the external synthetic acceptance and operating limits. Next work is scientific validation, broader model coverage, and a permanent deployment only after their separate decisions/credentials/cost authority; none is implied by this demo.
+The [browser-upload correction handoff](handoffs/RL-LINK-017-lead-20261106T154819Z-93ae727.md) records the original failure evidence, reviewed implementation, PR #17 merge, exact verification and external synthetic acceptance. The temporary owner-only link is live again. Next work is scientific validation, broader model coverage, and a permanent deployment only after their separate decisions/credentials/cost authority; none is implied by this demo.

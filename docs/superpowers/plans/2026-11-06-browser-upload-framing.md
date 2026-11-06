@@ -88,10 +88,10 @@ Stop only the task-owned live launcher/tunnel while port-bound tests run. Run fu
 
 Review Task 1 against the spec's Review Focus. Correct Critical/Important findings through one RED/GREEN pass and rerun affected/full suites.
 
-- [ ] **Step 4: Perform synthetic external acceptance**
+- [x] **Step 4: Perform synthetic external acceptance**
 
 After normal integration, relaunch the reviewed candidate and tunnel with existing private configuration. Send a generated synthetic multipart pair through the public HTTPS route using chunked transfer and no `Content-Length`; verify upload, genuine processing/results, API-shaped malformed rejection, unauthenticated rejection and GET-only reconnect. Do not use the user's PDFs.
 
-- [ ] **Step 5: Publish handoff/checklists and commit**
+- [x] **Step 5: Publish handoff/checklists and commit**
 
 Commit message: `docs: record durable browser upload correction`
