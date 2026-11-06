@@ -113,13 +113,15 @@ def test_shipped_worker_v2_qualification_binds_current_source_and_exact_inventor
     lock = json.loads((packaging / "runtime.lock").read_text())
     integrity = json.loads((packaging / "integrity-manifest.json").read_text())
     sbom = json.loads((packaging / "sbom.cdx.json").read_text())
+    source = integrity["worker_source_files"]
+    assert set(source) == {str(path.relative_to(root)) for path in (root / "src").rglob("*")
+                           if path.is_file() and "__pycache__" not in path.parts}
+    for path in source:
+        assert source[path]["sha256"] == sha256((root / path).read_bytes()).hexdigest()
     assert lock["protocol_version"] == WORKER_PROTOCOL_VERSION
     assert lock["image_digest"] != "sha256:7a78eaf7ef812d354f0abe13f40c6c0a4e3684d94f72002245c5249249bf293b"
     assert sbom["metadata"]["component"]["version"] == lock["image_digest"]
     assert integrity["artifacts"]["worker_image_id"]["sha256"] == lock["image_digest"].removeprefix("sha256:")
-    source = integrity["worker_source_files"]
-    for path in ("src/redaction_lab/application/worker_protocol.py", "src/redaction_lab/pdf_detector.py", "src/redaction_lab/contracts.py"):
-        assert source[path]["sha256"] == sha256((root / path).read_bytes()).hexdigest()
     assert json.loads((packaging / "qualification-sources.json").read_text())["worker_image"]["runtime_canaries"]["reference_v2_protocol"] == "PASS"
 
 

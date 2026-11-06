@@ -101,6 +101,11 @@ assert Path('/sys/fs/cgroup/memory.max').read_text().strip()=='1610612736'
 assert Path('/sys/fs/cgroup/pids.max').read_text().strip()=='32'
 assert resource.getrlimit(resource.RLIMIT_NOFILE)==(64,64)
 assert Path('/sys/fs/cgroup/cpu.max').read_text().split()[0]!='max'
+from redaction_lab.experimental_scoring import score_text_agreement
+for reference in ('Temperature was - 5 degrees.', 'Temperature was − 5 degrees.'):
+ evidence=score_text_agreement(reference, 'Temperature was + 5 degrees.')
+ assert evidence.experimental_score==60.0 and evidence.applied_caps==(60.0,)
+ assert not evidence.subscores.normalized_exact_match and evidence.verified_score is None
 print(json.dumps({'isolation':'PASS'}))
 """
 try:
@@ -134,7 +139,7 @@ if lock['runtime_verified']:
     ApplicationPdfWorker().ensure_available()
 print(json.dumps({'protocol_version': WORKER_PROTOCOL_VERSION, 'image_digest': policy.image_digest,
     'reference_v2_protocol': 'PASS', 'redacted_source_excludes_covered_text': 'PASS',
-    'reference_text_bounds': 'PASS', 'adversarial_isolation': 'PASS', 'failure_cleanup': 'PASS',
+    'reference_text_bounds': 'PASS', 'adversarial_isolation': 'PASS', 'signed_quantity_regression': 'PASS', 'failure_cleanup': 'PASS',
     'timeout_cleanup': 'PASS', 'covered_reference_excluded': 'PASS', 'reference_page_limit': 'PASS',
     'receipts': receipts}, sort_keys=True))
 PY

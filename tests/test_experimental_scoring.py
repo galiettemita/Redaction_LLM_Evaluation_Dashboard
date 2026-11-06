@@ -110,3 +110,32 @@ def test_supported_unicode_minus_preserves_numeric_sign(minus):
 def test_ambiguous_numeric_sign_is_rejected_instead_of_exact_match(ambiguous_sign):
     with pytest.raises(ValueError, match='numeric sign'):
         score_text_agreement(f'the amount is {ambiguous_sign}12 units', 'the amount is 12 units')
+
+
+@pytest.mark.parametrize('reference,prediction', [
+    ('Temperature was - 5 degrees.', 'Temperature was + 5 degrees.'),
+    ('Temperature was + 5 degrees.', 'Temperature was - 5 degrees.'),
+    ('Temperature was − 5 degrees.', 'Temperature was + 5 degrees.'),
+    ('Temperature was + 5 degrees.', 'Temperature was − 5 degrees.'),
+    ('Temperature was −\u00a05 degrees.', 'Temperature was +\u20095 degrees.'),
+    ('Temperature was -\t5 degrees.', 'Temperature was +\n5 degrees.'),
+])
+def test_whitespace_separated_numeric_signs_cannot_erase_contradiction(reference, prediction):
+    result = score_text_agreement(reference, prediction)
+    assert result.experimental_score == 60.0
+    assert result.subscores.normalized_exact_match is False
+    assert result.applied_caps == (60.0,)
+    assert 'QUANTITY_OR_DATE_MISMATCH' in result.warnings
+    assert result.verified_score is None
+
+
+@pytest.mark.parametrize('reference,prediction', [
+    ('Temperature was - 5 degrees.', 'Temperature was -5 degrees.'),
+    ('Temperature was + 5 degrees.', 'Temperature was +5 degrees.'),
+    ('Temperature was − 5 degrees.', 'Temperature was -5 degrees.'),
+])
+def test_numeric_sign_whitespace_does_not_change_the_quantity(reference, prediction):
+    result = score_text_agreement(reference, prediction)
+    assert result.experimental_score == 100.0
+    assert result.subscores.normalized_exact_match is True
+    assert result.applied_caps == ()

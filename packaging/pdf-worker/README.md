@@ -84,8 +84,13 @@ that probe never persists application sources. Afterwards the production
 
 The integrity manifest binds all 38 source files in the built image. Complete
 3,216-entry dependency file/link inventories and 21 license file hashes were
-observed in both exact images and match. The 55-component CycloneDX SBOM was
-reconciled against the new image's observed Python and APK versions/licenses.
+observed in both exact images and match. The 55-entry CycloneDX package/OS SBOM was
+reconciled against observed installed Python-distribution and APK versions.
+Its package license annotations are incomplete. CPython 3.12.16 is observed
+separately in `qualification-sources.json`; its executable and standard-library
+bytes are bound by the complete `/usr/local` file/link inventory. The separate
+21-file license hash inventory does not claim complete license metadata for
+every component or the interpreter.
 Original download and advisory observations retain their original audit date;
 source refresh is not a new advisory scan. Exact new image/protocol identities,
 source hash, disk measurements and synthetic canaries are in the records here.

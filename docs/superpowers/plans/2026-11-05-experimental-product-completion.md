@@ -140,11 +140,11 @@
 - [x] **Step 5: Implement configurable trusted runtime-root resolution without weakening file inventory/digest checks.**
 - [x] **Step 6: Add failing API/E2E tests for reference-first processing, one attempt per target, evaluation creation only after terminal prediction, progress counts, experimental result shapes, null cases, reference absence from manifests, and GET-only reconnect.**
 - [x] **Step 7: Implement API v0.3 orchestration and result serialization; preserve v0.2 stored-record compatibility.**
-- [ ] **Step 8: Run focused tests, full Python suite, and a genuine synthetic Qwen canary after Task 6's v2 worker requalification prerequisite; require at least one persisted SUCCEEDED prediction before claiming Task 4 acceptance.**
+- [x] **Step 8: Run focused tests, full Python suite, and a genuine synthetic Qwen canary after Task 6's v2 worker requalification prerequisite; require at least one persisted SUCCEEDED prediction before claiming Task 4 acceptance.**
 - [x] **Step 9: Commit `feat: connect genuine inference to experimental evaluation`.**
 
 
-Task 4 implementation evidence: full Python suite 856 passed; genuine prompt-v2 Qwen canary persisted one SUCCEEDED attempt using an authentic previously-qualified v1 isolated PDF source, with replay/reopen stability and cleanup. Step 8 remains open only for Task 6 v2 PDF/reference runtime requalification and full combined canary. This is not a v2 runtime acceptance claim.
+Task 4 implementation evidence: full Python suite 856 passed; genuine prompt-v2 Qwen canary persisted one SUCCEEDED attempt using an authentic previously-qualified v1 isolated PDF source, with replay/reopen stability and cleanup. Task 6 subsequently closed Step 8 with independently requalified v2 PDF/reference extraction and genuine combined canaries. The final review correction image `03db44f11ea940fff0c75a94dc393aed73095e8ee71307afb4adc3ef0e290e34` has 14 fresh SUCCEEDED attempts: exact-reference target scores 0/8.3, document/model 4.2, conservative negative-reference nulls and all verified scores null. Final whole-branch re-review and external delivery remain open.
 
 ### Task 5: Document-centered experimental React workspace
 

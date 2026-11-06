@@ -727,3 +727,29 @@ def test_experimental_binding_validates_model_identity_not_only_record_digest(tm
     changed = changed.model_copy(update={'evaluation_id': _digest('evaluation', _record_identity_payload(changed))})
     with pytest.raises(ValueError, match='provenance|binding'):
         verify_evaluation_bindings(changed, resolved)
+
+
+@pytest.mark.parametrize('reference,prediction,expected', [
+    ('Temperature was - 5 degrees.', 'Temperature was + 5 degrees.', 60.0),
+    ('Temperature was + 5 degrees.', 'Temperature was - 5 degrees.', 60.0),
+    ('Temperature was − 5 degrees.', 'Temperature was + 5 degrees.', 60.0),
+    ('Temperature was ± 5 degrees.', 'Temperature was + 5 degrees.', None),
+])
+def test_experimental_evaluator_preserves_spaced_sign_caps_or_unknown(tmp_path, reference, prediction, expected):
+    from dataclasses import replace
+    from test_evaluation_store import _experimental_inputs, PROJECT_ID, NOW
+    from redaction_lab.evaluator import evaluate_experimental_attempt
+    inputs, mapping = _experimental_inputs(tmp_path)
+    resolved = inputs[1].resolve_attempt(inputs[5].attempt_id, project_id=PROJECT_ID)
+    resolved = replace(resolved, attempt=resolved.attempt.model_copy(update={'prediction': prediction}))
+    mapping = mapping.model_copy(update={'exact_revealed_text': reference})
+    record = evaluate_experimental_attempt(resolved, mapping, created_at=NOW)
+    assert record.experimental_score == expected
+    assert record.verified_score is None
+    if expected is None:
+        assert record.reason == 'INVALID_SCORING_INPUT'
+        assert record.evidence is None and record.score_status is ScoreStatus.NONE
+    else:
+        assert record.reason is None
+        assert record.evidence.applied_caps == (60.0,)
+        assert 'QUANTITY_OR_DATE_MISMATCH' in record.evidence.warnings

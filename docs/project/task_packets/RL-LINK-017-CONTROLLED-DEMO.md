@@ -1,7 +1,7 @@
 # RL-LINK-017 — Owner-only controlled experimental demonstration
 
 Baseline integration SHA: `cb0fa4f1242ae8bf12afb084bc9475017040b784` (live GitHub main, 2026-11-05 UTC). Epoch: E0072.
-Accountable owner: Codex Engineering Lead; delegated implementers report exact candidates to Lead. State: ACTIVE / AUTHORIZED FOR BOUNDED ENGINEERING, NOT IMPLEMENTED OR VERIFIED by this record.
+Accountable owner: Codex Engineering Lead; delegated implementers report exact candidates to Lead. State: IMPLEMENTED / FINAL REVIEW CORRECTION READY; NOT YET INTEGRATED OR EXTERNALLY DEPLOYED.
 Authority: owner clarification dated 2026-11-05, DEC-023 and [RL-OPS-002](RL-OPS-002-AUTONOMOUS-ENGINEERING.md). Read the [design](../../superpowers/specs/2026-11-05-experimental-product-completion-design.md), [implementation plan](../../superpowers/plans/2026-11-05-experimental-product-completion.md), [API v0.3](../API_CONTRACT_V0_3.md) and live integration HEAD before work.
 
 ## Objective and dependencies
@@ -48,13 +48,13 @@ No arbitrary upstream selection, redirect/proxy feature or Ollama route. Never e
 
 ## Acceptance checklist (plan Task 6)
 
-- [ ] Worker v2 rebuild uses reviewed source and pinned installed dependencies; full source/image/runtime hashes, SBOM and provenance recorded; protocol/extraction tests qualify exact image and isolation. Live v2 execution remains blocked until this passes.
-- [ ] RED/GREEN gateway tests cover exact Host/Origin, authentication, malformed/ambiguous framing, upload bounds, bounded streaming, loopback translation, security headers, arbitrary-upstream/Ollama rejection and failure cleanup.
-- [ ] Launch/preflight tests cover trusted runtime root, API v0.3, exact frontend inventory, gateway loopback binding, occupied ports and clean shutdown.
-- [ ] Fresh full Python and Node suites, typecheck/build/audit and packaging checks pass on the delivery candidate; deterministic production asset inventory rebound after the final frontend build.
-- [ ] Genuine isolated synthetic PDF + local Qwen canary persists at least one SUCCEEDED prediction and one experimental target score, non-null document/model summaries, exact provenance and verified_score null.
-- [ ] Missing, mismatched, partial and ambiguous reference canaries remain null/Accuracy unknown; technical outcomes remain distinct; prompt-like reference text is absent from prediction manifests.
-- [ ] Browser acceptance covers upload, local viewer toggle, process, truthful progress/results, selection, experimental labels, actionable errors and refresh/reconnect without a second attempt.
+- [x] Worker v2 rebuild uses reviewed source and pinned installed dependencies; full source/image/runtime hashes, SBOM and provenance recorded; protocol/extraction tests qualify exact image and isolation. Live v2 execution remains blocked until this passes.
+- [x] RED/GREEN gateway tests cover exact Host/Origin, authentication, malformed/ambiguous framing, upload bounds, bounded streaming, loopback translation, security headers, arbitrary-upstream/Ollama rejection and failure cleanup.
+- [x] Launch/preflight tests cover trusted runtime root, API v0.3, exact frontend inventory, gateway loopback binding, occupied ports and clean shutdown.
+- [x] Fresh full Python and Node suites, typecheck/build/audit and packaging checks pass on the delivery candidate; deterministic production asset inventory rebound after the final frontend build.
+- [x] Genuine isolated synthetic PDF + local Qwen canary persists at least one SUCCEEDED prediction and one experimental target score, non-null document/model summaries, exact provenance and verified_score null.
+- [x] Missing, mismatched, partial and ambiguous reference canaries remain null/Accuracy unknown; technical outcomes remain distinct; prompt-like reference text is absent from prediction manifests.
+- [x] Browser acceptance covers upload, local viewer toggle, process, truthful progress/results, selection, experimental labels, actionable errors and refresh/reconnect without a second attempt.
 - [ ] Independent exact-candidate whole-branch security/product and experimental-semantics review completed; all Critical/Important findings corrected and affected/full verification rerun. No scientific sign-off invented.
 - [ ] Recheck live main; reconcile overlap, update canonical state, all checklists and unique handoff with actual evidence; commit `docs: record experimental application delivery`.
 - [ ] Push normally, open/integrate reviewed PR under RL-OPS-002, launch app/gateway/ngrok and verify actual HTTPS application access with authentication. Unauthenticated access and wrong-origin mutations fail. Deliver working link privately without committing credentials/hostname.
@@ -120,3 +120,30 @@ ID without mutating immutable provenance. Add actual API-to-TypeScript contract
 and mismatched-identity rejection regressions. Preserve all prior successful
 attempts; a prompt-marker reference remains conflicting/null evidence, and an
 exact matching reference is a separate declared synthetic scoring canary.
+
+### Final whole-branch review correction wave (2026-11-05)
+
+Lead authorizes the single correction wave for candidate `9aea516`: add
+`src/redaction_lab/experimental_scoring.py`, `tests/test_experimental_scoring.py`
+and `tests/test_evaluator.py` to fix whitespace-separated numeric signs with
+literal scorer and evaluator regressions. Preserve immutable stored evidence;
+never rescore or overwrite old records during reads. Rebuild the source-bound
+v2 image offline and independently repeat qualification, inventories, restart
+and combined synthetic acceptance under the existing >=8 GiB/no-download gate.
+Correct SBOM/interpreter/license scope and historical image/attempt counts,
+reconcile local checklists, document unchanged planned test-file disposition,
+and publish a durable exact-candidate final-review handoff. Independent final
+acceptance, integration and external HTTPS launch remain controller actions.
+
+### Planned test-file disposition after final review
+
+| Planned Task 6 file | Disposition and reused evidence |
+| --- | --- |
+| `tests/application/test_worker_protocol.py` | No Task 6 edit. Existing v2 request/role/framing/bounds tests from `16ae648` rerun in the full suite; the actual qualified image is exercised by `scripts/verify-pdf-worker.sh`. |
+| `tests/application/test_document_worker.py` | No Task 6 edit. Existing isolated reference extraction/persistence/binding tests from `16ae648` rerun; genuine combined canaries prove the installed v2 application path. |
+| `tests/packaging/test_local_static.py` | No Task 6 edit. Existing asset/security/v0.3 assertions through `1f964db` rerun, plus actual mounted Chrome against the hash-bound built page. |
+
+These scopes permitted edits only if needed; no cosmetic edits were made to
+claim coverage. First seven local acceptance items have direct final-candidate
+evidence. Final independent re-review, delivery closure/integration and actual
+external HTTPS acceptance remain open.

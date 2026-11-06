@@ -1,24 +1,24 @@
 {
   "bomFormat": "CycloneDX",
   "specVersion": "1.5",
-  "serialNumber": "urn:uuid:0abbe771-4a47-4235-a8a1-8c870505b3cc",
+  "serialNumber": "urn:uuid:116ea4c1-c7be-4876-b32c-bf200e02e3a6",
   "version": 2,
   "metadata": {
-    "timestamp": "2026-11-05T22:00:25Z",
+    "timestamp": "2026-11-05T22:41:34Z",
     "component": {
       "type": "container",
       "name": "redaction-lab-pdf-worker",
-      "version": "sha256:954ca79b9c06811911b3d68ceb90a3b7ca85bdb509b1e09b5c17ba7c1c603129",
+      "version": "sha256:03db44f11ea940fff0c75a94dc393aed73095e8ee71307afb4adc3ef0e290e34",
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "954ca79b9c06811911b3d68ceb90a3b7ca85bdb509b1e09b5c17ba7c1c603129"
+          "content": "03db44f11ea940fff0c75a94dc393aed73095e8ee71307afb4adc3ef0e290e34"
         }
       ],
       "properties": [
         {
           "name": "redaction-lab:image-manifest-digest",
-          "value": "sha256:6549682347120c2fa64d4f18015c63a381b22d7829832fdbcb517769e33d261e"
+          "value": "sha256:d90c5ec2c01ad84cc2949354e26f9a7140f23f5095956ea2100031904f9850ab"
         },
         {
           "name": "redaction-lab:base-image-digest",
@@ -46,7 +46,11 @@
         },
         {
           "name": "redaction-lab:source-inventory-sha256",
-          "value": "c9af4248a5dfe1dc5272aac7ac89846194f0709fbf4754c6a17004cd1691f337"
+          "value": "f11ab0192f3484c5789d4a61b9c302a3be3371985563df899dde1ce8e2d50e76"
+        },
+        {
+          "name": "redaction-lab:sbom-scope",
+          "value": "55 Alpine OS/APK and installed Python-distribution package entries; package license annotations are incomplete. Separate 21-file license hash inventory does not claim complete license metadata for every component or the interpreter. CPython 3.12.16 is observed separately in qualification-sources.json and the complete /usr/local file/link inventory."
         }
       ]
     }

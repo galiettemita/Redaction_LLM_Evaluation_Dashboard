@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-05T22:00:25Z",
+  "generated_at": "2026-11-05T22:41:34Z",
   "architecture": "linux/arm64",
   "artifacts": {
     "podman_installer": {
@@ -18,11 +18,11 @@
       "sha256": "5642cb13b1fc85462dec7ad9d954623a57fe1e65981e1508dff894942eaa8694"
     },
     "worker_image_id": {
-      "size": 179907427,
-      "sha256": "954ca79b9c06811911b3d68ceb90a3b7ca85bdb509b1e09b5c17ba7c1c603129"
+      "size": 179907424,
+      "sha256": "03db44f11ea940fff0c75a94dc393aed73095e8ee71307afb4adc3ef0e290e34"
     },
     "worker_image_manifest": {
-      "sha256": "6549682347120c2fa64d4f18015c63a381b22d7829832fdbcb517769e33d261e"
+      "sha256": "d90c5ec2c01ad84cc2949354e26f9a7140f23f5095956ea2100031904f9850ab"
     }
   },
   "wheelhouse": [
@@ -208,8 +208,8 @@
       "sha256": "e70f2ae1b1c8b25856ebc6b42506c450814b2db28aa1b86f639596fd7ffe0fc9"
     },
     "src/redaction_lab/experimental_scoring.py": {
-      "byte_size": 6705,
-      "sha256": "855c2adc98876fecd85fa593e5d70c867660f27a3d896ac2dc13f31d09edd277"
+      "byte_size": 6840,
+      "sha256": "6f7d4faa1a9191f5daa06cd544343ea9b11f6ab091ff54fa76475901a6036a94"
     },
     "src/redaction_lab/fixtures.py": {
       "byte_size": 5462,
@@ -263,5 +263,5 @@
     "license_file_count": 21,
     "license_inventory_sha256": "1048df2b689585e6b847f2150e30f59d46f13321fc0552b30877653a400d31b4"
   },
-  "source_inventory_sha256": "c9af4248a5dfe1dc5272aac7ac89846194f0709fbf4754c6a17004cd1691f337"
+  "source_inventory_sha256": "f11ab0192f3484c5789d4a61b9c302a3be3371985563df899dde1ce8e2d50e76"
 }

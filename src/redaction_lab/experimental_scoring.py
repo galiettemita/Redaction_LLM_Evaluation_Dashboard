@@ -6,6 +6,7 @@ whitespace collapsed. Trigrams are multisets of the joined normalized tokens
 (short strings use the entire string). LCS agreement is 2L/(reference+prediction
 lengths). Critical details are tagged multisets of signed numeric literals, ordered numeric date strings, English
 number words/month names, explicit negation and originally capitalized tokens.
+Whitespace between an ASCII/normalized sign and its number is insignificant.
 No details on either side means critical agreement 1. Raw UTF-8 hashes bind the
 original inputs. Limits bound memory/CPU; rejecting input is never a zero score.
 """
@@ -67,7 +68,8 @@ def _parts(value: str):
     tokens = _TOKEN.findall(original.casefold())
     if not tokens or len(tokens) > 4096:
         raise ValueError('text must contain between 1 and 4096 tokens')
-    quantity = Counter(re.findall(r'(?<!\w)[+-]?\d+(?:[.,]\d+)*', original))
+    quantity = Counter(re.sub(r'\s+', '', literal) for literal in
+        re.findall(r'(?<!\w)(?:[+-]\s*)?\d+(?:[.,]\d+)*', original))
     quantity.update('date:' + date for date in re.findall(r'\b\d{1,4}[-/]\d{1,2}[-/]\d{1,4}\b', original))
     quantity.update(word for word in tokens if word in _NUMBER_WORDS | _MONTHS)
     negations = Counter(word for word in tokens if word in _NEGATIONS)
