@@ -9,6 +9,7 @@ from hashlib import sha256
 import json
 from pathlib import Path
 import sqlite3
+import re
 
 from redaction_lab.application.migration import migrate_database
 from redaction_lab.contracts import DocumentRole
@@ -17,6 +18,18 @@ from redaction_lab.application.worker_protocol import (
     WorkerResponse,
     WorkerStatus,
 )
+from redaction_lab.application.config import MAX_CANONICAL_TEXT_BYTES, MAX_PDF_PAGES
+
+
+_REFERENCE_FORMATS = frozenset(
+    {
+        ("pdf-worker-v2", "safe-exact-visible-text-v1"),
+        ("pdf-worker-v3", "safe-exact-visible-text-v1"),
+        ("pdf-worker-v3", "ocr-reference-text-v1"),
+    }
+)
+_HEX_32 = re.compile(r"^[0-9a-f]{32}$")
+_HEX_64 = re.compile(r"^[0-9a-f]{64}$")
 
 
 class ProcessingStatus(StrEnum):
@@ -116,6 +129,26 @@ def _identity(prefix: str, values: object) -> str:
         values, sort_keys=True, separators=(",", ":"), ensure_ascii=False
     ).encode("utf-8")
     return f"{prefix}-{sha256(encoded).hexdigest()}"
+
+
+def _validate_stored_reference_source(source: StoredReferenceSource) -> None:
+    """Validate historical immutable evidence without relaxing the live protocol."""
+
+    encoded = source.canonical_text.encode("utf-8")
+    if (
+        (source.protocol_version, source.canonicalizer_version)
+        not in _REFERENCE_FORMATS
+        or not source.project_id.strip()
+        or not _HEX_64.fullmatch(source.input_sha256)
+        or not _HEX_64.fullmatch(source.canonical_hash)
+        or not _HEX_32.fullmatch(source.request_nonce)
+        or not 1 <= source.page_count <= MAX_PDF_PAGES
+        or len(encoded) > MAX_CANONICAL_TEXT_BYTES
+        or sha256(encoded).hexdigest() != source.canonical_hash
+        or not source.image_digest
+        or source.provenance != "USER_SUPPLIED_EXPERIMENTAL"
+    ):
+        raise ValueError("reference source integrity failure")
 
 
 class ApplicationStore:
@@ -272,14 +305,8 @@ class ApplicationStore:
         values.pop("source_id")
         if source.source_id != _identity("reference-source", values) or source.provenance != "USER_SUPPLIED_EXPERIMENTAL":
             raise ValueError("reference source identity mismatch")
-        # Validate hashes, bounds and schema again on every read, including after reopen.
-        WorkerResponse(
-            protocol_version=source.protocol_version, request_nonce=source.request_nonce,
-            project_id=source.project_id, role=DocumentRole.REFERENCE, input_sha256=source.input_sha256,
-            status=WorkerStatus.PROCESSABLE, page_count=source.page_count,
-            reference_text=source.canonical_text, reference_hash=source.canonical_hash,
-            reference_canonicalizer_version=source.canonicalizer_version,
-        )
+        # Historical v2 evidence remains readable; live responses remain v3-only.
+        _validate_stored_reference_source(source)
         bound = connection.execute(
             """SELECT 1 FROM application_jobs j JOIN document_versions v ON v.version_id=j.document_version_id
                WHERE j.job_id=? AND v.version_id=? AND j.role='REFERENCE' AND v.role='REFERENCE'
@@ -543,11 +570,13 @@ class ApplicationStore:
                     and row["protocol_version"] is not None
                     and row["image_digest"] is not None
                 ):
-                    source = connection.execute(
+                    candidates = connection.execute(
                         """SELECT source_id FROM canonical_sources
-                           WHERE project_id=? AND source_sha256=? AND role='REDACTED'""",
+                           WHERE project_id=? AND source_sha256=? AND role='REDACTED'
+                           ORDER BY source_id LIMIT 2""",
                         (row["project_id"], row["input_sha256"]),
-                    ).fetchone()
+                    ).fetchall()
+                    source = candidates[0] if len(candidates) == 1 else None
                 if row["role"] == "REFERENCE":
                     try:
                         reference = self._reference_source(connection, row["document_version_id"])

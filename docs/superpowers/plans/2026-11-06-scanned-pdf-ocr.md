@@ -101,10 +101,10 @@
 - Consumes: worker material with vector or raster version/method.
 - Produces: target/source identities validated against their stored backend versions while preserving existing vector records.
 
-- [ ] Write failing tests for raster material construction, forged method/version combinations, canonical marker binding, a serialized legacy vector source reopening unchanged, v2 reference rows reopening, v3 OCR rows persisting, and unallowlisted protocol/canonicalizer pairs being rejected.
-- [ ] Run tests and verify expected failures.
-- [ ] Implement an explicit allowed backend-version registry and version-derived source/target validation.
-- [ ] Run focused and application persistence tests; commit.
+- [x] Write failing tests for raster material construction, forged method/version combinations, canonical marker binding, legacy vector behavior, v2 reference rows reopening, v3 OCR rows persisting, and unallowlisted protocol/canonicalizer pairs being rejected.
+- [x] Run tests and verify expected failures.
+- [x] Implement an explicit allowed backend-version registry and version-derived source/target validation.
+- [x] Run focused and application persistence tests; commit.
 
 ### Task 5: Cross-product regression and exact-image qualification
 

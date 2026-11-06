@@ -15,7 +15,11 @@ import pytest
 
 import redaction_lab.application.migration as migration_module
 from redaction_lab.application.migration import MigrationError, migrate_database
-from redaction_lab.application.application_store import ApplicationStore
+from redaction_lab.application.application_store import (
+    ApplicationStore,
+    StoredReferenceSource,
+    _identity,
+)
 from redaction_lab.evaluation_store import EvaluationStore
 from redaction_lab.fixtures import make_synthetic_pair
 from redaction_lab.judges.base import SourceFact, SourceFactRecord
@@ -131,7 +135,7 @@ def test_fresh_migration_creates_application_and_reference_tables(tmp_path: Path
     result = migrate_database(path, backup_directory=tmp_path / "backups")
 
     assert EXPECTED_TABLES <= _tables(path)
-    assert result.applied_versions == (1, 2)
+    assert result.applied_versions == (1, 2, 3)
     assert result.backup_path is None
 
 
@@ -615,7 +619,7 @@ os._exit(23)
 
     result = migrate_database(path, backup_directory=tmp_path / "backups")
 
-    assert result.applied_versions == (1, 2)
+    assert result.applied_versions == (1, 2, 3)
     with sqlite3.connect(path) as connection:
         assert connection.execute("SELECT value FROM legacy").fetchone()[0] == "committed"
 
@@ -684,7 +688,7 @@ def test_concurrent_initialization_serializes_without_partial_state(tmp_path: Pa
         worker.join(timeout=5)
 
     assert all(not isinstance(result, Exception) for result in results)
-    assert sorted(result.applied_versions for result in results) == [(), (1, 2)]
+    assert sorted(result.applied_versions for result in results) == [(), (1, 2, 3)]
     assert EXPECTED_TABLES <= _tables(path)
 
 
@@ -714,11 +718,11 @@ def test_two_independent_processes_serialize_legacy_migration(tmp_path: Path) ->
         assert worker.returncode == 0, stderr
         results.append(json.loads(worker.stdout.read()))
 
-    assert sorted(tuple(result["applied"]) for result in results) == [(), (1, 2)]
+    assert sorted(tuple(result["applied"]) for result in results) == [(), (1, 2, 3)]
     assert len(tuple(backup_directory.glob("*.bak"))) == 1
     assert not tuple(backup_directory.glob("*.part"))
     with sqlite3.connect(path) as connection:
-        assert connection.execute("SELECT count(*) FROM schema_migrations").fetchone()[0] == 2
+        assert connection.execute("SELECT count(*) FROM schema_migrations").fetchone()[0] == 3
         assert connection.execute("SELECT value FROM immutable").fetchone()[0] == b"preserved"
 
 
@@ -759,7 +763,7 @@ def test_two_process_migration_preserves_task4_and_task6_evidence_on_reopen(
     assert third.returncode == 0, third.stderr.read()
     third_result = json.loads(third.stdout.read())
 
-    assert sorted(tuple(result["applied"]) for result in results) == [(), (1, 2)]
+    assert sorted(tuple(result["applied"]) for result in results) == [(), (1, 2, 3)]
     assert tuple(third_result["applied"]) == ()
     assert len(tuple(backup_directory.glob("*.bak"))) == 1
     with sqlite3.connect(path) as connection:
@@ -1166,9 +1170,67 @@ def test_reference_migration_is_additive_and_backs_up_v1_database(tmp_path):
                            (1, migration_module.MIGRATIONS[0].checksum, datetime.now(UTC).isoformat()))
         connection.execute("INSERT INTO documents VALUES ('legacy', 'project', 'REFERENCE', 'ACCEPTED', 'now')")
     result = migrate_database(path, backup_directory=tmp_path / "backups")
-    assert result.applied_versions == (2,)
+    assert result.applied_versions == (2, 3)
     assert result.backup_path is not None
     with sqlite3.connect(result.backup_path) as connection:
         assert "reference_sources" not in _tables(result.backup_path)
         assert connection.execute("SELECT document_id FROM documents").fetchone() == ("legacy",)
     assert "reference_sources" in _tables(path)
+
+
+def test_v3_reference_migration_preserves_and_reopens_v2_evidence(tmp_path):
+    path = tmp_path / "v2.sqlite3"
+    now = datetime.now(UTC).isoformat()
+    values = dict(
+        version_id="legacy-version",
+        job_id="legacy-job",
+        project_id="legacy-project",
+        input_sha256="a" * 64,
+        canonical_text="legacy reference",
+        canonical_hash=__import__("hashlib").sha256(b"legacy reference").hexdigest(),
+        canonicalizer_version="safe-exact-visible-text-v1",
+        page_count=1,
+        request_nonce="b" * 32,
+        protocol_version="pdf-worker-v2",
+        image_digest="sha256:" + "c" * 64,
+        provenance="USER_SUPPLIED_EXPERIMENTAL",
+    )
+    source = StoredReferenceSource(
+        source_id=_identity("reference-source", values), **values
+    )
+    with sqlite3.connect(path) as connection:
+        for migration in migration_module.MIGRATIONS[:2]:
+            connection.executescript(migration.sql)
+            connection.execute(
+                "INSERT INTO schema_migrations VALUES (?, ?, ?)",
+                (migration.version, migration.checksum, now),
+            )
+        connection.execute(
+            "INSERT INTO documents VALUES (?, ?, 'REFERENCE', 'ACCEPTED', ?)",
+            ("legacy-document", values["project_id"], now),
+        )
+        connection.execute(
+            """INSERT INTO document_versions VALUES
+               (?, ?, ?, 'REFERENCE', 'legacy.pdf', ?, 1, 'application/pdf', 1,
+                'ACCEPTED', NULL, ?)""",
+            (values["version_id"], "legacy-document", values["project_id"],
+             values["input_sha256"], now),
+        )
+        connection.execute(
+            """INSERT INTO application_jobs VALUES
+               (?, 'legacy-request', ?, ?, 'REFERENCE', ?, 'PROCESSING', 'worker',
+                ?, ?, ?, 1, NULL, NULL, ?, ?)""",
+            (values["job_id"], values["project_id"], values["version_id"],
+             values["input_sha256"], values["request_nonce"],
+             values["protocol_version"], values["image_digest"], now, now),
+        )
+        connection.execute(
+            "INSERT INTO reference_sources VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            tuple(getattr(source, field) for field in source.__dataclass_fields__),
+        )
+
+    result = migrate_database(path, backup_directory=tmp_path / "backups")
+
+    assert result.applied_versions == (3,)
+    reopened = ApplicationStore(path, backup_directory=tmp_path / "backups")
+    assert reopened.reference_source(values["version_id"]) == source

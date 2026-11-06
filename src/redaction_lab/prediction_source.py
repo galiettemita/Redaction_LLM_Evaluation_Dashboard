@@ -8,11 +8,17 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from hashlib import sha256
-import json
 from math import isfinite
 import re
 
 from redaction_lab.canonical import CANONICALIZER_VERSION, canonicalize_redacted
+from redaction_lab.analysis_identity import (
+    PREDICTION_SOURCE_VERSION,
+    RASTER_ANALYSIS_METHOD,
+    VECTOR_ANALYSIS_METHOD,
+    source_ids,
+    target_id,
+)
 from redaction_lab.contracts import (
     CanonicalRedactedDocument,
     DetectionEvidence,
@@ -25,11 +31,18 @@ from redaction_lab.pdf_detector import (
     DetectionStatus,
     detect_targets,
 )
+from redaction_lab.raster_analysis import (
+    RASTER_CANONICALIZER_VERSION,
+    RASTER_DETECTOR_VERSION,
+)
 
 
-PREDICTION_SOURCE_VERSION = "prediction-source-v1"
 PREDICTION_SOURCE_PROVENANCE = "internal-redacted-pdf-byte-ingestion-v1"
 _TARGET_MARKER = re.compile(r"\[\[TARGET:([^\]]+)\]\]")
+_ANALYSIS_METHOD_BY_VERSION = {
+    (DETECTOR_VERSION, CANONICALIZER_VERSION): VECTOR_ANALYSIS_METHOD,
+    (RASTER_DETECTOR_VERSION, RASTER_CANONICALIZER_VERSION): RASTER_ANALYSIS_METHOD,
+}
 
 
 @dataclass(frozen=True)
@@ -58,6 +71,8 @@ class PredictionTargetObservation:
     page_index: int
     normalized_bbox: tuple[float, float, float, float]
     rectangle_index: int
+    target_id: str | None = None
+    analysis_method: str = VECTOR_ANALYSIS_METHOD
 
 
 @dataclass(frozen=True)
@@ -73,23 +88,14 @@ class PredictionSourceMaterial:
     targets: tuple[PredictionTargetObservation, ...]
 
 
-def _source_ids(project_id: str, source_sha256: str) -> tuple[str, str, str]:
-    material = json.dumps(
-        (
-            PREDICTION_SOURCE_VERSION,
-            project_id,
-            source_sha256,
-            DETECTOR_VERSION,
-            CANONICALIZER_VERSION,
-        ),
-        separators=(",", ":"),
-        ensure_ascii=False,
-    ).encode("utf-8")
-    digest = sha256(material).hexdigest()
-    return (
-        f"source-{digest}",
-        f"redacted-{digest}-{DETECTOR_VERSION}",
-        f"canonical-{digest}-{CANONICALIZER_VERSION}",
+def _source_ids(
+    project_id: str,
+    source_sha256: str,
+    detector_version: str = DETECTOR_VERSION,
+    canonicalizer_version: str = CANONICALIZER_VERSION,
+) -> tuple[str, str, str]:
+    return source_ids(
+        project_id, source_sha256, detector_version, canonicalizer_version
     )
 
 
@@ -98,6 +104,8 @@ def _target_from_observation(
     *,
     project_id: str,
     redacted_document_version_id: str,
+    detector_version: str,
+    expected_analysis_method: str,
 ) -> RedactionTarget:
     bbox = tuple(float(value) for value in observation.normalized_bbox)
     if (
@@ -111,21 +119,21 @@ def _target_from_observation(
         or bbox[1] >= bbox[3]
     ):
         raise ValueError("invalid worker target observation")
-    identity_material = json.dumps(
-        (
-            project_id,
-            redacted_document_version_id,
-            observation.page_index,
-            bbox,
-            DETECTOR_VERSION,
-        ),
-        ensure_ascii=False,
-        separators=(",", ":"),
+    if observation.analysis_method != expected_analysis_method:
+        raise ValueError("worker target analysis provenance mismatch")
+    expected_target_id = target_id(
+        project_id=project_id,
+        redacted_document_version_id=redacted_document_version_id,
+        page_index=observation.page_index,
+        normalized_bbox=bbox,
+        detector_version=detector_version,
+        analysis_method=expected_analysis_method,
     )
-    digest = sha256(identity_material.encode("utf-8")).hexdigest()[:24]
+    if observation.target_id is not None and observation.target_id != expected_target_id:
+        raise ValueError("worker target identity mismatch")
     return RedactionTarget(
-        target_id=f"target-{digest}",
-        target_version=f"target-{digest}-{DETECTOR_VERSION}",
+        target_id=expected_target_id,
+        target_version=f"{expected_target_id}-{detector_version}",
         project_id=project_id,
         redacted_document_version_id=redacted_document_version_id,
         page_index=observation.page_index,
@@ -135,14 +143,14 @@ def _target_from_observation(
             + ",".join(f"{value:.8f}" for value in bbox)
         ),
         scope_status=ScopeStatus.SUPPORTED,
-        detection_method="vector-near-black-text-occlusion",
+        detection_method=expected_analysis_method,
         detection_evidence=DetectionEvidence(
             rectangle_count=1,
             source_object_ids=(
                 f"page-{observation.page_index}-rect-{observation.rectangle_index}",
             ),
         ),
-        detector_version=DETECTOR_VERSION,
+        detector_version=detector_version,
     )
 
 
@@ -160,17 +168,27 @@ def _expected_target(target: RedactionTarget) -> RedactionTarget:
             page_index=target.page_index,
             normalized_bbox=target.normalized_bbox,
             rectangle_index=rectangle_index,
+            target_id=target.target_id,
+            analysis_method=target.detection_method,
         ),
         project_id=target.project_id,
         redacted_document_version_id=target.redacted_document_version_id,
+        detector_version=target.detector_version,
+        expected_analysis_method=target.detection_method,
     )
 
 
 def validate_prediction_source(source: PredictionSource) -> None:
     """Fail closed if an immutable stored source no longer self-validates."""
 
+    expected_analysis_method = _ANALYSIS_METHOD_BY_VERSION.get(
+        (source.detector_version, source.canonicalizer_version)
+    )
     source_id, redacted_version, canonical_version = _source_ids(
-        source.project_id, source.source_sha256
+        source.project_id,
+        source.source_sha256,
+        source.detector_version,
+        source.canonicalizer_version,
     )
     canonical = source.canonical_document
     if (
@@ -178,13 +196,12 @@ def validate_prediction_source(source: PredictionSource) -> None:
         or source.source_id != source_id
         or source.role is not DocumentRole.REDACTED
         or source.redacted_document_version_id != redacted_version
-        or source.detector_version != DETECTOR_VERSION
-        or source.canonicalizer_version != CANONICALIZER_VERSION
+        or expected_analysis_method is None
         or source.provenance != PREDICTION_SOURCE_PROVENANCE
         or canonical.project_id != source.project_id
         or canonical.redacted_document_version_id != redacted_version
         or canonical.canonical_document_version_id != canonical_version
-        or canonical.canonicalizer_version != CANONICALIZER_VERSION
+        or canonical.canonicalizer_version != source.canonicalizer_version
         or sha256(canonical.canonical_text.encode("utf-8")).hexdigest()
         != canonical.canonical_hash
         or not source.targets
@@ -211,7 +228,8 @@ def validate_prediction_source(source: PredictionSource) -> None:
             target.project_id != source.project_id
             or target.redacted_document_version_id != redacted_version
             or target.scope_status is not ScopeStatus.SUPPORTED
-            or target.detector_version != DETECTOR_VERSION
+            or target.detector_version != source.detector_version
+            or target.detection_method != expected_analysis_method
             or target != _expected_target(target)
         ):
             raise ValueError("stored prediction source target integrity failure")
@@ -242,10 +260,10 @@ def build_prediction_source_from_material(
     actual_sha256 = sha256(pdf_bytes).hexdigest()
     if material.source_sha256 != actual_sha256:
         raise ValueError("worker material does not match input bytes")
-    if (
-        material.detector_version != DETECTOR_VERSION
-        or material.canonicalizer_version != CANONICALIZER_VERSION
-    ):
+    expected_analysis_method = _ANALYSIS_METHOD_BY_VERSION.get(
+        (material.detector_version, material.canonicalizer_version)
+    )
+    if expected_analysis_method is None:
         raise ValueError("worker material uses an unapproved code version")
     if not 1 <= material.page_count <= 100:
         raise ValueError("worker page count is outside the approved limit")
@@ -256,13 +274,18 @@ def build_prediction_source_from_material(
     if sha256(material.canonical_text.encode("utf-8")).hexdigest() != material.canonical_hash:
         raise ValueError("worker canonical text hash mismatch")
     source_id, redacted_version, canonical_version = _source_ids(
-        project_id, actual_sha256
+        project_id,
+        actual_sha256,
+        material.detector_version,
+        material.canonicalizer_version,
     )
     targets = tuple(
         _target_from_observation(
             observation,
             project_id=project_id,
             redacted_document_version_id=redacted_version,
+            detector_version=material.detector_version,
+            expected_analysis_method=expected_analysis_method,
         )
         for observation in material.targets
     )
@@ -296,7 +319,7 @@ def build_prediction_source_from_material(
         canonical_hash=material.canonical_hash,
         canonical_text=material.canonical_text,
         target_ids=tuple(target.target_id for target in targets),
-        canonicalizer_version=CANONICALIZER_VERSION,
+        canonicalizer_version=material.canonicalizer_version,
     )
     source = PredictionSource(
         source_id=source_id,
@@ -305,8 +328,8 @@ def build_prediction_source_from_material(
         source_sha256=actual_sha256,
         role=DocumentRole.REDACTED,
         redacted_document_version_id=redacted_version,
-        detector_version=DETECTOR_VERSION,
-        canonicalizer_version=CANONICALIZER_VERSION,
+        detector_version=material.detector_version,
+        canonicalizer_version=material.canonicalizer_version,
         canonical_document=canonical,
         targets=targets,
         provenance=PREDICTION_SOURCE_PROVENANCE,

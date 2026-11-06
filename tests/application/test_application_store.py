@@ -200,6 +200,43 @@ def test_restart_reconciles_already_committed_task4_source_without_reparsing(tmp
     assert recovered.source_id == source_id
 
 
+def test_restart_recovery_fails_closed_on_ambiguous_source_profiles(tmp_path: Path) -> None:
+    path = tmp_path / "app.sqlite3"
+    store = ApplicationStore(path, backup_directory=tmp_path / "backups")
+    redacted, _ = make_synthetic_pair("two_boxes", tmp_path / "fixture")
+    pdf_bytes = redacted.read_bytes()
+    digest = __import__("hashlib").sha256(pdf_bytes).hexdigest()
+    upload = store.register_upload(
+        project_id="project", role=DocumentRole.REDACTED,
+        artifact_key=f"sha256/{digest[:2]}/{digest}.pdf", sha256=digest,
+        byte_size=len(pdf_bytes),
+    )
+    job = store.claim_next(owner="dead-worker", now=datetime.now(UTC))
+    assert job
+    store.record_runtime(
+        job.job_id, owner="dead-worker", request_nonce="a" * 32,
+        protocol_version="pdf-worker-v3", image_digest="sha256:" + "b" * 64,
+        page_count=1,
+    )
+    RunStore(path).ingest_redacted_pdf(pdf_bytes, project_id="project")
+    with store.connect() as connection:
+        connection.execute(
+            """INSERT INTO canonical_sources
+               SELECT source_id || '-alternate', source_version, project_id,
+                      source_sha256, role, redacted_document_version_id,
+                      detector_version || '-alternate', canonicalizer_version || '-alternate',
+                      canonical_document_version_id, canonical_hash, canonical_json,
+                      targets_json, ingested_at, provenance
+               FROM canonical_sources WHERE project_id='project'"""
+        )
+
+    store.recover_interrupted(now=datetime.now(UTC))
+
+    recovered = store.get_job(upload.job_id)
+    assert recovered.status is ProcessingStatus.FAILED
+    assert recovered.reason_code == "INTERRUPTED"
+
+
 def test_identity_rows_and_terminal_jobs_are_immutable(tmp_path: Path) -> None:
     store = _store(tmp_path)
     upload = store.register_upload(
@@ -252,7 +289,7 @@ def test_store_rejects_fictional_task4_source_binding(tmp_path: Path) -> None:
         )
 
 
-def _reference_work(store):
+def _reference_work(store, *, canonicalizer_version="safe-exact-visible-text-v1"):
     from hashlib import sha256
     from redaction_lab.application.worker_protocol import WorkerResponse, WORKER_PROTOCOL_VERSION
     upload = store.register_upload(project_id="project", role=DocumentRole.REFERENCE,
@@ -262,7 +299,7 @@ def _reference_work(store):
                               project_id="project", role=DocumentRole.REFERENCE,
                               input_sha256="c" * 64, status="PROCESSABLE", page_count=1,
                               reference_text="isolated reference", reference_hash=sha256(b"isolated reference").hexdigest(),
-                              reference_canonicalizer_version="safe-exact-visible-text-v1")
+                              reference_canonicalizer_version=canonicalizer_version)
     store.record_runtime(job.job_id, owner="worker", request_nonce=response.request_nonce,
                          protocol_version=response.protocol_version, image_digest="sha256:" + "d" * 64,
                          page_count=1)
@@ -288,6 +325,20 @@ def test_reference_source_is_immutable_bound_and_recoverable_without_task4(tmp_p
         for sql in ("UPDATE reference_sources SET canonical_text='tampered'", "DELETE FROM reference_sources"):
             with pytest.raises(sqlite3.IntegrityError, match="immutable"):
                 connection.execute(sql)
+
+
+def test_ocr_reference_source_is_persisted_and_reopens_under_v3(tmp_path):
+    store = _store(tmp_path)
+    upload, job, response = _reference_work(
+        store, canonicalizer_version="ocr-reference-text-v1"
+    )
+
+    source = store.record_reference_source(job.job_id, owner="worker", response=response)
+    reopened = _store(tmp_path)
+
+    assert source.version_id == upload.version_id
+    assert source.canonicalizer_version == "ocr-reference-text-v1"
+    assert reopened.reference_source(upload.version_id) == source
 
 
 def test_reference_source_rejects_wrong_binding_and_missing_ready_evidence(tmp_path):

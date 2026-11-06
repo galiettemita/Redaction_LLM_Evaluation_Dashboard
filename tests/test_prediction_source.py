@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from hashlib import sha256
 
 import pytest
 
@@ -10,6 +11,15 @@ from redaction_lab.prediction_source import (
     PredictionTargetObservation,
     build_prediction_source_from_material,
     derive_prediction_source,
+)
+from redaction_lab.analysis_identity import (
+    RASTER_ANALYSIS_METHOD,
+    source_ids,
+    target_id,
+)
+from redaction_lab.raster_analysis import (
+    RASTER_CANONICALIZER_VERSION,
+    RASTER_DETECTOR_VERSION,
 )
 
 
@@ -109,6 +119,97 @@ def test_worker_material_reconstructs_identical_source_without_pdf_parsing(tmp_p
     )
 
     assert rebuilt == expected
+
+
+def test_raster_worker_material_builds_a_version_bound_prediction_source() -> None:
+    pdf_bytes = b"opaque-scanned-pdf-bytes"
+    project_id = "raster-project"
+    digest = sha256(pdf_bytes).hexdigest()
+    _, redacted_version, _ = source_ids(
+        project_id,
+        digest,
+        RASTER_DETECTOR_VERSION,
+        RASTER_CANONICALIZER_VERSION,
+    )
+    bbox = (0.1, 0.2, 0.7, 0.3)
+    expected_target_id = target_id(
+        project_id=project_id,
+        redacted_document_version_id=redacted_version,
+        page_index=0,
+        normalized_bbox=bbox,
+        detector_version=RASTER_DETECTOR_VERSION,
+        analysis_method=RASTER_ANALYSIS_METHOD,
+    )
+    canonical_text = f"visible [[TARGET:{expected_target_id}]] context"
+    material = PredictionSourceMaterial(
+        source_sha256=digest,
+        page_count=1,
+        detector_version=RASTER_DETECTOR_VERSION,
+        canonicalizer_version=RASTER_CANONICALIZER_VERSION,
+        canonical_text=canonical_text,
+        canonical_hash=sha256(canonical_text.encode()).hexdigest(),
+        targets=(PredictionTargetObservation(
+            target_id=expected_target_id,
+            analysis_method=RASTER_ANALYSIS_METHOD,
+            page_index=0,
+            normalized_bbox=bbox,
+            rectangle_index=0,
+        ),),
+    )
+
+    source = build_prediction_source_from_material(
+        pdf_bytes, project_id=project_id, material=material
+    )
+
+    assert source.detector_version == RASTER_DETECTOR_VERSION
+    assert source.canonicalizer_version == RASTER_CANONICALIZER_VERSION
+    assert source.targets[0].target_id == expected_target_id
+    assert source.targets[0].detection_method == RASTER_ANALYSIS_METHOD
+
+
+@pytest.mark.parametrize(
+    ("target_id_override", "analysis_method"),
+    (("target-forged", RASTER_ANALYSIS_METHOD), (None, "vector-near-black-text-occlusion")),
+)
+def test_raster_worker_material_rejects_forged_target_provenance(
+    target_id_override: str | None, analysis_method: str
+) -> None:
+    pdf_bytes = b"opaque-scanned-pdf-bytes"
+    project_id = "raster-project"
+    digest = sha256(pdf_bytes).hexdigest()
+    _, redacted_version, _ = source_ids(
+        project_id, digest, RASTER_DETECTOR_VERSION, RASTER_CANONICALIZER_VERSION
+    )
+    bbox = (0.1, 0.2, 0.7, 0.3)
+    expected_target_id = target_id(
+        project_id=project_id,
+        redacted_document_version_id=redacted_version,
+        page_index=0,
+        normalized_bbox=bbox,
+        detector_version=RASTER_DETECTOR_VERSION,
+        analysis_method=RASTER_ANALYSIS_METHOD,
+    )
+    canonical_text = f"visible [[TARGET:{expected_target_id}]] context"
+    material = PredictionSourceMaterial(
+        source_sha256=digest,
+        page_count=1,
+        detector_version=RASTER_DETECTOR_VERSION,
+        canonicalizer_version=RASTER_CANONICALIZER_VERSION,
+        canonical_text=canonical_text,
+        canonical_hash=sha256(canonical_text.encode()).hexdigest(),
+        targets=(PredictionTargetObservation(
+            target_id=target_id_override or expected_target_id,
+            analysis_method=analysis_method,
+            page_index=0,
+            normalized_bbox=bbox,
+            rectangle_index=0,
+        ),),
+    )
+
+    with pytest.raises(ValueError, match="provenance|target"):
+        build_prediction_source_from_material(
+            pdf_bytes, project_id=project_id, material=material
+        )
 
 
 def test_worker_material_has_no_authority_to_persist_itself(tmp_path: Path) -> None:

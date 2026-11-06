@@ -195,6 +195,8 @@ class WorkerResponse(_StrictModel):
             canonical_hash=self.canonical_hash,
             targets=tuple(
                 PredictionTargetObservation(
+                    target_id=target.target_id,
+                    analysis_method=target.analysis_method.value,
                     page_index=target.page_index,
                     normalized_bbox=target.normalized_bbox,
                     rectangle_index=target.rectangle_index,
