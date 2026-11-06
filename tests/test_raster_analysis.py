@@ -163,6 +163,94 @@ def test_low_confidence_scan_is_unsupported_instead_of_silently_empty() -> None:
     assert result.canonical_text is None
 
 
+def test_one_ambiguous_black_region_invalidates_other_supported_targets() -> None:
+    rendered = _page(rectangles=((80, 45, 230, 75), (280, 220, 370, 245)))
+    words = (
+        _word("Before", (20, 50, 65, 70)),
+        _word("after", (245, 50, 275, 70)),
+        _word("Enough", (20, 100, 70, 120), line=2),
+        _word("visible", (80, 100, 125, 120), line=2),
+        _word("context", (135, 100, 185, 120), line=2),
+    )
+
+    result = analyze_redacted_scan(
+        b"synthetic-scan",
+        ocr_engine=QueueOcr([_ocr_page(words)]),
+        renderer=StaticRenderer((rendered,)),
+        marker_id=_marker,
+    )
+
+    assert result.status is RasterStatus.UNSUPPORTED
+    assert result.reason_code == "AMBIGUOUS_RASTER_REGION"
+    assert result.targets == ()
+
+
+def test_contextless_bar_adjacent_to_a_supported_bar_is_not_silently_omitted() -> None:
+    rendered = _page(rectangles=((80, 45, 230, 75), (80, 78, 230, 108)))
+    words = (
+        _word("Before", (20, 50, 65, 70)),
+        _word("after", (245, 50, 275, 70)),
+        _word("Enough", (20, 150, 70, 170), line=2),
+        _word("visible", (80, 150, 125, 170), line=2),
+        _word("context", (135, 150, 185, 170), line=2),
+    )
+
+    result = analyze_redacted_scan(
+        b"synthetic-scan",
+        ocr_engine=QueueOcr([_ocr_page(words)]),
+        renderer=StaticRenderer((rendered,)),
+        marker_id=_marker,
+    )
+
+    assert result.status is RasterStatus.SUPPORTED
+    assert len(result.targets) == 2
+
+
+def test_target_observations_follow_canonical_marker_order_when_lines_collapse() -> None:
+    rendered = _page(rectangles=((250, 45, 350, 75), (80, 78, 230, 108)))
+    words = (
+        _word("Before", (20, 60, 65, 80)),
+        _word("after", (360, 60, 395, 80)),
+        _word("Enough", (20, 150, 70, 170), line=2),
+        _word("visible", (80, 150, 125, 170), line=2),
+        _word("context", (135, 150, 185, 170), line=2),
+    )
+
+    result = analyze_redacted_scan(
+        b"synthetic-scan",
+        ocr_engine=QueueOcr([_ocr_page(words)]),
+        renderer=StaticRenderer((rendered,)),
+        marker_id=_marker,
+    )
+
+    assert result.status is RasterStatus.SUPPORTED
+    assert tuple(target.rectangle_index for target in result.targets) == (1, 0)
+    assert (result.canonical_text or "").index("target-0-1") < (
+        result.canonical_text or ""
+    ).index("target-0-0")
+
+
+def test_reference_rejects_any_uncertain_word_instead_of_scoring_it() -> None:
+    words = tuple(
+        _word(
+            text,
+            (20 + index * 45, 20, 55 + index * 45, 40),
+            confidence=0 if text == "999999" else 100,
+        )
+        for index, text in enumerate(("Known", "text", "is", "clear", "except", "999999"))
+    )
+
+    result = analyze_reference_scan(
+        b"synthetic-reference",
+        ocr_engine=QueueOcr([_ocr_page(words)]),
+        renderer=StaticRenderer((_page(),)),
+    )
+
+    assert result.status is RasterStatus.UNSUPPORTED
+    assert result.reason_code == "OCR_QUALITY_UNCERTAIN"
+    assert result.reference_text is None
+
+
 def test_whole_page_black_region_is_explicitly_unsupported() -> None:
     page = _page(rectangles=((0, 0, 399, 299),))
     words = tuple(
@@ -307,6 +395,40 @@ def test_whole_document_preflight_rejects_unsafe_later_page_before_ocr() -> None
         _scan_pdf(unsafe_second_page=True),
         ocr_engine=ocr,
         renderer=PdfiumRasterRenderer(),
+    )
+
+    assert result.status is RasterStatus.UNSUPPORTED
+    assert result.reason_code == "UNSAFE_RASTER_PDF"
+    assert ocr.calls == 0
+
+
+def test_huge_declared_page_is_rejected_before_pdfium_allocates() -> None:
+    image = Image.new("RGB", (1, 1), "white")
+    output = BytesIO()
+    canvas = Canvas(output, pagesize=(100_000, 100_000), invariant=1)
+    canvas.drawImage(ImageReader(image), 0, 0, width=100_000, height=100_000)
+    canvas.save()
+    ocr = QueueOcr([])
+
+    result = analyze_reference_scan(
+        output.getvalue(), ocr_engine=ocr, renderer=PdfiumRasterRenderer()
+    )
+
+    assert result.status is RasterStatus.UNSUPPORTED
+    assert result.reason_code == "RASTER_PIXEL_LIMIT"
+    assert ocr.calls == 0
+
+
+def test_small_image_placement_cannot_masquerade_as_a_scanned_page() -> None:
+    image = Image.new("RGB", (20, 20), "white")
+    output = BytesIO()
+    canvas = Canvas(output, pagesize=(400, 300), invariant=1)
+    canvas.drawImage(ImageReader(image), 10, 10, width=20, height=20)
+    canvas.save()
+    ocr = QueueOcr([])
+
+    result = analyze_reference_scan(
+        output.getvalue(), ocr_engine=ocr, renderer=PdfiumRasterRenderer()
     )
 
     assert result.status is RasterStatus.UNSUPPORTED

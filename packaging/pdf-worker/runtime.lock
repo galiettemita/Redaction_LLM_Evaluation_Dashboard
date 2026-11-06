@@ -12,7 +12,7 @@
   "ocr_dependency_image_digest": "sha256:698f1a601c9f0465ac425a81790cb68d5d978430ad73207feb579e200a11c3ff",
   "ocr_engine_version": "5.5.2",
   "ocr_language": "eng",
-  "image_digest": "sha256:0bd78c8670e96342eaba91e68233f2c1f483a3f696fe2ae8a5845cce4528708e",
+  "image_digest": "sha256:e3b0add32b136443b470dbc2cadd5b7ddb4a3342da7b9cdb2589cd7094c7ce99",
   "python_version": "3.12.16",
   "timeout_seconds": 60,
   "runtime_verified": true

@@ -210,15 +210,18 @@ def validate_prediction_source(source: PredictionSource) -> None:
         or len(set(canonical.target_ids)) != len(canonical.target_ids)
         or tuple(_TARGET_MARKER.findall(canonical.canonical_text))
         != canonical.target_ids
-        or tuple(source.targets)
-        != tuple(
-            sorted(
-                source.targets,
-                key=lambda target: (
-                    target.page_index,
-                    -target.normalized_bbox[3],
-                    target.normalized_bbox[0],
-                ),
+        or (
+            expected_analysis_method == VECTOR_ANALYSIS_METHOD
+            and tuple(source.targets)
+            != tuple(
+                sorted(
+                    source.targets,
+                    key=lambda target: (
+                        target.page_index,
+                        -target.normalized_bbox[3],
+                        target.normalized_bbox[0],
+                    ),
+                )
             )
         )
     ):
@@ -310,7 +313,7 @@ def build_prediction_source_from_material(
             ),
         )
     )
-    if targets != expected_order:
+    if expected_analysis_method == VECTOR_ANALYSIS_METHOD and targets != expected_order:
         raise ValueError("worker targets are not in canonical order")
     canonical = CanonicalRedactedDocument(
         canonical_document_version_id=canonical_version,

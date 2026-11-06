@@ -67,11 +67,11 @@
     }
   },
   "worker_image": {
-    "local_image_id": "sha256:0bd78c8670e96342eaba91e68233f2c1f483a3f696fe2ae8a5845cce4528708e",
-    "manifest_digest": "sha256:bc0a4143922ea60d2c8dfcbae55056ad12499b25683fbee9750e8704725dee20",
+    "local_image_id": "sha256:e3b0add32b136443b470dbc2cadd5b7ddb4a3342da7b9cdb2589cd7094c7ce99",
+    "manifest_digest": "sha256:728d263a36523051ee9db9ad7af1e72c051c57152aaade9409b33646bf067363",
     "architecture": "arm64",
     "os": "linux",
-    "size": 246705132,
+    "size": 246710253,
     "user": "65532:65532",
     "entrypoint": [
       "python",
@@ -81,7 +81,7 @@
     "protocol_version": "pdf-worker-v3",
     "build_policy": "Exact pinned OCR/Python dependency image; --pull=never --network=none; isolated source context; COPY --chmod=0555; independent qualification. No source-build downloads.",
     "dependency_source_image": "sha256:698f1a601c9f0465ac425a81790cb68d5d978430ad73207feb579e200a11c3ff",
-    "source_inventory_sha256": "17ab677bc809d3acabc292e9d464ae1a47c8fee7bdc487323fa19ae5b9032c81",
+    "source_inventory_sha256": "b53dee3976cb0ef457508f1dd60adca1c0546b45f8c0ef740f0ed3cc4750805d",
     "installed_inventory": {
       "usr_local_file_count": 3216,
       "usr_local_inventory_sha256": "796918201c671074182df724ba7a42fb59f5628bfbb595897c90be5a8653ddc5",
@@ -154,21 +154,23 @@
         "experimental_summaries": 28
       },
       "reference_marker_absent_from_all_28_manifests": true,
-      "mounted_browser_workflow": "PASS"
+      "mounted_browser_workflow": "PASS",
+      "legacy_image_acceptance": {
+        "image_digest": "sha256:b4e126e3b710050ec2c425a8e2ff322d74cda4f1cdfed282bb62e50ef0574a3a",
+        "successful_attempts": 2,
+        "target_experimental_scores": [1.3, 1.5],
+        "document_and_model_experimental_score": 1.4,
+        "verified_scores": null,
+        "external_chunked_upload": "PASS",
+        "same_attempt_restart_reconnect": "PASS",
+        "last_restart_check_utc": "2026-11-06T15:48:19Z"
+      }
     },
     "current_image_application_acceptance": {
-      "successful_attempts": 2,
-      "target_experimental_scores": [
-        1.3,
-        1.5
-      ],
-      "document_and_model_experimental_score": 1.4,
-      "verified_scores": null,
-      "external_chunked_upload": "PASS",
-      "same_attempt_restart_reconnect": "PASS",
+      "image_digest": "sha256:e3b0add32b136443b470dbc2cadd5b7ddb4a3342da7b9cdb2589cd7094c7ce99",
+      "status": "PENDING_POST_REVIEW_ACCEPTANCE",
       "scope": "Synthetic reference-host acceptance only; not scientific or recipient-device validation."
-    },
-    "last_restart_check_utc": "2026-11-06T15:48:19Z"
+    }
   },
   "python_dependencies": [
     [

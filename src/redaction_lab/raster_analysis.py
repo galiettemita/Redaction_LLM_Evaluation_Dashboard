@@ -7,12 +7,14 @@ from dataclasses import dataclass
 from enum import StrEnum
 from hashlib import sha256
 from io import BytesIO
+from math import ceil, isfinite
 import re
 from statistics import median
 from typing import Protocol
 
 from PIL import Image
 from pypdf import PdfReader
+from pypdf.generic import ContentStream
 import pypdfium2 as pdfium
 
 from redaction_lab.ocr import OcrEngine, OcrFailure, OcrPage, OcrWord
@@ -115,21 +117,51 @@ class PdfiumRasterRenderer:
                 page_count = len(reader.pages)
                 if not 1 <= page_count <= MAX_RASTER_PAGES:
                     raise _RasterFailure("RASTER_PAGE_LIMIT")
+                total_pixels = 0
                 for page in reader.pages:
                     if int(page.get("/Rotate", 0) or 0) % 360:
                         raise _RasterFailure("UNSAFE_RASTER_PDF")
                     if page.get("/Annots") or page.get("/AA"):
                         raise _RasterFailure("UNSAFE_RASTER_PDF")
+                    width_points = float(page.cropbox.width)
+                    height_points = float(page.cropbox.height)
+                    if (
+                        not isfinite(width_points)
+                        or not isfinite(height_points)
+                        or width_points <= 0
+                        or height_points <= 0
+                    ):
+                        raise _RasterFailure("UNSAFE_RASTER_PDF")
+                    render_width = ceil(width_points * RASTER_RENDER_DPI / 72)
+                    render_height = ceil(height_points * RASTER_RENDER_DPI / 72)
+                    page_pixels = render_width * render_height
+                    total_pixels += page_pixels
+                    if (
+                        page_pixels > MAX_PAGE_PIXELS
+                        or total_pixels > MAX_TOTAL_PIXELS
+                    ):
+                        raise _RasterFailure("RASTER_PIXEL_LIMIT")
                     resources = self._resolved(page.get("/Resources", {}))
                     xobjects = self._resolved(resources.get("/XObject", {}))
-                    images = 0
+                    image_names: set[str] = set()
                     for value in xobjects.values():
                         resolved = self._resolved(value)
                         if str(resolved.get("/Subtype")) != "/Image":
                             raise _RasterFailure("UNSAFE_RASTER_PDF")
-                        images += 1
-                    if images != 1:
+                        image_width = int(resolved.get("/Width", 0))
+                        image_height = int(resolved.get("/Height", 0))
+                        if (
+                            image_width <= 0
+                            or image_height <= 0
+                            or image_width * image_height > MAX_PAGE_PIXELS
+                        ):
+                            raise _RasterFailure("RASTER_PIXEL_LIMIT")
+                    image_names.update(str(name) for name in xobjects)
+                    if len(image_names) != 1:
                         raise _RasterFailure("UNSAFE_RASTER_PDF")
+                    self._validate_page_composition(
+                        reader, page, next(iter(image_names))
+                    )
                 if diagnostics.unsafe_seen:
                     raise _RasterFailure("UNSAFE_RASTER_PDF")
                 return page_count
@@ -137,6 +169,67 @@ class PdfiumRasterRenderer:
             raise
         except Exception:
             raise _RasterFailure("UNSAFE_RASTER_PDF") from None
+
+    @staticmethod
+    def _validate_page_composition(reader, page, image_name: str) -> None:
+        """Allow one crop-covering image plus non-painting OCR text overlay."""
+
+        operations = ContentStream(page.get_contents(), reader).operations
+        image_calls = [
+            (index, operands)
+            for index, (operands, operator) in enumerate(operations)
+            if operator == b"Do"
+        ]
+        if len(image_calls) != 1 or str(image_calls[0][1][0]) != image_name:
+            raise _RasterFailure("UNSAFE_RASTER_PDF")
+        image_index = image_calls[0][0]
+        transforms = [
+            tuple(float(value) for value in operands)
+            for operands, operator in operations[:image_index]
+            if operator == b"cm"
+        ]
+        if any(len(transform) != 6 for transform in transforms):
+            raise _RasterFailure("UNSAFE_RASTER_PDF")
+        non_identity = [
+            transform
+            for transform in transforms
+            if transform != (1.0, 0.0, 0.0, 1.0, 0.0, 0.0)
+        ]
+        if len(non_identity) != 1:
+            raise _RasterFailure("UNSAFE_RASTER_PDF")
+        a, b, c, d, e, f = non_identity[0]
+        if not all(isfinite(value) for value in (a, b, c, d, e, f)) or b or c or a <= 0 or d <= 0:
+            raise _RasterFailure("UNSAFE_RASTER_PDF")
+        crop = tuple(float(value) for value in page.cropbox)
+        tolerance = 2.0
+        if (
+            e > crop[0] + tolerance
+            or f > crop[1] + tolerance
+            or e + a < crop[2] - tolerance
+            or f + d < crop[3] - tolerance
+        ):
+            raise _RasterFailure("UNSAFE_RASTER_PDF")
+
+        allowed_outside_text = {b"q", b"Q", b"cm", b"g", b"Do"}
+        allowed_inside_text = {
+            b"BT", b"ET", b"BDC", b"BMC", b"EMC", b"g", b"rg",
+            b"G", b"RG", b"Tf", b"Tc", b"Tr", b"Tm", b"Td", b"TD",
+            b"Tj", b"TJ", b"Tw", b"Tz", b"TL", b"Ts", b"T*", b"'", b'"',
+        }
+        in_text = False
+        for _operands, operator in operations:
+            if operator == b"BT":
+                if in_text:
+                    raise _RasterFailure("UNSAFE_RASTER_PDF")
+                in_text = True
+            if operator not in (allowed_inside_text if in_text else allowed_outside_text):
+                raise _RasterFailure("UNSAFE_RASTER_PDF")
+            if operator == b"ET":
+                if not in_text:
+                    raise _RasterFailure("UNSAFE_RASTER_PDF")
+                in_text = False
+        if in_text:
+            raise _RasterFailure("UNSAFE_RASTER_PDF")
 
     def render(self, pdf_bytes: bytes) -> RenderedDocument:
         page_count = self._preflight(pdf_bytes)
@@ -255,7 +348,7 @@ def _target_components(page: OcrPage, image: Image.Image) -> tuple[_Component, .
     minimum_run = max(12, int(median_height * 0.6))
     width, height = image.size
     candidates: list[_Component] = []
-    plausible_without_context = False
+    unresolved: list[_Component] = []
     for component in _union_components(image, minimum_run):
         x0, y0, x1, y1 = component.bbox
         box_width, box_height = x1 - x0, y1 - y0
@@ -273,11 +366,20 @@ def _target_components(page: OcrPage, image: Image.Image) -> tuple[_Component, .
         ):
             continue
         if not _text_context(component.bbox, page.words, median_height):
-            plausible_without_context = True
+            unresolved.append(component)
             continue
         candidates.append(component)
-    if plausible_without_context and not candidates:
-        raise _RasterFailure("AMBIGUOUS_RASTER_REGION")
+    for component in unresolved:
+        x0, y0, x1, y1 = component.bbox
+        adjacent = any(
+            min(x1, other.bbox[2]) > max(x0, other.bbox[0])
+            and min(abs(y1 - other.bbox[1]), abs(y0 - other.bbox[3]))
+            <= 2 * median_height
+            for other in candidates
+        )
+        if not adjacent:
+            raise _RasterFailure("AMBIGUOUS_RASTER_REGION")
+        candidates.append(component)
     return tuple(sorted(candidates, key=lambda item: (item.bbox[1], item.bbox[0])))
 
 
@@ -288,6 +390,12 @@ def _validate_ocr(page: OcrPage) -> None:
     if sum(value >= 60 for value in confidences) / len(confidences) < 0.60 or sum(
         confidences
     ) / len(confidences) < 60:
+        raise _RasterFailure("OCR_QUALITY_UNCERTAIN")
+
+
+def _validate_reference_ocr(page: OcrPage) -> None:
+    _validate_ocr(page)
+    if any(word.confidence < 60 for word in page.words):
         raise _RasterFailure("OCR_QUALITY_UNCERTAIN")
 
 
@@ -409,15 +517,23 @@ def analyze_redacted_scan(
                 reason_code="NO_SUPPORTED_REDACTIONS",
             )
         canonical_text = "\n\n".join(pages)
-        if any(
-            canonical_text.count(f"[[TARGET:{marker_id(observation)}]]") != 1
-            for observation in observations
+        observation_by_marker = {
+            marker_id(observation): observation for observation in observations
+        }
+        canonical_markers = tuple(re.findall(r"\[\[TARGET:([^\]]+)\]\]", canonical_text))
+        if (
+            len(observation_by_marker) != len(observations)
+            or len(canonical_markers) != len(observations)
+            or set(canonical_markers) != set(observation_by_marker)
         ):
             raise _RasterFailure("CANONICAL_MARKER_INVALID")
+        ordered_observations = tuple(
+            observation_by_marker[marker] for marker in canonical_markers
+        )
         return RasterRedactedAnalysis(
             status=RasterStatus.SUPPORTED,
             page_count=page_count,
-            targets=tuple(observations),
+            targets=ordered_observations,
             canonical_text=canonical_text,
             canonical_hash=sha256(canonical_text.encode()).hexdigest(),
         )
@@ -457,7 +573,7 @@ def analyze_reference_scan(
             ocr_page = ocr_engine.recognize(rendered.image)
             if (ocr_page.width, ocr_page.height) != (width, height):
                 raise _RasterFailure("OCR_GEOMETRY_INVALID")
-            _validate_ocr(ocr_page)
+            _validate_reference_ocr(ocr_page)
             if _target_components(ocr_page, rendered.image):
                 raise _RasterFailure("REFERENCE_PARTIALLY_HIDDEN")
             pages.append(_page_text(ocr_page, ()))
