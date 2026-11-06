@@ -1,5 +1,5 @@
 #!/bin/sh
-# Synthetic-only v2 protocol and container-isolation qualification.
+# Synthetic-only v3 protocol, OCR, and container-isolation qualification.
 set -eu
 umask 077
 script_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
@@ -59,7 +59,7 @@ for role in (DocumentRole.REDACTED, DocumentRole.REFERENCE):
     result = worker.process(pdf(role is DocumentRole.REDACTED), project_id='v2-qualification', role=role)
     response = result.response
     assert response.status is WorkerStatus.PROCESSABLE
-    assert response.protocol_version == 'pdf-worker-v2'
+    assert response.protocol_version == WORKER_PROTOCOL_VERSION
     if role is DocumentRole.REFERENCE:
         assert response.reference_text and 'Paris' in response.reference_text
         assert response.reference_hash == sha256(response.reference_text.encode()).hexdigest()
@@ -180,7 +180,7 @@ assert shutil.disk_usage(runtime).free >= 8 * 1024**3
 if lock['runtime_verified']:
     ApplicationPdfWorker().ensure_available()
 print(json.dumps({'protocol_version': WORKER_PROTOCOL_VERSION, 'image_digest': policy.image_digest,
-    'reference_v2_protocol': 'PASS', 'redacted_source_excludes_covered_text': 'PASS',
+    'reference_v3_protocol': 'PASS', 'redacted_source_excludes_covered_text': 'PASS',
     'reference_text_bounds': 'PASS', 'adversarial_isolation': 'PASS', 'signed_quantity_regression': 'PASS', 'failure_cleanup': 'PASS',
     'timeout_cleanup': 'PASS', 'covered_reference_excluded': 'PASS', 'reference_page_limit': 'PASS',
     'ocr_runtime': 'PASS', 'raster_redacted_reference': 'PASS',

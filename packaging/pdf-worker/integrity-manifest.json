@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-06T15:33:34Z",
+  "generated_at": "2026-11-06T17:21:12Z",
   "architecture": "linux/arm64",
   "artifacts": {
     "podman_installer": {
@@ -18,11 +18,11 @@
       "sha256": "5642cb13b1fc85462dec7ad9d954623a57fe1e65981e1508dff894942eaa8694"
     },
     "worker_image_id": {
-      "size": 246666218,
-      "sha256": "34893717ed476aaf6082a6d3cf0649c6de75e356121a2d67674769dc42dc63d5"
+      "size": 246705132,
+      "sha256": "0bd78c8670e96342eaba91e68233f2c1f483a3f696fe2ae8a5845cce4528708e"
     },
     "worker_image_manifest": {
-      "sha256": "d32200c92611ea59ba02953556bb1c82ba18f25a633f28a8d0d76fb0c86c1626"
+      "sha256": "bc0a4143922ea60d2c8dfcbae55056ad12499b25683fbee9750e8704725dee20"
     }
   },
   "wheelhouse": [
@@ -111,6 +111,10 @@
       "byte_size": 16090,
       "sha256": "f06eaedf266078608983a5b1e65418fa5bd47ab45f69ced9a9fb1aaf71024861"
     },
+    "src/redaction_lab/analysis_identity.py": {
+      "byte_size": 1630,
+      "sha256": "dac7a901bc480cc00df1d694c8078eeeb4e2f7d9813b82e0f32521eb22aa75b0"
+    },
     "src/redaction_lab/api/__init__.py": {
       "byte_size": 149,
       "sha256": "f415e2d993057a46db6c4e6f95162cee5d50f16aa18513d6f21fbaa79521af0e"
@@ -136,8 +140,8 @@
       "sha256": "520b03306b9d0217d51c1cbdffa98ac783250deeeb31e2b5c47f7d8a0ad98ab9"
     },
     "src/redaction_lab/application/application_store.py": {
-      "byte_size": 25706,
-      "sha256": "893286da8a74220bcaaa851ba617f6d6a84a47879861ca7f052a644e6717f316"
+      "byte_size": 26673,
+      "sha256": "22d51f5da0532957047a8fd2885031c71ff1e372f61a8338dcd7ee8cafc71903"
     },
     "src/redaction_lab/application/artifact_store.py": {
       "byte_size": 11101,
@@ -164,8 +168,8 @@
       "sha256": "cd86ef6bc46543a59625e850b2dcb91e80c3debd417b29cc66a6836dda5220b1"
     },
     "src/redaction_lab/application/migration.py": {
-      "byte_size": 25202,
-      "sha256": "14aaa8a48ce7c9c76c57c7fb678ed682c6fd47c86ffffcfa59d44889ae68e466"
+      "byte_size": 25287,
+      "sha256": "6e4da88fea77fb0468b6c842e595cc45cf4a925f4b4359439b2403fac5e51b93"
     },
     "src/redaction_lab/application/migrations/0001.sql": {
       "byte_size": 5784,
@@ -174,6 +178,10 @@
     "src/redaction_lab/application/migrations/0002.sql": {
       "byte_size": 2711,
       "sha256": "8fad495fdbf69b530e1c41d3dd8e03f9e3b304d37b61846f609feb6ae0964012"
+    },
+    "src/redaction_lab/application/migrations/0003.sql": {
+      "byte_size": 3403,
+      "sha256": "914b21ff58d3582dda0da3fdfaa22206e4895d9e9085d130496b2862e4405a3e"
     },
     "src/redaction_lab/application/paths.py": {
       "byte_size": 6275,
@@ -188,8 +196,8 @@
       "sha256": "b92c31bf28c01f20c2b8d3c82cdb34441174563b91496d3536b2e0e01ad10fcf"
     },
     "src/redaction_lab/application/worker_protocol.py": {
-      "byte_size": 14029,
-      "sha256": "1ed2242f7180ce9be327ce0400d81434142a4c9a4cebcadb61d68db2f46d3338"
+      "byte_size": 15300,
+      "sha256": "237b046dc4133889fd2c0df14cab8673848380d831e01247240622a872b4d547"
     },
     "src/redaction_lab/canonical.py": {
       "byte_size": 6454,
@@ -198,6 +206,10 @@
     "src/redaction_lab/contracts.py": {
       "byte_size": 50124,
       "sha256": "030149e7efe0dac589c6d9227d53480319f6cb130fda1bd580bf7ef3aa7dfb76"
+    },
+    "src/redaction_lab/document_analysis.py": {
+      "byte_size": 8646,
+      "sha256": "d5261229122d7a83d174cddbea18bed12acba098d74d297f817c26a7ee189c20"
     },
     "src/redaction_lab/evaluation_store.py": {
       "byte_size": 39243,
@@ -232,8 +244,12 @@
       "sha256": "1fb8eb120348fd145f179b35fdf3464975e342778a2fc8e96a79b02f797d3dab"
     },
     "src/redaction_lab/prediction_source.py": {
-      "byte_size": 13119,
-      "sha256": "e832e72200150be1c5f8ffb2bd74ee8a00f017bc72ada1fa0d191684b8bc81c4"
+      "byte_size": 14384,
+      "sha256": "bcb2ffa14e2f244f05952ccf733d31e65cd7fba2aae72d26f7294896ecec1d46"
+    },
+    "src/redaction_lab/raster_analysis.py": {
+      "byte_size": 18482,
+      "sha256": "d1bef33aad8bc1c5ef52b823973d7d11b1138088fca9c59ce8c89d8f13b51969"
     },
     "src/redaction_lab/reference.py": {
       "byte_size": 50111,
@@ -267,5 +283,5 @@
     "license_file_count": 21,
     "license_inventory_sha256": "1048df2b689585e6b847f2150e30f59d46f13321fc0552b30877653a400d31b4"
   },
-  "source_inventory_sha256": "9501eccc53d49e5de8bb3670a6e77d9beb348132d618dd03201d9d3a4f39b73a"
+  "source_inventory_sha256": "17ab677bc809d3acabc292e9d464ae1a47c8fee7bdc487323fa19ae5b9032c81"
 }

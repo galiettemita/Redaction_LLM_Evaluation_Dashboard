@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "protocol_version": "pdf-worker-v2",
+  "protocol_version": "pdf-worker-v3",
   "podman_executable": "runtime/pdf-worker/podman/bin/podman",
   "podman_executable_sha256": "sha256:9603079ca32a9fa88f0aa2b3f9e41c9365d7db2dc19c75857a1ec40aee6e5837",
   "podman_version": "6.1.4",
@@ -12,7 +12,7 @@
   "ocr_dependency_image_digest": "sha256:698f1a601c9f0465ac425a81790cb68d5d978430ad73207feb579e200a11c3ff",
   "ocr_engine_version": "5.5.2",
   "ocr_language": "eng",
-  "image_digest": "sha256:34893717ed476aaf6082a6d3cf0649c6de75e356121a2d67674769dc42dc63d5",
+  "image_digest": "sha256:0bd78c8670e96342eaba91e68233f2c1f483a3f696fe2ae8a5845cce4528708e",
   "python_version": "3.12.16",
   "timeout_seconds": 60,
   "runtime_verified": true

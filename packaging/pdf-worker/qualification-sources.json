@@ -67,21 +67,21 @@
     }
   },
   "worker_image": {
-    "local_image_id": "sha256:34893717ed476aaf6082a6d3cf0649c6de75e356121a2d67674769dc42dc63d5",
-    "manifest_digest": "sha256:d32200c92611ea59ba02953556bb1c82ba18f25a633f28a8d0d76fb0c86c1626",
+    "local_image_id": "sha256:0bd78c8670e96342eaba91e68233f2c1f483a3f696fe2ae8a5845cce4528708e",
+    "manifest_digest": "sha256:bc0a4143922ea60d2c8dfcbae55056ad12499b25683fbee9750e8704725dee20",
     "architecture": "arm64",
     "os": "linux",
-    "size": 246666218,
+    "size": 246705132,
     "user": "65532:65532",
     "entrypoint": [
       "python",
       "-m",
       "redaction_lab.application.worker_protocol"
     ],
-    "protocol_version": "pdf-worker-v2",
+    "protocol_version": "pdf-worker-v3",
     "build_policy": "Exact pinned OCR/Python dependency image; --pull=never --network=none; isolated source context; COPY --chmod=0555; independent qualification. No source-build downloads.",
     "dependency_source_image": "sha256:698f1a601c9f0465ac425a81790cb68d5d978430ad73207feb579e200a11c3ff",
-    "source_inventory_sha256": "9501eccc53d49e5de8bb3670a6e77d9beb348132d618dd03201d9d3a4f39b73a",
+    "source_inventory_sha256": "17ab677bc809d3acabc292e9d464ae1a47c8fee7bdc487323fa19ae5b9032c81",
     "installed_inventory": {
       "usr_local_file_count": 3216,
       "usr_local_inventory_sha256": "796918201c671074182df724ba7a42fb59f5628bfbb595897c90be5a8653ddc5",
@@ -95,7 +95,8 @@
       "redacted_source_excludes_covered_text": "PASS",
       "reference_page_limit": "PASS",
       "reference_text_bounds": "PASS",
-      "reference_v2_protocol": "PASS",
+      "reference_v3_protocol": "PASS",
+      "raster_redacted_reference": "PASS",
       "ocr_runtime": "PASS",
       "signed_quantity_regression": "PASS",
       "timeout_cleanup": "PASS"
@@ -111,6 +112,20 @@
         "canonical_hash": null,
         "input_sha256": "8c797663f3953b1fccf791cfd6adf93080447ca65b4fd6e1e04980e4fb3cdd21",
         "reference_hash": "84874baed95096b535d43797a450eeff4a576b3333d62bccdab2ffad3e51adfc",
+        "status": "PROCESSABLE"
+      }
+    },
+    "raster_protocol_receipts": {
+      "REDACTED": {
+        "canonical_hash": "e85995fcc10b3e16aa07edb5a2b47b0b92fe4f5b5ec99cc9e9d8fd4eadc43c37",
+        "input_sha256": "3c7f54983cb609e0b11dce512454432cee8e7c9b87092dbddf711c679884db75",
+        "reference_hash": null,
+        "status": "PROCESSABLE"
+      },
+      "REFERENCE": {
+        "canonical_hash": null,
+        "input_sha256": "1f9cedf658d91c1315cac41bec2688d1017864f301a62228abf5bd756b4c0e68",
+        "reference_hash": "84874baed95096b535f43797a450eeff4a576b3333d62bccdab2ffad3e51adfc",
         "status": "PROCESSABLE"
       }
     },

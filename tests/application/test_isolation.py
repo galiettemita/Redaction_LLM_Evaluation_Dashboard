@@ -107,7 +107,7 @@ def test_unverified_runtime_lock_cannot_create_policy(tmp_path: Path) -> None:
         RuntimePolicy.from_lock(lock, application_root=tmp_path)
 
 
-def test_shipped_worker_v2_qualification_binds_current_source_and_exact_inventory():
+def test_shipped_worker_v3_qualification_binds_current_source_and_exact_inventory():
     root = Path(__file__).resolve().parents[2]
     packaging = root / "packaging/pdf-worker"
     lock = json.loads((packaging / "runtime.lock").read_text())
@@ -122,7 +122,7 @@ def test_shipped_worker_v2_qualification_binds_current_source_and_exact_inventor
     assert lock["image_digest"] != "sha256:7a78eaf7ef812d354f0abe13f40c6c0a4e3684d94f72002245c5249249bf293b"
     assert sbom["metadata"]["component"]["version"] == lock["image_digest"]
     assert integrity["artifacts"]["worker_image_id"]["sha256"] == lock["image_digest"].removeprefix("sha256:")
-    assert json.loads((packaging / "qualification-sources.json").read_text())["worker_image"]["runtime_canaries"]["reference_v2_protocol"] == "PASS"
+    assert json.loads((packaging / "qualification-sources.json").read_text())["worker_image"]["runtime_canaries"]["reference_v3_protocol"] == "PASS"
 
 
 @pytest.mark.parametrize("mutation", ["valid", "relative", "missing", "symlink", "writable", "parent-symlink", "parent-writable", "wrong-owner"])

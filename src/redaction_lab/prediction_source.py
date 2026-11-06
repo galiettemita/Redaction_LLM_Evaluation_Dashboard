@@ -104,8 +104,8 @@ def _target_from_observation(
     *,
     project_id: str,
     redacted_document_version_id: str,
-    detector_version: str,
-    expected_analysis_method: str,
+    detector_version: str = DETECTOR_VERSION,
+    expected_analysis_method: str = VECTOR_ANALYSIS_METHOD,
 ) -> RedactionTarget:
     bbox = tuple(float(value) for value in observation.normalized_bbox)
     if (

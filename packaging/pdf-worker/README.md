@@ -10,7 +10,7 @@ This is host-specific engineering qualification, not institutional data
 permission, public deployment approval, scientific validation, or proof that a
 different computer has the same runtime state.
 
-The current v2 refresh reuses already installed, hash-bound dependencies without
+The current v3 refresh reuses already installed, hash-bound dependencies without
 network access; see the exact offline recipe below. `requirements.lock` and the
 wheel entries in `integrity-manifest.json` retain the original acquisition
 provenance. No current script acquires wheels or installs new dependencies.
@@ -45,7 +45,7 @@ qualified worker image.
 
 The original RL-RUNTIME-009A acquisition initialized the dedicated machine,
 obtained the pinned base and verified wheelhouse, and independently qualified
-v1. Those historical acquisition steps are not part of the current v2 refresh.
+v1. Those historical acquisition steps are not part of the current v3 refresh.
 Do not treat them as permission to acquire or initialize another runtime.
 
 Application startup and every worker request re-attest the exact Podman bytes
@@ -55,15 +55,14 @@ container receives one synthetic or authorized PDF only through stdin with
 `--interactive`; it has no network or host mounts, a read-only root, dropped
 capabilities, no-new-privileges, non-root UID and bounded resources/output/time.
 
-## pdf-worker-v2 source refresh (2026-11-05)
+## pdf-worker-v3 OCR source refresh (2026-11-06)
 
-The current lock pins a newly built v2 image, independently qualified for
-isolated redacted and reference extraction. The immutable prior v1 image is
-used **only as an offline dependency stage**, because its original wheelhouse is
-no longer present. `Containerfile` retains the exact original Python base and
-copies the observed `/usr/local` dependency bytes, then replaces application
-source with explicit 0555 read-only permissions for the non-root worker.
-The v1 operational qualification is not inherited.
+The current lock pins a newly built v3 image, independently qualified for
+isolated vector and raster/OCR redacted and reference extraction. A pinned OCR
+dependency image supplies the previously qualified Python environment,
+Tesseract 5.5.2, English trained data, and Leptonica. `Containerfile` then
+replaces only application source with explicit 0555 read-only permissions for
+the non-root worker. Earlier operational qualification is not inherited.
 
 `scripts/build-pdf-worker.sh` accepts the existing interpreter through
 `REDACTION_LAB_PYTHON` and the trusted installed runtime through
@@ -74,17 +73,17 @@ and unrelated files, and builds with `--pull=never --network=none`. It reserves
 the bounded build, and deletes only its temporary context. It never starts a VM
 or downloads dependencies. New acquisition still requires its separate gate.
 
-`scripts/verify-pdf-worker.sh` exercises genuine synthetic redacted/reference
-framed protocol, exact visible reference hashes, covered-text exclusion, page
+`scripts/verify-pdf-worker.sh` exercises genuine synthetic vector and scanned
+redacted/reference framed protocol, exact visible reference hashes, covered-text exclusion, page
 and framing bounds, non-root/no-network/read-only/no-capabilities/no-new-privileges
 and resource controls, nonzero failure cleanup and deadline cleanup. It uses a
 non-authoritative qualification probe until the observed lock is marked verified;
 that probe never persists application sources. Afterwards the production
 `ApplicationPdfWorker` independently attests the exact lock and runtime.
 
-The integrity manifest binds all 38 source files in the built image. Complete
+The integrity manifest binds all 43 source files in the built image. Complete
 3,216-entry dependency file/link inventories and 21 license file hashes were
-observed in both exact images and match. The 55-entry CycloneDX package/OS SBOM was
+observed in both exact images and match. The 95-entry CycloneDX package/OS SBOM was
 reconciled against observed installed Python-distribution and APK versions.
 Its package license annotations are incomplete. CPython 3.12.16 is observed
 separately in `qualification-sources.json`; its executable and standard-library

@@ -8,7 +8,7 @@ SCIENTIFICALLY VALIDATED**. Missing, partial, ambiguous, unreadable or mismatche
 truth stays Accuracy unknown. This single-model demonstration does not satisfy
 the eventual commercial multi-model research requirement.
 
-The PDF v2 and model runtimes have synthetic engineering qualification on the
+The PDF v3 and model runtimes have synthetic engineering qualification on the
 reference Mac. They are **not bundled**, and this is not a clean-device installer,
 scientific validation, institutional permission or a permanent hosted service.
 The API health response retains `DEGRADED / runtime_qualified: false` to avoid
@@ -148,7 +148,7 @@ nosniff, no-referrer and denied outer framing.
 - [x] Browser chunked uploads, framing ambiguity, spool I/O failure and API-shaped
       gateway errors are covered by raw-socket regressions.
 - [x] Trusted shared runtime-root checks preserve isolated synthetic storage.
-- [x] Exact v2 image source/dependency/license inventory and protocol/isolation
+- [x] Exact v3 image source/dependency/license inventory and protocol/isolation/OCR
       canaries independently requalified with no downloads.
 - [x] Full combined genuine model/reference/evaluation and mounted-browser evidence
       on the reference host through a synthetic HTTPS origin mapped to loopback.

@@ -2,23 +2,23 @@
   "bomFormat": "CycloneDX",
   "specVersion": "1.5",
   "serialNumber": "urn:uuid:2c90bfa1-7d6f-4003-8281-fb87fbfc8072",
-  "version": 3,
+  "version": 4,
   "metadata": {
-    "timestamp": "2026-11-06T15:33:34Z",
+    "timestamp": "2026-11-06T17:21:12Z",
     "component": {
       "type": "container",
       "name": "redaction-lab-pdf-worker",
-      "version": "sha256:34893717ed476aaf6082a6d3cf0649c6de75e356121a2d67674769dc42dc63d5",
+      "version": "sha256:0bd78c8670e96342eaba91e68233f2c1f483a3f696fe2ae8a5845cce4528708e",
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "34893717ed476aaf6082a6d3cf0649c6de75e356121a2d67674769dc42dc63d5"
+          "content": "0bd78c8670e96342eaba91e68233f2c1f483a3f696fe2ae8a5845cce4528708e"
         }
       ],
       "properties": [
         {
           "name": "redaction-lab:image-manifest-digest",
-          "value": "sha256:d32200c92611ea59ba02953556bb1c82ba18f25a633f28a8d0d76fb0c86c1626"
+          "value": "sha256:bc0a4143922ea60d2c8dfcbae55056ad12499b25683fbee9750e8704725dee20"
         },
         {
           "name": "redaction-lab:base-image-digest",
@@ -30,7 +30,7 @@
         },
         {
           "name": "redaction-lab:protocol",
-          "value": "pdf-worker-v2"
+          "value": "pdf-worker-v3"
         },
         {
           "name": "redaction-lab:dependency-source-image",
@@ -46,7 +46,7 @@
         },
         {
           "name": "redaction-lab:source-inventory-sha256",
-          "value": "9501eccc53d49e5de8bb3670a6e77d9beb348132d618dd03201d9d3a4f39b73a"
+          "value": "17ab677bc809d3acabc292e9d464ae1a47c8fee7bdc487323fa19ae5b9032c81"
         },
         {
           "name": "redaction-lab:sbom-scope",
