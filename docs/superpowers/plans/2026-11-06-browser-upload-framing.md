@@ -38,27 +38,27 @@
 - Consumes: authenticated raw HTTP/1.1 request headers/body at `GatewayHandler`.
 - Produces: body mode state, strict decoded spool for chunked uploads, unchanged fixed-length forwarding, and API v0.3 JSON rejection responses.
 
-- [ ] **Step 1: Write failing raw-socket tests**
+- [x] **Step 1: Write failing raw-socket tests**
 
 Add literal tests for a valid multi-chunk multipart body, decoded `Content-Length`, exact bytes, no forwarded transfer/auth headers, API-versioned gateway errors, authentication-before-read, conflicting/unsupported framing, extensions/trailers, invalid/overlong/truncated sizes and bodies, and decoded overflow.
 
-- [ ] **Step 2: Run focused tests and verify RED**
+- [x] **Step 2: Run focused tests and verify RED**
 
 Run: `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src <python> -m pytest tests/api/test_gateway.py -q`
 
 Expected: new valid chunked and API-error-contract tests fail because transfer encoding is rejected and gateway errors lack `X-Redaction-Lab-API`.
 
-- [ ] **Step 3: Implement the minimal strict adapter**
+- [x] **Step 3: Implement the minimal strict adapter**
 
 Add focused private helpers/methods in `gateway.py` for exact transfer-mode selection, bounded chunk-line/exact-byte reads, decoded spooling and body forwarding. Reject unsupported/ambiguous modes; retain direct fixed-length streaming. Import `API_VERSION` for gateway error headers and make overload responses API-shaped.
 
-- [ ] **Step 4: Run focused tests and verify GREEN**
+- [x] **Step 4: Run focused tests and verify GREEN**
 
 Run the Step 2 command. Expected: all gateway tests pass.
 
-- [ ] **Step 5: Refactor names/control flow without behavior expansion and rerun focused tests**
+- [x] **Step 5: Refactor names/control flow without behavior expansion and rerun focused tests**
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 Commit message: `fix: support bounded browser chunked uploads`
 
@@ -76,15 +76,15 @@ Commit message: `fix: support bounded browser chunked uploads`
 - Consumes: Task 1's exact framing/error contract and reviewed candidate.
 - Produces: operator documentation, durable evidence, corrected live service and checklist closure.
 
-- [ ] **Step 1: Update operator documentation**
+- [x] **Step 1: Update operator documentation**
 
 Document strict browser chunked support, decoded bounds/spooling, rejected ambiguity and unchanged fixed-length/internal contracts.
 
-- [ ] **Step 2: Verify focused, full and packaging/web suites**
+- [x] **Step 2: Verify focused, full and packaging/web suites**
 
 Stop only the task-owned live launcher/tunnel while port-bound tests run. Run full Python, Node tests, typecheck, build, audit and `git diff --check`; record exact results. Restart the prior service immediately if verification is interrupted.
 
-- [ ] **Step 3: Obtain exact-candidate independent review**
+- [x] **Step 3: Obtain exact-candidate independent review**
 
 Review Task 1 against the spec's Review Focus. Correct Critical/Important findings through one RED/GREEN pass and rerun affected/full suites.
 

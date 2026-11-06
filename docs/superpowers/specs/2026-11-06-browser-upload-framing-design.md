@@ -45,7 +45,7 @@ Selected. The gateway retains raw framing visibility, authenticates and validate
 
 Header validation distinguishes three request-body modes: no body, fixed `Content-Length`, and chunked upload. `Transfer-Encoding` is valid only when its single raw value is case-insensitively exactly `chunked`, no `Content-Length` exists, the method/path is the document upload route, exact multipart content type is present, and authentication/Host/Origin/route checks have already passed. All other transfer-encoding combinations fail 400.
 
-The chunk decoder reads an ASCII hexadecimal size line bounded to 16 hex digits plus CRLF, rejects parameters/extensions, reads each chunk exactly, requires a trailing CRLF, counts decoded bytes before writing, and requires an immediate empty trailer section after the zero chunk. EOF, timeout, overlong lines, invalid sizes, chunk overflow, nonempty trailers and surplus ambiguity fail closed. Valid bytes are written to a `SpooledTemporaryFile(max_size=_CHUNK)`. Only after terminal validation does the gateway connect upstream, send the decoded length, and copy the spool in `_CHUNK` blocks.
+The chunk decoder reads an ASCII hexadecimal size line bounded to 16 hex digits plus CRLF, rejects parameters/extensions, reads each chunk exactly, requires a trailing CRLF, counts decoded bytes before writing, and requires an immediate empty trailer section after the zero chunk. EOF, timeout, overlong lines, invalid sizes, chunk overflow and nonempty trailers fail closed. The zero chunk is the authoritative end of the decoded message; because every request is connection-closing, any subsequent transport bytes are discarded with that connection and never enter the measured body or upstream request. Valid bytes are written to a `SpooledTemporaryFile(max_size=_CHUNK)`. Only after terminal validation does the gateway connect upstream, send the decoded length, and copy the spool in `_CHUNK` blocks. Spool creation, write, rollover and seek failures return an API-shaped 500, close any opened spool and never connect upstream.
 
 Fixed-length uploads continue to connect upstream immediately and stream chunks without pre-buffering. Body-free routes continue to require zero length and reject transfer encoding.
 
@@ -54,7 +54,7 @@ Gateway `_reject` responses include `X-Redaction-Lab-API: 0.3`, JSON content typ
 ## Verification
 
 - Raw-socket tests cover successful multi-chunk decoding, byte preservation, translated length and removed transport/auth headers.
-- Security regressions cover authentication-before-read, fixed-length plus chunked ambiguity, unsupported codings/routes, extensions/trailers, malformed/truncated chunks, decoded overflow, timeout/cleanup and no upstream connection on failure.
+- Security regressions cover authentication-before-read, fixed-length plus chunked ambiguity, unsupported codings/routes, extensions/trailers, malformed/truncated chunks, decoded overflow, spool I/O failure, terminal-surplus isolation, timeout/cleanup and no upstream connection on failure.
 - Error-contract tests prove gateway failures include API v0.3 and are consumable by the unchanged frontend error path.
 - Existing fixed-length streaming test proves no regression.
 - Full Python/Node/typecheck/build/audit verification and an external synthetic browser-framed upload prove the deployed path. User PDFs are not used for acceptance.
