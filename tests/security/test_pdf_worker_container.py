@@ -44,7 +44,7 @@ def test_packaging_declares_no_network_no_host_mounts_and_pinned_runtime() -> No
         "sha256:633971788fcfe7df04f49da53f06c98b28933c5df2f684d57c2f9831411cac77"
     )
     assert runtime["image_digest"] == (
-        "sha256:98599c2e1694c94d1f458b2c3b5cf458c121b2da3987eca6a52d2e7a445b4af4"
+        "sha256:d6ea1523e6d2601fe15f17fb64ac7ba871b83be49ddf9ee0f8be7bbdfd052b85"
     )
 
 

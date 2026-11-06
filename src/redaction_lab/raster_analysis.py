@@ -241,7 +241,14 @@ class PdfiumRasterRenderer:
         }
         in_text = False
         text_render_mode = 0
+        text_mode_stack: list[int] = []
         for _operands, operator in operations:
+            if operator == b"q":
+                text_mode_stack.append(text_render_mode)
+            elif operator == b"Q":
+                if not text_mode_stack:
+                    raise _RasterFailure("UNSAFE_RASTER_PDF")
+                text_render_mode = text_mode_stack.pop()
             if operator == b"BT":
                 if in_text:
                     raise _RasterFailure("UNSAFE_RASTER_PDF")
@@ -259,6 +266,8 @@ class PdfiumRasterRenderer:
                     raise _RasterFailure("UNSAFE_RASTER_PDF")
                 in_text = False
         if in_text:
+            raise _RasterFailure("UNSAFE_RASTER_PDF")
+        if text_mode_stack:
             raise _RasterFailure("UNSAFE_RASTER_PDF")
 
     def render(self, pdf_bytes: bytes) -> RenderedDocument:

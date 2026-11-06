@@ -481,6 +481,33 @@ def test_painting_text_overlay_is_rejected_before_ocr() -> None:
     assert ocr.calls == 0
 
 
+def test_restored_text_mode_cannot_authorize_a_painting_overlay() -> None:
+    image = Image.new("RGB", (400, 300), "white")
+    source = BytesIO()
+    canvas = Canvas(source, pagesize=(400, 300), invariant=1)
+    canvas.drawImage(ImageReader(image), 0, 0, width=400, height=300)
+    canvas.drawString(20, 20, "painted overlay")
+    canvas.save()
+    reader = PdfReader(BytesIO(source.getvalue()))
+    original = reader.pages[0].get_contents().get_data()
+    replacement = DecodedStreamObject()
+    replacement.set_data(b"q BT /F1 12 Tf 3 Tr ET Q\n" + original)
+    writer = PdfWriter()
+    writer.add_page(reader.pages[0])
+    writer.pages[0].replace_contents(replacement)
+    output = BytesIO()
+    writer.write(output)
+    ocr = QueueOcr([])
+
+    result = analyze_reference_scan(
+        output.getvalue(), ocr_engine=ocr, renderer=PdfiumRasterRenderer()
+    )
+
+    assert result.status is RasterStatus.UNSUPPORTED
+    assert result.reason_code == "UNSAFE_RASTER_PDF"
+    assert ocr.calls == 0
+
+
 def test_inert_embedded_attachment_is_ignored_and_never_enters_reference_text() -> None:
     words = tuple(
         _word(text, (20 + index * 60, 20, 70 + index * 60, 40))

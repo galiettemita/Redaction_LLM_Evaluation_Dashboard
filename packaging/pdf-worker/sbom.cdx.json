@@ -2,23 +2,23 @@
   "bomFormat": "CycloneDX",
   "specVersion": "1.5",
   "serialNumber": "urn:uuid:2c90bfa1-7d6f-4003-8281-fb87fbfc8072",
-  "version": 8,
+  "version": 9,
   "metadata": {
-    "timestamp": "2026-11-06T17:55:47Z",
+    "timestamp": "2026-11-06T18:01:53Z",
     "component": {
       "type": "container",
       "name": "redaction-lab-pdf-worker",
-      "version": "sha256:98599c2e1694c94d1f458b2c3b5cf458c121b2da3987eca6a52d2e7a445b4af4",
+      "version": "sha256:d6ea1523e6d2601fe15f17fb64ac7ba871b83be49ddf9ee0f8be7bbdfd052b85",
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "98599c2e1694c94d1f458b2c3b5cf458c121b2da3987eca6a52d2e7a445b4af4"
+          "content": "d6ea1523e6d2601fe15f17fb64ac7ba871b83be49ddf9ee0f8be7bbdfd052b85"
         }
       ],
       "properties": [
         {
           "name": "redaction-lab:image-manifest-digest",
-          "value": "sha256:8339a623e1d6f495dbce9b7b1afd2bcdd4b9575ac090c6f338a5d34a8e38424d"
+          "value": "sha256:1694c36460087c60ea06533602afe1e98fd77e25fd726683b4b90667e5480375"
         },
         {
           "name": "redaction-lab:base-image-digest",
@@ -46,7 +46,7 @@
         },
         {
           "name": "redaction-lab:source-inventory-sha256",
-          "value": "1a735cf0a4d7515a9efa128af8c46ea4727516682b24eec26cf77ae679699964"
+          "value": "89cc4fc4dac7140f0ef7d79e3952f25c21222dded92b1430c4e11a55c9d5d79f"
         },
         {
           "name": "redaction-lab:sbom-scope",
