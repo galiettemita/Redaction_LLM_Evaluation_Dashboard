@@ -82,11 +82,11 @@
 - Consumes: existing vector detector/canonicalizer and Task 2 raster results.
 - Produces: role-specific worker analysis with selected backend versions/method; bump internal worker protocol and add strict target analysis method.
 
-- [ ] Write failing routing tests: vector success never invokes OCR; only the three approved scan dispositions fall through; malformed/encrypted/unsafe graphics do not; reference OCR is independent; raster failures map to explicit dispositions.
-- [ ] Run tests and verify expected failures.
-- [ ] Implement the registry/router and adapt worker responses without changing public API v0.3.
-- [ ] Extend the exact-image qualification script with real synthetic scanned redacted/reference probes and no-reference-leak assertions.
-- [ ] Run focused worker/routing tests and commit.
+- [x] Write failing routing tests: vector success never invokes OCR; only the three approved scan dispositions fall through; malformed/encrypted/unsafe graphics do not; reference OCR is independent; raster failures map to explicit dispositions.
+- [x] Run tests and verify expected failures.
+- [x] Implement the registry/router and adapt worker responses without changing public API v0.3.
+- [x] Extend the exact-image qualification script with real synthetic scanned redacted/reference probes and no-reference-leak assertions.
+- [x] Run focused worker/routing tests and commit.
 
 ### Task 4: Versioned prediction-source compatibility
 

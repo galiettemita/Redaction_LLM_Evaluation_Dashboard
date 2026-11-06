@@ -5,6 +5,7 @@ from __future__ import annotations
 from hashlib import sha256
 from io import BytesIO
 import json
+import re
 import sys
 from enum import StrEnum
 from typing import Annotated
@@ -19,20 +20,38 @@ from redaction_lab.application.config import (
     MAX_TARGETS,
     MAX_WORKER_RESPONSE_BYTES,
 )
-from redaction_lab.canonical import CANONICALIZER_VERSION
 from redaction_lab.contracts import DocumentRole
-from redaction_lab.pdf_detector import DETECTOR_VERSION, DetectionStatus, detect_targets
+from redaction_lab.canonical import CANONICALIZER_VERSION
+from redaction_lab.document_analysis import (
+    AnalysisMethod,
+    DocumentAnalysisStatus,
+    analyze_redacted_document,
+    analyze_reference_document,
+)
+from redaction_lab.pdf_detector import DETECTOR_VERSION, _suppress_parser_debug_logs
 from redaction_lab.prediction_source import (
     PredictionSourceMaterial,
     PredictionTargetObservation,
-    derive_prediction_source,
+)
+from redaction_lab.raster_analysis import (
+    RASTER_CANONICALIZER_VERSION,
+    RASTER_DETECTOR_VERSION,
+    RASTER_REFERENCE_VERSION,
 )
 
 
-WORKER_PROTOCOL_VERSION = "pdf-worker-v2"
+WORKER_PROTOCOL_VERSION = "pdf-worker-v3"
 REFERENCE_CANONICALIZER_VERSION = "safe-exact-visible-text-v1"
+REFERENCE_CANONICALIZER_VERSIONS = frozenset(
+    {REFERENCE_CANONICALIZER_VERSION, RASTER_REFERENCE_VERSION}
+)
 MAX_HEADER_BYTES = 4096
 MAX_RESPONSE_BYTES = MAX_WORKER_RESPONSE_BYTES
+_TARGET_MARKER = re.compile(r"\[\[TARGET:([^\]]+)\]\]")
+_ANALYSIS_METHOD_BY_VERSION = {
+    (DETECTOR_VERSION, CANONICALIZER_VERSION): AnalysisMethod.VECTOR,
+    (RASTER_DETECTOR_VERSION, RASTER_CANONICALIZER_VERSION): AnalysisMethod.RASTER,
+}
 
 
 class WorkerStatus(StrEnum):
@@ -57,6 +76,8 @@ class WorkerRequest(_StrictModel):
 
 
 class WorkerTargetObservation(_StrictModel):
+    target_id: Annotated[str, Field(pattern=r"^target-[A-Za-z0-9_-]{1,128}$")]
+    analysis_method: AnalysisMethod
     page_index: Annotated[int, Field(ge=0)]
     normalized_bbox: tuple[FiniteFloat, FiniteFloat, FiniteFloat, FiniteFloat]
     rectangle_index: Annotated[int, Field(ge=0)]
@@ -105,7 +126,7 @@ class WorkerResponse(_StrictModel):
                 raise ValueError("reference text exceeds limit")
             if sha256(self.reference_text.encode("utf-8")).hexdigest() != self.reference_hash:
                 raise ValueError("reference canonical hash mismatch")
-            if self.reference_canonicalizer_version != REFERENCE_CANONICALIZER_VERSION:
+            if self.reference_canonicalizer_version not in REFERENCE_CANONICALIZER_VERSIONS:
                 raise ValueError("unsupported reference canonicalizer")
         if self.status == WorkerStatus.PROCESSABLE:
             if self.page_count < 1 or self.reason_code is not None:
@@ -121,6 +142,18 @@ class WorkerResponse(_StrictModel):
                     raise ValueError("processable redacted response requires complete material")
                 if len(self.canonical_text.encode("utf-8")) > MAX_CANONICAL_TEXT_BYTES:
                     raise ValueError("canonical text exceeds limit")
+                expected_method = _ANALYSIS_METHOD_BY_VERSION.get(
+                    (self.detector_version, self.canonicalizer_version)
+                )
+                if (
+                    expected_method is None
+                    or any(target.analysis_method is not expected_method for target in self.targets)
+                    or sha256(self.canonical_text.encode("utf-8")).hexdigest()
+                    != self.canonical_hash
+                    or tuple(_TARGET_MARKER.findall(self.canonical_text))
+                    != tuple(target.target_id for target in self.targets)
+                ):
+                    raise ValueError("redacted analysis provenance mismatch")
             elif any(
                 value is not None
                 for value in (
@@ -226,10 +259,11 @@ def process_request(request: WorkerRequest, pdf_bytes: bytes) -> WorkerResponse:
     if len(pdf_bytes) != request.byte_count or sha256(pdf_bytes).hexdigest() != request.input_sha256:
         raise ValueError("worker request binding mismatch")
     try:
-        reader = PdfReader(BytesIO(pdf_bytes), strict=True)
-        if reader.is_encrypted:
-            return WorkerResponse(**_base(request, status=WorkerStatus.UNSUPPORTED, page_count=0, reason_code="ENCRYPTED"))
-        page_count = len(reader.pages)
+        with _suppress_parser_debug_logs():
+            reader = PdfReader(BytesIO(pdf_bytes), strict=True)
+            if reader.is_encrypted:
+                return WorkerResponse(**_base(request, status=WorkerStatus.UNSUPPORTED, page_count=0, reason_code="ENCRYPTED"))
+            page_count = len(reader.pages)
     except Exception:
         return WorkerResponse(**_base(request, status=WorkerStatus.FAILED, page_count=0, reason_code="MALFORMED_PDF"))
     if page_count == 0:
@@ -237,58 +271,59 @@ def process_request(request: WorkerRequest, pdf_bytes: bytes) -> WorkerResponse:
     if page_count > request.max_pages:
         return WorkerResponse(**_base(request, status=WorkerStatus.UNSUPPORTED, page_count=0, reason_code="PAGE_LIMIT"))
     if request.role is DocumentRole.REFERENCE:
-        # These helpers parse only inside this isolated executable, never on the host.
-        from redaction_lab.reference import _reference_document, _safe_exact_reference_text
-
-        parsed = _reference_document(
-            pdf_bytes, project_id=request.project_id,
-            reference_document_version_id="worker-reference",
-            reference_canonical_version_id="worker-reference-canonical",
-        )
-        text = _safe_exact_reference_text(pdf_bytes, parsed[0]) if parsed else None
-        if text is None:
-            return WorkerResponse(**_base(request, status=WorkerStatus.UNSUPPORTED,
-                                          page_count=page_count, reason_code="REFERENCE_EXTRACTION_FAILED"))
-        if len(text.encode("utf-8")) > MAX_CANONICAL_TEXT_BYTES:
+        analysis = analyze_reference_document(pdf_bytes, project_id=request.project_id)
+        if analysis.status is not DocumentAnalysisStatus.PROCESSABLE:
+            return WorkerResponse(
+                **_base(
+                    request,
+                    status=WorkerStatus(analysis.status.value),
+                    page_count=analysis.page_count,
+                    reason_code=analysis.reason_code or "REFERENCE_EXTRACTION_FAILED",
+                )
+            )
+        assert analysis.reference_text is not None
+        assert analysis.reference_hash is not None
+        assert analysis.reference_canonicalizer_version is not None
+        if len(analysis.reference_text.encode("utf-8")) > MAX_CANONICAL_TEXT_BYTES:
             return WorkerResponse(**_base(request, status=WorkerStatus.UNSUPPORTED,
                                           page_count=page_count, reason_code="REFERENCE_TEXT_LIMIT"))
         return WorkerResponse(
-            **_base(request, status=WorkerStatus.PROCESSABLE, page_count=page_count),
-            reference_text=text, reference_hash=sha256(text.encode("utf-8")).hexdigest(),
-            reference_canonicalizer_version=REFERENCE_CANONICALIZER_VERSION,
+            **_base(request, status=WorkerStatus.PROCESSABLE, page_count=analysis.page_count),
+            reference_text=analysis.reference_text,
+            reference_hash=analysis.reference_hash,
+            reference_canonicalizer_version=analysis.reference_canonicalizer_version,
         )
 
-    detection = detect_targets(
-        pdf_bytes,
-        project_id=request.project_id,
-        redacted_document_version_id="worker-preflight",
-    )
-    if detection.status is DetectionStatus.NO_REDACTIONS:
-        return WorkerResponse(**_base(request, status=WorkerStatus.NO_REDACTIONS, page_count=page_count, reason_code="NO_SUPPORTED_REDACTIONS"))
-    if detection.status is DetectionStatus.UNSUPPORTED:
-        status = WorkerStatus.FAILED if detection.reason_code == "MALFORMED_PDF" else WorkerStatus.UNSUPPORTED
-        return WorkerResponse(**_base(request, status=status, page_count=page_count, reason_code=detection.reason_code or "UNSUPPORTED_PDF"))
-    try:
-        source = derive_prediction_source(pdf_bytes, project_id=request.project_id)
-    except Exception:
-        return WorkerResponse(**_base(request, status=WorkerStatus.FAILED, page_count=page_count, reason_code="DERIVATION_FAILED"))
-    observations = []
-    for target in source.targets:
-        identifier = target.detection_evidence.source_object_ids[0]
-        observations.append(
-            WorkerTargetObservation(
-                page_index=target.page_index,
-                normalized_bbox=target.normalized_bbox,
-                rectangle_index=int(identifier.rsplit("-", 1)[1]),
+    analysis = analyze_redacted_document(pdf_bytes, project_id=request.project_id)
+    if analysis.status is not DocumentAnalysisStatus.PROCESSABLE:
+        return WorkerResponse(
+            **_base(
+                request,
+                status=WorkerStatus(analysis.status.value),
+                page_count=analysis.page_count,
+                reason_code=analysis.reason_code or "UNSUPPORTED_PDF",
             )
         )
+    assert analysis.detector_version is not None
+    assert analysis.canonicalizer_version is not None
+    assert analysis.canonical_text is not None
+    assert analysis.canonical_hash is not None
     return WorkerResponse(
-        **_base(request, status=WorkerStatus.PROCESSABLE, page_count=page_count),
-        detector_version=DETECTOR_VERSION,
-        canonicalizer_version=CANONICALIZER_VERSION,
-        canonical_text=source.canonical_document.canonical_text,
-        canonical_hash=source.canonical_document.canonical_hash,
-        targets=tuple(observations),
+        **_base(request, status=WorkerStatus.PROCESSABLE, page_count=analysis.page_count),
+        detector_version=analysis.detector_version,
+        canonicalizer_version=analysis.canonicalizer_version,
+        canonical_text=analysis.canonical_text,
+        canonical_hash=analysis.canonical_hash,
+        targets=tuple(
+            WorkerTargetObservation(
+                target_id=target.target_id,
+                analysis_method=target.analysis_method,
+                page_index=target.page_index,
+                normalized_bbox=target.normalized_bbox,
+                rectangle_index=target.rectangle_index,
+            )
+            for target in analysis.targets
+        ),
     )
 
 

@@ -32,7 +32,8 @@ def _payload(**changes: object) -> dict[str, object]:
         "canonicalizer_version": "safe-visible-text-v1",
         "canonical_text": text,
         "canonical_hash": sha256(text.encode()).hexdigest(),
-        "targets": [{"page_index": 0, "normalized_bbox": [0.1, 0.2, 0.3, 0.4], "rectangle_index": 0}],
+        "targets": [{"target_id": "target-placeholder", "analysis_method": "vector-near-black-text-occlusion",
+                     "page_index": 0, "normalized_bbox": [0.1, 0.2, 0.3, 0.4], "rectangle_index": 0}],
         "reason_code": None,
     }
     payload.update(changes)
@@ -97,9 +98,9 @@ def _reference_payload(**changes):
     return payload
 
 
-def test_v2_reference_response_requires_isolated_bounded_hashed_text() -> None:
+def test_v3_reference_response_requires_isolated_bounded_hashed_text() -> None:
     from redaction_lab.application.config import MAX_CANONICAL_TEXT_BYTES
-    assert WORKER_PROTOCOL_VERSION == "pdf-worker-v2"
+    assert WORKER_PROTOCOL_VERSION == "pdf-worker-v3"
     parsed = WorkerResponse.model_validate(_reference_payload())
     assert parsed.reference_text == "fully visible reference"
     with pytest.raises(ValueError):
@@ -123,6 +124,37 @@ def test_reference_evidence_is_forbidden_for_failures_and_redacted_roles() -> No
     with pytest.raises(ValueError):
         WorkerResponse.model_validate(_reference_payload(reference_text=None, reference_hash=None,
                                                          reference_canonicalizer_version=None))
+
+
+def test_v3_response_binds_target_method_versions_and_canonical_markers() -> None:
+    target_id = "target-0123456789abcdef01234567"
+    text = f"visible [[TARGET:{target_id}]] context"
+    raster = _payload(
+        detector_version="raster-dark-text-v1",
+        canonicalizer_version="ocr-visible-text-v1",
+        canonical_text=text,
+        canonical_hash=sha256(text.encode()).hexdigest(),
+        targets=[
+            {
+                "target_id": target_id,
+                "analysis_method": "raster-ocr-near-black-text-occlusion",
+                "page_index": 0,
+                "normalized_bbox": [0.1, 0.2, 0.3, 0.4],
+                "rectangle_index": 0,
+            }
+        ],
+    )
+
+    assert WorkerResponse.model_validate(raster).targets[0].target_id == target_id
+    forged_method = json.loads(json.dumps(raster))
+    forged_method["targets"][0]["analysis_method"] = "vector-near-black-text-occlusion"
+    with pytest.raises(ValueError):
+        WorkerResponse.model_validate(forged_method)
+    forged_marker = json.loads(json.dumps(raster))
+    forged_marker["canonical_text"] = "visible [[TARGET:target-other]] context"
+    forged_marker["canonical_hash"] = sha256(forged_marker["canonical_text"].encode()).hexdigest()
+    with pytest.raises(ValueError):
+        WorkerResponse.model_validate(forged_marker)
 
 
 def test_reference_worker_extracts_visible_text_and_suppresses_occluded_text(tmp_path) -> None:

@@ -18,6 +18,8 @@ root = Path(sys.argv[1])
 sys.path.insert(0, str(root / 'src'))
 from reportlab.pdfgen.canvas import Canvas
 from reportlab.pdfbase.pdfmetrics import stringWidth
+from reportlab.lib.utils import ImageReader
+import pypdfium2 as pdfium
 from redaction_lab.application.inference_runtime import InferenceRuntime
 from redaction_lab.application.isolation import RuntimePolicy, SubprocessPodmanRunner, NonAuthoritativePdfWorkerProbe, ApplicationPdfWorker
 from redaction_lab.application.worker_protocol import WorkerStatus, WORKER_PROTOCOL_VERSION, MAX_HEADER_BYTES
@@ -43,6 +45,14 @@ def pdf(redacted):
     canvas.save()
     return data.getvalue()
 
+def scanned_pdf(redacted):
+    image = pdfium.PdfDocument(pdf(redacted))[0].render(scale=200/72).to_pil()
+    data = BytesIO()
+    canvas = Canvas(data, pagesize=(612, 792), invariant=1)
+    canvas.drawImage(ImageReader(image), 0, 0, width=612, height=792)
+    canvas.save()
+    return data.getvalue()
+
 receipts = {}
 for role in (DocumentRole.REDACTED, DocumentRole.REFERENCE):
     worker = NonAuthoritativePdfWorkerProbe(policy, SubprocessPodmanRunner())
@@ -60,6 +70,26 @@ for role in (DocumentRole.REDACTED, DocumentRole.REFERENCE):
         assert response.reference_text is None
     receipts[role.value] = {'input_sha256': response.input_sha256, 'status': response.status.value,
         'canonical_hash': response.canonical_hash, 'reference_hash': response.reference_hash}
+
+scan_receipts = {}
+for role in (DocumentRole.REDACTED, DocumentRole.REFERENCE):
+    response = NonAuthoritativePdfWorkerProbe(policy, SubprocessPodmanRunner()).process(
+        scanned_pdf(role is DocumentRole.REDACTED), project_id='v3-raster-qualification', role=role).response
+    assert response.status is WorkerStatus.PROCESSABLE
+    if role is DocumentRole.REDACTED:
+        assert len(response.targets) == 1
+        assert response.targets[0].analysis_method.value == 'raster-ocr-near-black-text-occlusion'
+        assert response.detector_version == 'raster-dark-text-v1'
+        assert response.canonicalizer_version == 'ocr-visible-text-v1'
+        assert 'Paris' not in response.canonical_text
+        assert response.reference_text is None
+    else:
+        assert response.reference_canonicalizer_version == 'ocr-reference-text-v1'
+        assert response.reference_text and 'Paris' in response.reference_text
+        assert response.canonical_text is None and not response.targets
+    scan_receipts[role.value] = {'input_sha256': response.input_sha256,
+        'status': response.status.value, 'canonical_hash': response.canonical_hash,
+        'reference_hash': response.reference_hash}
 
 covered = NonAuthoritativePdfWorkerProbe(policy, SubprocessPodmanRunner()).process(
     pdf(True), project_id='v2-covered-reference', role=DocumentRole.REFERENCE).response
@@ -153,6 +183,6 @@ print(json.dumps({'protocol_version': WORKER_PROTOCOL_VERSION, 'image_digest': p
     'reference_v2_protocol': 'PASS', 'redacted_source_excludes_covered_text': 'PASS',
     'reference_text_bounds': 'PASS', 'adversarial_isolation': 'PASS', 'signed_quantity_regression': 'PASS', 'failure_cleanup': 'PASS',
     'timeout_cleanup': 'PASS', 'covered_reference_excluded': 'PASS', 'reference_page_limit': 'PASS',
-    'ocr_runtime': 'PASS',
-    'receipts': receipts}, sort_keys=True))
+    'ocr_runtime': 'PASS', 'raster_redacted_reference': 'PASS',
+    'receipts': receipts, 'scan_receipts': scan_receipts}, sort_keys=True))
 PY
