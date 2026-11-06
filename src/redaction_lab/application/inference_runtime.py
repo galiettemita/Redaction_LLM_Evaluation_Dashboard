@@ -178,6 +178,23 @@ class InferenceRuntime:
             or any(part in {".", ".."} for part in raw.split("/"))
         ):
             raise InferenceRuntimeUnavailable("runtime path is not application-relative")
+        configured = os.environ.get("REDACTION_LAB_RUNTIME_ROOT")
+        if configured is not None:
+            root = Path(configured)
+            if not configured or not root.is_absolute() or ".." in root.parts:
+                raise InferenceRuntimeUnavailable("runtime root must be absolute")
+            cls._audit_parent_directories(root)
+            try:
+                info = root.lstat()
+            except OSError as error:
+                raise InferenceRuntimeUnavailable("runtime root is unavailable") from error
+            if (not stat.S_ISDIR(info.st_mode) or stat.S_ISLNK(info.st_mode)
+                    or info.st_uid != os.geteuid() or info.st_mode & 0o022):
+                raise InferenceRuntimeUnavailable("runtime root is untrusted")
+            # Shipped locks retain their legacy application-relative runtime prefix.
+            if not raw.startswith("runtime/"):
+                raise InferenceRuntimeUnavailable("locked path is outside runtime root")
+            return root / raw.removeprefix("runtime/")
         root = cls.APPLICATION_ROOT or resolve_paths().root
         if not root.is_absolute():
             raise InferenceRuntimeUnavailable("application root is unavailable")

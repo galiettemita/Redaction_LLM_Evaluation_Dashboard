@@ -786,3 +786,21 @@ def test_v3_exclusion_only_summary_rejects_inexact_membership_and_scores() -> No
         contracts.SummarySnapshot.model_validate(
             {**values, "score_status": "EXPERIMENTAL"}
         )
+
+
+def test_experimental_record_rejects_verified_and_wrong_channels(tmp_path):
+    from test_evaluation_store import _experimental_inputs, PROJECT_ID
+    from redaction_lab.evaluation_store import EvaluationStore
+    from redaction_lab.contracts import ExperimentalEvaluationRecord
+    inputs, mapping = _experimental_inputs(tmp_path)
+    record = EvaluationStore(inputs[0]).evaluate_experimental_and_store(
+        project_id=PROJECT_ID, attempt_id=inputs[5].attempt_id, mapping=mapping,
+    )
+    for changes in (
+        {'verified_score': 100.0}, {'score_status': 'VERIFIED'},
+        {'evidence_schema_version': 'qualitative-fact-evidence-v2'},
+        {'experimental_score': 99.0}, {'reason': 'ACCURACY_UNKNOWN'},
+        {'eligible': False},
+    ):
+        with pytest.raises(ValueError):
+            ExperimentalEvaluationRecord.model_validate({**record.model_dump(), **changes})

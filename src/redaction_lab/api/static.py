@@ -29,7 +29,7 @@ _SECURITY_HEADERS = (
     ("X-Frame-Options", "DENY"),
     ("Referrer-Policy", "no-referrer"),
     ("Permissions-Policy", "camera=(), microphone=(), geolocation=()"),
-    ("Content-Security-Policy", "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"),
+    ("Content-Security-Policy", "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; font-src 'self'; frame-src blob:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"),
 )
 StartResponse = Callable[[str, list[tuple[str, str]]], object]
 WsgiApp = Callable[[Mapping[str, object], StartResponse], Iterable[bytes]]

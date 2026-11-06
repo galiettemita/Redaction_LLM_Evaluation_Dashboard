@@ -1,174 +1,153 @@
-# Local website and API package
+# Experimental local application and owner-only gateway
 
-> **RL-WEB-008 frontend candidate — BUILT FOR API v0.2.** The exact production
-> bundle is hash-bound in the local manifest and may launch in truthful
-> `DEGRADED` mode. The PDF worker and local model locks are qualified only on
-> the reference host; neither runtime is bundled with this candidate. This is not a complete recipient
-> release or scientific validation.
+This API v0.3 package serves the exact hash-bound React workspace and supports
+isolated PDF processing, genuine local Qwen2.5 1.5B predictions, and versioned
+experimental text-agreement scores. Reference text is evaluation-only.
+`verified_score` remains null and the interface says **EXPERIMENTAL — NOT
+SCIENTIFICALLY VALIDATED**. Missing, partial, ambiguous, unreadable or mismatched
+truth stays Accuracy unknown. This single-model demonstration does not satisfy
+the eventual commercial multi-model research requirement.
 
-This candidate starts the merged Task 7B API on your own macOS Apple Silicon
-computer. It composes the verified API v0.2 frontend bundle on the same origin
-as the API. The PDF worker and model runtime have synthetic-only qualification
-evidence on the reference host, but are not bundled for a recipient. Accuracy
-remains unknown and numeric scores remain null.
+The PDF v2 and model runtimes have synthetic engineering qualification on the
+reference Mac. They are **not bundled**, and this is not a clean-device installer,
+scientific validation, institutional permission or a permanent hosted service.
+The API health response retains `DEGRADED / runtime_qualified: false` to avoid
+claiming recipient/release qualification; runtime identity is actually checked
+again before each explicit processing operation.
 
-The manifest binds the reviewed v0.2 artifact under `web/dist` by exact paths,
-sizes, SHA-256 hashes and MIME types; arbitrary builds are not accepted. This package is neither a standalone
-installer nor evidence of clean recipient-device acceptance, runtime isolation,
-model availability on another host or scientific validity. Exact local model
-source, integrity, license and SBOM records are under `packaging/model-runtime`.
+## Existing prerequisites
 
-## Prerequisites and pins
+Use native macOS arm64 CPython **3.12.14** with every dependency version in
+[manifest.json](manifest.json). Source, production assets and both runtime locks
+must be the reviewed package. The existing application-owned Podman machine must
+be running, rootless and without host shares. Exact pinned model files and the
+signed Ollama payload must exist. Launch never downloads dependencies, builds
+images, starts Podman, opens a browser, or opens an external tunnel. An explicit
+process action may start the owned loopback Ollama runtime, which is supervised
+and stopped after the request. Ollama port `11434` must never be exposed.
 
-Use macOS on Apple Silicon, with a native arm64 CPython **3.12.14** environment.
-Intel Macs, Rosetta interpreters, Linux and Windows are unsupported by this
-candidate. The general project minimum is Python 3.11; this candidate deliberately
-requires the narrower tested version. The exact direct and transitive dependency
-versions are in [manifest.json](manifest.json). They were captured from an existing
-compatible environment and are candidate reproducibility pins, not approval of a
-production stack or software license inventory. Preflight checks every listed
-version and imports the application from this package's `src` directory.
+`REDACTION_LAB_RUNTIME_ROOT` may point to the absolute trusted `runtime` directory
+containing `pdf-worker/` and `model-runtime/`. This lets a separate synthetic
+workspace reuse installed artifacts without copying gigabytes. Both runtimes
+use the same owner/no-symlink/no-group-or-world-write root validation; full
+inventories, executable identity, runtime policy and image checks remain.
+Without this variable, legacy application-relative runtime paths remain valid.
 
-No account, credentials, API keys, Node, Podman or model artifacts are bundled or
-downloaded by this package. Scripts never install, download, build assets/images, create
-VMs or start Podman. No prerequisite installation is authorized under Task 7P.
-If an interpreter or dependency is missing or mismatched, stop and arrange a
-separately authorized prerequisite environment. Do not change pins just to bypass
-the check. A wheel archive, interpreter installer, SBOM/license inventory and
-fully offline prerequisite bundle are not supplied. Once prerequisites exist,
-these scripts require no internet connection.
+## Check and launch locally
 
-## Check and launch
-
-1. Receive the reviewed source package including `src/redaction_lab`, application
-   migrations, `packaging/pdf-worker` and `packaging/local`. Extract it outside
-   any existing application data directory. Paths containing spaces are supported.
-2. Open **Finder → Applications → Utilities → Terminal**. Type `cd ` (including
-   the space), drag the extracted package folder from Finder into Terminal, then
-   press **Return**.
-3. Select an existing, compatible Python interpreter. Replace the example path
-   with your own prerequisite environment; this is not a bundled environment:
+1. Open **Finder → Applications → Utilities → Terminal**. Type `cd `, drag the
+   reviewed package folder into Terminal, and press **Return**.
+2. Select the existing interpreter and private synthetic data/runtime paths:
 
    ```sh
-   export REDACTION_LAB_PYTHON="/absolute/path/to/your/existing/environment/bin/python"
+   export REDACTION_LAB_PYTHON="/absolute/path/to/existing/environment/bin/python"
+   export REDACTION_LAB_RUNTIME_ROOT="/absolute/path/to/trusted/runtime"
+   export REDACTION_LAB_HOME="/absolute/path/to/dedicated/synthetic-workspace"
    ```
 
-4. Run the read-only check:
+   Replace the example paths. Use a dedicated data directory outside the source
+   checkout, not your home directory or a directory containing unrelated files.
+3. Run `sh packaging/local/launch.sh --check`. This read-only check validates the
+   platform/pins, lock hashes, API version, exact frontend inventory, storage
+   safety, configured runtime inventories and optional gateway configuration.
+   It does not execute either runtime or create application state.
+   `runtime_files_verified: true` attests files, not live readiness. Missing or
+   changed runtime files fail closed. Without an explicit runtime root, the
+   diagnostic-only launch remains available and processing still re-attests.
+4. Run `sh packaging/local/launch.sh`. Open `http://127.0.0.1:8765/` in the browser.
+   Choose the generated redacted PDF and optionally its matching reference,
+   click **Upload documents**, then **Process or resume saved document**.
+   The PDF view shows locally selected files. Restored results require selecting
+   the files again for preview; the server does not return saved PDF bytes.
+5. Press **Control-C** in Terminal to stop the application. Restarting with the
+   same data directory restores immutable uploaded bytes, jobs and results.
+   Refresh/reconnect uses GET only and cannot generate another attempt.
 
-   ```sh
-   sh packaging/local/launch.sh --check
-   ```
+The default local address is literal `127.0.0.1:8765`; `localhost`, IPv6 and
+cross-origin mutations are rejected. A different `REDACTION_LAB_PORT` is allowed
+for local diagnostics only. The gateway mode requires API port 8765. Storage
+uses private directories, umask 077, descriptor-confined artifact access and
+pre-migration backups. No deletion command is supplied. Keep private research
+PDFs, raw payloads and credentials out of this public repository.
 
-   Exit 0 with `state: DEGRADED` means the API prerequisites and exact frontend bundle matched.
-   `frontend_available: true` is emitted only after exact bundle verification;
-   a changed or missing bundle reports false. It does not
-   mean PDF processing works. Error codes identify incompatible platform/Python,
-   missing or mismatched dependencies, unsafe storage, or a changed worker lock.
-   Preflight creates no data directory or database and makes no runtime calls.
-5. After the candidate has the necessary review and local-use authority, launch:
+## Owner-only HTTPS demonstration
 
-   ```sh
-   sh packaging/local/launch.sh
-   ```
+The controller opens the external tunnel only after exact-candidate review and
+integration. The demonstration is one workspace, protected by a private
+username/password at both the gateway and tunnel edge. Anyone given those
+credentials could access that workspace. Do not share them with other users;
+store generated synthetic documents only. The link works only while the Mac is
+awake and the application, gateway, Podman machine and tunnel are running.
 
-6. Read the launcher output. If it prints `Verified frontend assets`, type
-   `http://127.0.0.1:8765/` into your browser's address bar and press **Return**.
-   If it prints `FRONTEND_UNAVAILABLE`, use
-   `http://127.0.0.1:8765/api/v1/health` for the API diagnostic. Expect API
-   version `0.2`, `mode: local`, `state: DEGRADED` and
-   `runtime_qualified: false`. Use `127.0.0.1`; `localhost`, another host, IPv6 or
-   cross-origin requests are rejected. No browser is opened automatically.
-   Frontend availability never changes the API's degraded runtime status.
-7. Return to Terminal and press **Control-C** to stop the API. Restarting with the
-   same storage directory preserves uploaded synthetic bytes and accepted jobs.
+Store private configuration outside Git, in an owner-only directory with mode
+0700 and a configuration file with mode 0600. Load these variables privately:
 
-You may choose another port with `export REDACTION_LAB_PORT="8766"`; use that
-port in the diagnostic URL. The port must be 1–65535. An occupied port fails
-before initializing storage. `REDACTION_LAB_HOST` must be exactly `127.0.0.1`;
-the listening address is also hard-coded to that address. This single-process
-standard-library server is a bounded local diagnostic service, not a production
-HTTP server; it sets a 10-second socket timeout and suppresses access logs.
+- `REDACTION_LAB_GATEWAY=1`
+- `REDACTION_LAB_PUBLIC_HOST`: the exact lowercase assigned DNS hostname, without
+  scheme, port, slash or trailing dot.
+- `REDACTION_LAB_GATEWAY_USERNAME`: 1–64 ASCII letters/digits or `._-`.
+- `REDACTION_LAB_GATEWAY_PASSWORD`: a generated 24–256 character printable ASCII
+  secret without spaces. Do not pass it on command lines or place it in a URL.
 
-## Storage and safety boundaries
+Run preflight and launch as above. The application and gateway reserve both
+`127.0.0.1:8765` and `127.0.0.1:8766` before creating state. Invalid credentials,
+wrong configuration or occupied ports stop launch. No actual host or secret is
+printed. Stop the launcher to close both listeners.
 
-The default local data directory is
-`~/Library/Application Support/RedactionLab`. To use a separate dedicated
-directory, set a literal absolute path before checking and launching:
+With the existing authenticated ngrok installation and private Basic-auth
+traffic policy, the controller's tunnel command is:
 
 ```sh
-export REDACTION_LAB_HOME="/absolute/path/to/dedicated/redaction-lab-data"
+ngrok http http://127.0.0.1:8766 \
+  --url "https://$REDACTION_LAB_PUBLIC_HOST" \
+  --inspect=false --traffic-policy-file "/absolute/private/path/policy.yml"
 ```
 
-Do not select your home directory, a shared directory, source checkout or an
-existing directory containing unrelated files. Preflight rejects symlinked path
-components and existing data roots without mode 0700. Launch uses Task 7A's
-descriptor-confined directory/storage services and locked migration helper;
-directories are private (0700), new files use umask 077, and required database
-upgrades use the existing pre-migration backup behavior. Launch changes only
-this dedicated state directory; preflight is read-only. Uploaded documents,
-SQLite state, retained evidence and backups survive restart. No deletion or
-automatic cleanup command is supplied here.
+Use HTTPS ingress only. Preserve the original Host and Authorization headers;
+do not use `--host-header=rewrite`, expose the application/model directly, or
+remove either authentication boundary. The actual private edge policy and
+hostname are operator configuration, never package artifacts. Inspect the
+installed CLI help if its policy syntax changes. Final external acceptance must
+prove unauthenticated access fails, authenticated assets/API succeed, wrong
+origins cannot mutate, uploads/process/results work, and reconnect does not
+create a second attempt. Local simulated TLS testing is not that final proof.
 
-Use only synthetic data within current authorization. The repository was public;
-never put private PDFs, datasets, credentials or raw model payloads into it.
-Keep package/source files trusted and unchanged while the service runs. The
-manifest pins the reference-host-qualified worker and model locks by SHA-256;
-changing either lock requires a separately reviewed package. The API refuses
-PDF processing or model dispatch when the corresponding application-owned
-runtime is absent or differs, returning `RUNTIME_UNVERIFIED` or
-`MODEL_RUNTIME_UNVERIFIED`. The model lock uses application-root-relative paths
-and requires the exact signed executable, complete model-file inventory,
-literal-loopback API version, provider model name and manifest digest before
-dispatch. The qualified profile uses a raw prompt, 32,768-token context,
-1,024-token output ceiling, conservative 30,000-byte rendered-prompt bound and
-explicitly disables truncation/context shifting. Unknown truth and both scores remain null.
-Refreshing, reading results, or restarting does not dispatch a paid run.
+## Gateway and static boundaries
 
-## Static asset boundary
+The standard-library gateway has one fixed destination: `127.0.0.1:8765`.
+It listens only on `127.0.0.1:8766`, authenticates before reading an upload, checks
+exact Host and HTTPS Origin (required for POST), allowlists application routes,
+rejects duplicated/ambiguous framing and transfer encoding, and limits active
+connections to eight. Uploads stream in 64 KiB chunks with the API's 50 MiB pair
+plus multipart-overhead limit. Response bodies are bounded; large responses
+spill into a private temporary file before complete framing is accepted.
+Redirects, arbitrary destinations and Ollama routes are rejected. Only validated
+requests receive translated local Host/Origin headers; credentials, cookies and
+forwarding headers never reach the application. Security/content headers are
+preserved and HSTS is added. Request bodies, URLs and credentials are not logged.
 
-Only `/` and exact manifest-listed `/assets/<produced-name>.js` or `.css` routes
-support GET/HEAD. There is no `/index.html` alias, directory listing, source-map
-serving or fallback for unknown routes. Queries, encoded/absolute request targets,
-static bodies, transfer encoding and duplicate singleton HTTP headers are
-rejected. Successful HEAD responses carry the exact GET length and no body.
-Normal `/api/v1` requests retain their existing API behavior; the HTTP handler
-rejects ambiguous framing before WSGI, which has no chunked-body decoder.
+Only `/` and exact manifest-listed JS/CSS assets are served. No source maps,
+filesystem routes, directory listing or fallback route exist. Trusted ownership,
+no-follow descriptor traversal, single-link files, exact paths/size/hash/MIME,
+32-file/4-MiB-per-file/8-MiB-total limits and immutable in-memory snapshots bind
+the bundle. Missing or changed assets leave API diagnostics usable. Content
+security policy permits same-origin scripts/styles/connections and local blob
+PDF frames, with no inline script/eval/CDN. Other protections include no-store,
+nosniff, no-referrer and denied outer framing.
 
-The install root, manifest and frontend tree must belong to the launching
-account and must not be writable by group/others. Every path component is
-opened with directory descriptors and no-follow flags. Assets must be regular,
-single-link files; missing, extra, symlinked, redirected, changed or incorrectly
-hashed files fail frontend verification. Limits are 32 files, 4 MiB per file
-and 8 MiB total. The only permitted dist entries are `index.html` and `assets`.
-Bytes are validated once and retained as an immutable snapshot, so a later
-filesystem modification cannot cause a request to read a different file.
-Restart is required after an approved package update. No assets or upload data
-share a filesystem route.
+## Delivery checklist
 
-Static responses use exact MIME types, no-store, nosniff, no-referrer, denied
-framing and a restrictive content-security policy allowing local scripts,
-styles and connections only. No CDN, cross-origin fetch, inline script or eval
-is enabled. Failed frontend verification leaves the API diagnostic usable;
-an unsafe/invalid package manifest prevents launch entirely.
+- [x] API v0.3 and exact frontend inventory are bound together.
+- [x] Gateway raw-HTTP RED/GREEN tests and launch/auth/shutdown tests pass.
+- [x] Trusted shared runtime-root checks preserve isolated synthetic storage.
+- [x] Exact v2 image source/dependency/license inventory and protocol/isolation
+      canaries independently requalified with no downloads.
+- [x] Full combined genuine model/reference/evaluation and mounted-browser evidence
+      on the reference host through a synthetic HTTPS origin mapped to loopback.
+- [ ] Independent exact-candidate whole-branch review and normal integration.
+- [ ] Final authenticated external HTTPS acceptance and owner delivery.
+- [ ] Offline prerequisite/runtime bundle and clean second-device acceptance.
+- [ ] Scientific model roster, private-data authority and scoring validation.
 
-## Candidate evidence checklist
-
-- [x] Manifest records platform, interpreter/dependency pins and unavailable gates.
-- [x] Read-only preflight and literal loopback launcher implemented.
-- [x] Synthetic script checks cover prerequisites, unsafe storage and runtime lock.
-- [x] Synthetic loopback API checks cover upload, fail-closed processing, null
-      results, Host/Origin rejection and restart persistence in a copied package.
-- [x] Synthetic static GET/HEAD, exact bytes/MIME/length, security headers and
-      routing/framing/confinement checks pass with a frozen fixture inventory.
-- [x] Frontend verification fails closed and preserves API-only diagnostics.
-- [x] RL-WEB-008 frontend exact-candidate automated QA/security review passed.
-- [ ] Task 9B correction exact-candidate independent review durability.
-- [x] Genuine API v0.2 frontend build, reviewed hash-pinned integration and
-      synthetic headless-Chrome browser workflow.
-- [x] Reference-host PDF worker and synthetic-only Ollama/model qualification.
-- [x] Exact local model source, integrity, license and CycloneDX SBOM records.
-- [ ] Offline prerequisite/runtime bundle and clean second-device recipient acceptance.
-- [ ] Human-approved scientific model roster, private-data use and scoring validation.
-
-Completed test execution and exact candidate SHAs are recorded in the unique
-Task 7CP Packaging handoff; these checks do not settle the pending gates above.
+Exact commands, counts, runtime identities, failures/corrections and remaining
+launch work belong to the task-scoped handoff and controller review record.

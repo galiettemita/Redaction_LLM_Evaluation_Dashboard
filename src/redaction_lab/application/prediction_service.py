@@ -21,8 +21,8 @@ from redaction_lab.worker import run_job_once
 
 MODEL_ID = "qwen2.5:1.5b-instruct-q4_K_M"
 PROMPT_ID = "redaction-reconstruction-json"
-PROMPT_VERSION = "prompt-v1"
-RUN_VERSION = "run-v0.4"
+PROMPT_VERSION = "prompt-v2"
+RUN_VERSION = "run-v0.5"
 EXPERIMENT_CONDITION = "redacted-document-only"
 COMMON_CONTEXT_BUDGET = 29_000
 CONTEXT_POLICY = "common-full-document"
@@ -30,7 +30,7 @@ SETTINGS = {"temperature": 0}
 ATTEMPT_POLICY = "one-frozen-attempt"
 TOOL_PERMISSIONS: tuple[str, ...] = ()
 BUDGET_LABEL = "zero-cost-local-experimental"
-SERVICE_ID = "application-prediction-service-v0.4"
+SERVICE_ID = "application-prediction-service-v0.5"
 LEGACY_SERVICE_IDENTITIES = {
     ("run-v0.2", "application-prediction-service-v0.2"),
     ("run-v0.3", "application-prediction-service-v0.3"),
@@ -57,6 +57,7 @@ class PredictionService:
         *,
         model_config_id: str,
         model_manifest_digest: str,
+        legacy_v04: bool = False,
     ) -> tuple[str, RunDefinition]:
         version = self.store.get_version(version_id)
         if (
@@ -68,18 +69,19 @@ class PredictionService:
         source = self.runs.source(version.source_id)
         if source.project_id != version.project_id or source.source_sha256 != version.sha256:
             raise ValueError("document and prediction source provenance mismatch")
+        service_id = "application-prediction-service-v0.4" if legacy_v04 else SERVICE_ID
         created_by = json.dumps(
             {
                 "model_id": MODEL_ID,
                 "model_config_id": model_config_id,
                 "model_manifest_digest": model_manifest_digest,
-                "service": SERVICE_ID,
+                "service": service_id,
             },
             sort_keys=True,
             separators=(",", ":"),
         )
         run_fields = {
-            "run_version": RUN_VERSION,
+            "run_version": "run-v0.4" if legacy_v04 else RUN_VERSION,
             "project_id": version.project_id,
             "target_versions": source.target_versions,
             "model_ids": (MODEL_ID,),
@@ -91,7 +93,7 @@ class PredictionService:
             "common_context_budget": COMMON_CONTEXT_BUDGET,
             "context_policy": CONTEXT_POLICY,
             "prompt_id": PROMPT_ID,
-            "prompt_version": PROMPT_VERSION,
+            "prompt_version": "prompt-v1" if legacy_v04 else PROMPT_VERSION,
             "settings": SETTINGS,
             "attempt_policy": ATTEMPT_POLICY,
             "tool_permissions": TOOL_PERMISSIONS,
@@ -116,7 +118,7 @@ class PredictionService:
                 "model_id": MODEL_ID,
                 "model_config_id": model_config_id,
                 "model_manifest_digest": model_manifest_digest,
-                "service": SERVICE_ID,
+                "service": service_id,
             },
             "definition": run_fields,
         }
@@ -134,7 +136,7 @@ class PredictionService:
             not isinstance(identity, dict)
             or set(identity)
             != {"model_id", "model_config_id", "model_manifest_digest", "service"}
-            or identity.get("service") != SERVICE_ID
+            or identity.get("service") not in {SERVICE_ID, "application-prediction-service-v0.4"}
             or identity.get("model_id") != MODEL_ID
             or not isinstance(identity.get("model_config_id"), str)
             or not isinstance(identity.get("model_manifest_digest"), str)
@@ -188,6 +190,7 @@ class PredictionService:
                 version_id,
                 model_config_id=identity[1],
                 model_manifest_digest=identity[2],
+                legacy_v04=run.run_version == "run-v0.4",
             )
             if run != expected:
                 raise ValueError("stored v0.4 run identity is inconsistent")
@@ -240,6 +243,15 @@ class PredictionService:
             return tuple(job.job_id for job in jobs)
         finally:
             verified.close()
+
+    def progress(self, version_id: str) -> dict[str, int]:
+        _, run = self._stored_run(version_id)
+        jobs = self.runs.jobs_for_run(run.run_id, project_id=run.project_id) if run else ()
+        pending = sum(job.state == "PENDING" for job in jobs)
+        # The one-shot store marks dispatched outcomes IN_DOUBT until completion;
+        # it does not persist an observable RUNNING lease.
+        return {"total": len(jobs), "pending": pending, "running": 0,
+                "terminal": len(jobs) - pending}
 
     def results(self, version_id: str) -> tuple[dict[str, object], ...]:
         version = self.store.get_version(version_id)

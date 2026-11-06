@@ -74,10 +74,48 @@ try:
         fail("MODEL_RUNTIME_NOT_AUTHORIZED", "The qualified model lock is not paired with this non-bundled candidate")
     delivery = manifest["delivery_status"]
     if delivery.get("candidate_distribution_status") != "DISTRIBUTABLE":
-        fail("FRONTEND_BUILD_REQUIRED", "API v0.2 source is not paired with a verified v0.2 frontend bundle; candidate is non-distributable")
+        fail("FRONTEND_BUILD_REQUIRED", "API v0.3 source requires its reviewed frontend bundle")
     sys.path.insert(0, str(root / "src"))
     from redaction_lab.application.paths import resolve_paths, preflight_directories
     from redaction_lab.api.app import create_app
+    from redaction_lab.api.http import API_VERSION
+    from redaction_lab.api.gateway import GatewayConfig
+    if manifest["api_version"] != API_VERSION:
+        fail("API_VERSION_MISMATCH", "Package and application API versions differ")
+    gateway_enabled = os.environ.get("REDACTION_LAB_GATEWAY", "0")
+    try:
+        if gateway_enabled not in {"0", "1"}:
+            raise ValueError("invalid gateway flag")
+        if gateway_enabled == "1":
+            GatewayConfig.from_environment()
+            if int(raw_port) != 8765:
+                raise ValueError("gateway requires application port 8765")
+    except ValueError:
+        fail("GATEWAY_CONFIG_INVALID", "Gateway requires private host/auth configuration and application port 8765")
+    runtime_files_verified = False
+    if "REDACTION_LAB_RUNTIME_ROOT" in os.environ:
+        from redaction_lab.application.inference_runtime import InferenceRuntime, InferenceRuntimeUnavailable
+        from redaction_lab.application.isolation import RuntimePolicy, RuntimeUnavailable, SubprocessPodmanRunner
+        try:
+            value = InferenceRuntime._read_lock(root / model["lock_path"])
+            payload_path = InferenceRuntime._resolve_locked_path(value["runtime_payload"])
+            models_path = InferenceRuntime._resolve_locked_path(value["model_store"])
+            InferenceRuntime._assert_runtime_files(payload_path, value)
+            InferenceRuntime._assert_model_files(models_path, value)
+            descriptor, identity = InferenceRuntime._open_verified_executable(
+                payload_path / value["ollama_executable"], value["ollama_executable_sha256"])
+            os.close(descriptor)
+            policy = RuntimePolicy.from_lock(root / worker["lock_path"])
+            runner = SubprocessPodmanRunner()
+            try:
+                runner._open_executable(policy)
+                runner._assert_runtime_configuration(policy)
+                runner._read_machine_configuration(policy)
+            finally:
+                runner.close()
+            runtime_files_verified = True
+        except (OSError, ValueError, RuntimeUnavailable, InferenceRuntimeUnavailable):
+            fail("RUNTIME_FILES_UNVERIFIED", "Configured runtime root must contain the complete trusted pinned runtime inventories")
     frontend = static["create_static_app"](None, root, manifest.get("frontend"))
     try:
         paths = resolve_paths()
@@ -93,7 +131,9 @@ try:
         "api_version": manifest["api_version"], "state": "DEGRADED", "runtime_qualified": False,
         "mode": "local", "host": host, "port": int(raw_port),
         "frontend_available": frontend.frontend_available, "recipient_acceptance": "NOT_RUN",
-        "message": "API prerequisites match; frontend availability requires a verified bundle; PDF processing and inference remain unavailable",
+        "runtime_files_verified": runtime_files_verified,
+        "gateway": {"enabled": gateway_enabled == "1", "host": "127.0.0.1", "port": 8766},
+        "message": "API and asset checks complete; runtime readiness is re-attested before processing; recipient and scientific acceptance remain open",
     }, sort_keys=True))
 except (OSError, ValueError, KeyError, TypeError, ImportError):
     fail("PACKAGE_INVALID", "Package files or imports are unavailable; nothing was installed")

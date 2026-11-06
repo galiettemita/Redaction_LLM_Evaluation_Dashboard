@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from difflib import SequenceMatcher
 from hashlib import sha256
 from io import BytesIO
@@ -886,6 +886,71 @@ def _align_reference_content(
             )
             for target in targets
         ]
+    return _align_reference_text(
+        redacted, exact_reference_text, targets=targets,
+        reference_document_version_id=reference_document_version_id,
+        reference_canonical_version_id=reference_canonical_version_id,
+        mapping_version=mapping_version, reference_pdf=reference_pdf, detection=detection,
+    )
+
+
+def _text_candidate_bounds(
+    candidate: _Candidate,
+    redacted_text: str,
+    marker: tuple[int, int, str],
+    reference_text: str,
+    reference_tokens: tuple[_Token, ...],
+) -> _Candidate:
+    """Preserve the full substring between matching visible context edges.
+
+    Punctuation belonging to visible context is excluded only when identical at
+    the reference edge. Punctuation in the hidden span remains verbatim.
+    """
+    before = _tokens(redacted_text[:marker[0]])
+    after = _tokens(redacted_text[marker[1]:])
+    left_context_end = before[-1].end if before else 0
+    right_context_start = marker[1] + after[0].start if after else len(redacted_text)
+    left_edge = redacted_text[left_context_end:marker[0]].strip()
+    right_edge = redacted_text[marker[1]:right_context_start].strip()
+    start = reference_tokens[candidate.start - 1].end if candidate.left else 0
+    end = reference_tokens[candidate.end].start if candidate.right else len(reference_text)
+    while start < end and reference_text[start].isspace():
+        start += 1
+    while end > start and reference_text[end - 1].isspace():
+        end -= 1
+    if left_edge:
+        if not reference_text.startswith(left_edge, start, end):
+            return candidate
+        start += len(left_edge)
+    if right_edge:
+        if not reference_text[start:end].endswith(right_edge):
+            return candidate
+        end -= len(right_edge)
+    while start < end and reference_text[start].isspace():
+        start += 1
+    while end > start and reference_text[end - 1].isspace():
+        end -= 1
+    if (
+        start > reference_tokens[candidate.start].start
+        or end < reference_tokens[candidate.end - 1].end
+    ):
+        return candidate
+    return replace(candidate, source_start=start, source_end=end)
+
+
+def _align_reference_text(
+    redacted: CanonicalRedactedDocument,
+    exact_reference_text: str,
+    *,
+    targets: tuple[RedactionTarget, ...],
+    reference_document_version_id: str,
+    reference_canonical_version_id: str,
+    mapping_version: str,
+    reference_pdf: bytes | None = None,
+    detection: DetectionResult | None = None,
+) -> list[ReferenceMapping]:
+    """Shared conservative text-first core; geometry exists only for verified PDFs."""
+    markers = _validate_inputs(redacted, targets)
     exact_reference_hash = sha256(exact_reference_text.encode("utf-8")).hexdigest()
     reference_tokens = _tokens(exact_reference_text)
     redacted_tokens = _tokens(redacted.canonical_text)
@@ -929,7 +994,7 @@ def _align_reference_content(
     plausible_reference_ranges: list[tuple[int, int]] = []
     document_alignment_conflict = False
     for index, (target, marker) in enumerate(zip(targets, markers, strict=True)):
-        if _reference_boxes_overlap(target, detection):
+        if detection is not None and _reference_boxes_overlap(target, detection):
             results.append(
                 _unconfirmed(
                     redacted,
@@ -961,7 +1026,7 @@ def _align_reference_content(
                 document_right,
                 left_boundary,
                 right_boundary,
-            )
+            ) if reference_pdf is not None and detection is not None else []
         else:
             candidates = _anchor_candidates(
                 reference_tokens,
@@ -1030,7 +1095,10 @@ def _align_reference_content(
             document_right,
             left_boundary,
             right_boundary,
-        )
+        ) if reference_pdf is not None and detection is not None else [
+            _text_candidate_bounds(candidate, redacted.canonical_text, marker,
+                                   exact_reference_text, reference_tokens)
+        ]
         candidate = next(
             (
                 geometry
@@ -1212,3 +1280,88 @@ def align_reference(
         ),
         mapping_version=mapping_version,
     )
+
+
+EXPERIMENTAL_MAPPING_METHOD_VERSION = "experimental-text-first-reference-v1"
+_PARTIAL_TEXT_RE = re.compile(
+    r"\[\[TARGET:|\[\s*(?:REDACTED|REDACTION|WITHHELD|DELETED)\s*\]|[█▓▒]{2,}|_{3,}",
+    re.IGNORECASE,
+)
+
+
+def align_experimental_reference(
+    redacted: CanonicalRedactedDocument,
+    reference_text: str | None,
+    *,
+    targets: tuple[RedactionTarget, ...],
+    reference_document_version_id: str | None,
+    reference_canonical_version_id: str | None,
+    mapping_version: str,
+) -> list[ReferenceMapping]:
+    """Align isolated visible text solely in the user-supplied experimental channel.
+
+    No PDF parsing, synthetic registry registration or prediction-source mutation
+    occurs here. Callers bind this text to StoredReferenceSource before use.
+    """
+    from redaction_lab.application.config import MAX_CANONICAL_TEXT_BYTES
+
+    _validate_inputs(redacted, targets)
+    if not mapping_version.strip():
+        raise ValueError("mapping version is required")
+    if reference_text is not None and len(reference_text.encode("utf-8")) > MAX_CANONICAL_TEXT_BYTES:
+        raise ValueError("reference text exceeds limit")
+    reference_hash = (
+        sha256(reference_text.encode("utf-8")).hexdigest()
+        if reference_text is not None else None
+    )
+    status = None
+    if reference_text is None:
+        if reference_document_version_id is not None or reference_canonical_version_id is not None:
+            raise ValueError("absent reference must not have reference version identifiers")
+        status = ReferenceStatus.ABSENT
+    elif not _tokens(reference_text):
+        status = ReferenceStatus.UNREADABLE
+    elif (
+        not reference_document_version_id or not reference_document_version_id.strip()
+        or not reference_canonical_version_id or not reference_canonical_version_id.strip()
+    ):
+        status = ReferenceStatus.CONFLICTING
+    if status is not None:
+        mappings = [_unconfirmed(
+            redacted, target, status=status, mapping_version=mapping_version,
+            reference_document_version_id=reference_document_version_id,
+            reference_canonical_version_id=reference_canonical_version_id,
+            reference_hash=reference_hash, readable=False if status is ReferenceStatus.UNREADABLE else None,
+        ) for target in targets]
+    else:
+        mappings = _align_reference_text(
+            redacted, reference_text, targets=targets,
+            reference_document_version_id=reference_document_version_id,
+            reference_canonical_version_id=reference_canonical_version_id, mapping_version=mapping_version,
+        )
+    results: list[ReferenceMapping] = []
+    for target, mapping in zip(targets, mappings, strict=True):
+        quote = mapping.exact_revealed_text
+        partial = quote is not None and bool(_PARTIAL_TEXT_RE.search(quote))
+        unreadable = quote is not None and (
+            "\ufffd" in quote
+            or any(ord(char) < 32 and char not in "\n\r\t" for char in quote)
+        )
+        if partial or unreadable:
+            mapping = _unconfirmed(
+                redacted, target,
+                status=ReferenceStatus.PARTIAL if partial else ReferenceStatus.UNREADABLE,
+                mapping_version=mapping_version, reference_document_version_id=reference_document_version_id,
+                reference_canonical_version_id=reference_canonical_version_id, reference_hash=reference_hash,
+                complete_revelation=False, readable=not unreadable,
+            )
+        values = mapping.model_dump()
+        experimental_identity = sha256(
+            (mapping.mapping_id + EXPERIMENTAL_MAPPING_METHOD_VERSION).encode()
+        ).hexdigest()[:24]
+        values.update(
+            mapping_id="mapping-experimental-" + experimental_identity,
+            provenance="USER_SUPPLIED_EXPERIMENTAL", mapping_method_version=EXPERIMENTAL_MAPPING_METHOD_VERSION,
+        )
+        results.append(ReferenceMapping.model_validate(values))
+    return results

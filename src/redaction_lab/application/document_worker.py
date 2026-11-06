@@ -60,6 +60,8 @@ class DocumentWorker:
                     source_id = RunStore(self.store.path)._persist_prediction_source(
                         source, pdf_bytes=pdf_bytes, project_id=job.project_id
                     )
+                else:
+                    self.store.record_reference_source(job.job_id, owner=owner, response=response)
                 self.store.complete_job(
                     job.job_id,
                     owner=owner,

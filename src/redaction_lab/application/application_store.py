@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
 from hashlib import sha256
@@ -12,6 +12,11 @@ import sqlite3
 
 from redaction_lab.application.migration import migrate_database
 from redaction_lab.contracts import DocumentRole
+from redaction_lab.application.worker_protocol import (
+    WORKER_PROTOCOL_VERSION,
+    WorkerResponse,
+    WorkerStatus,
+)
 
 
 class ProcessingStatus(StrEnum):
@@ -79,6 +84,31 @@ class StoredDocumentPair:
     @property
     def truth_trusted(self) -> bool:
         return False
+
+
+@dataclass(frozen=True)
+class StoredReferenceSource:
+    source_id: str
+    version_id: str
+    job_id: str
+    project_id: str
+    input_sha256: str
+    canonical_text: str
+    canonical_hash: str
+    canonicalizer_version: str
+    page_count: int
+    request_nonce: str
+    protocol_version: str
+    image_digest: str
+    provenance: str = "USER_SUPPLIED_EXPERIMENTAL"
+
+    @property
+    def reference_document_version_id(self) -> str:
+        return self.version_id
+
+    @property
+    def canonical_document_version_id(self) -> str:
+        return self.source_id
 
 
 def _identity(prefix: str, values: object) -> str:
@@ -217,6 +247,97 @@ class ApplicationStore:
             connection.close()
         return StoredDocumentPair(pair_id, project_id, redacted_version_id, reference_version_id)
 
+    def get_pair(self, pair_id: str) -> StoredDocumentPair:
+        with self.connect() as connection:
+            row = connection.execute("SELECT * FROM document_pairs WHERE pair_id=?", (pair_id,)).fetchone()
+        if row is None:
+            raise KeyError(pair_id)
+        return StoredDocumentPair(**{key: row[key] for key in StoredDocumentPair.__dataclass_fields__})
+
+    def pairs_for_redacted(self, version_id: str) -> tuple[StoredDocumentPair, ...]:
+        with self.connect() as connection:
+            rows = connection.execute(
+                "SELECT * FROM document_pairs WHERE redacted_version_id=? ORDER BY pair_id", (version_id,)
+            ).fetchall()
+        return tuple(StoredDocumentPair(**{key: row[key] for key in StoredDocumentPair.__dataclass_fields__})
+                     for row in rows)
+
+    @staticmethod
+    def _reference_source(connection: sqlite3.Connection, version_id: str) -> StoredReferenceSource | None:
+        row = connection.execute("SELECT * FROM reference_sources WHERE version_id=?", (version_id,)).fetchone()
+        if row is None:
+            return None
+        source = StoredReferenceSource(**dict(row))
+        values = asdict(source)
+        values.pop("source_id")
+        if source.source_id != _identity("reference-source", values) or source.provenance != "USER_SUPPLIED_EXPERIMENTAL":
+            raise ValueError("reference source identity mismatch")
+        # Validate hashes, bounds and schema again on every read, including after reopen.
+        WorkerResponse(
+            protocol_version=source.protocol_version, request_nonce=source.request_nonce,
+            project_id=source.project_id, role=DocumentRole.REFERENCE, input_sha256=source.input_sha256,
+            status=WorkerStatus.PROCESSABLE, page_count=source.page_count,
+            reference_text=source.canonical_text, reference_hash=source.canonical_hash,
+            reference_canonicalizer_version=source.canonicalizer_version,
+        )
+        bound = connection.execute(
+            """SELECT 1 FROM application_jobs j JOIN document_versions v ON v.version_id=j.document_version_id
+               WHERE j.job_id=? AND v.version_id=? AND j.role='REFERENCE' AND v.role='REFERENCE'
+               AND j.project_id=? AND v.project_id=? AND j.input_sha256=? AND v.sha256=?
+               AND j.request_nonce=? AND j.protocol_version=? AND j.image_digest=? AND j.page_count=?""",
+            (source.job_id, source.version_id, source.project_id, source.project_id,
+             source.input_sha256, source.input_sha256, source.request_nonce, source.protocol_version,
+             source.image_digest, source.page_count),
+        ).fetchone()
+        if bound is None:
+            raise ValueError("reference source binding mismatch")
+        return source
+
+    def reference_source(self, version_id: str) -> StoredReferenceSource | None:
+        with self.connect() as connection:
+            return self._reference_source(connection, version_id)
+
+    def record_reference_source(
+        self, job_id: str, *, owner: str, response: WorkerResponse
+    ) -> StoredReferenceSource:
+        # Revalidate even model_copy-created instances before persisting any evidence.
+        response = WorkerResponse.model_validate(response.model_dump())
+        if response.role is not DocumentRole.REFERENCE or response.status is not WorkerStatus.PROCESSABLE:
+            raise ValueError("reference source requires processable reference evidence")
+        connection = self.connect()
+        try:
+            connection.execute("BEGIN IMMEDIATE")
+            job = connection.execute("SELECT * FROM application_jobs WHERE job_id=?", (job_id,)).fetchone()
+            if job is None or job["owner"] != owner or job["status"] != 'PROCESSING' or any((
+                job["role"] != response.role.value, job["project_id"] != response.project_id,
+                job["input_sha256"] != response.input_sha256, job["request_nonce"] != response.request_nonce,
+                job["protocol_version"] != response.protocol_version, job["page_count"] != response.page_count,
+                not job["image_digest"],
+            )):
+                raise ValueError("reference source runtime binding mismatch")
+            values = dict(
+                version_id=job["document_version_id"], job_id=job_id, project_id=response.project_id,
+                input_sha256=response.input_sha256, canonical_text=response.reference_text,
+                canonical_hash=response.reference_hash, canonicalizer_version=response.reference_canonicalizer_version,
+                page_count=response.page_count, request_nonce=response.request_nonce,
+                protocol_version=response.protocol_version, image_digest=job["image_digest"],
+                provenance="USER_SUPPLIED_EXPERIMENTAL",
+            )
+            source = StoredReferenceSource(source_id=_identity("reference-source", values), **values)
+            existing = self._reference_source(connection, source.version_id)
+            if existing is not None and existing != source:
+                raise ValueError("immutable reference source already differs")
+            if existing is None:
+                connection.execute("INSERT INTO reference_sources VALUES (" + ",".join("?" for _ in asdict(source)) + ")",
+                                   tuple(asdict(source).values()))
+            connection.commit()
+            return source
+        except Exception:
+            connection.rollback()
+            raise
+        finally:
+            connection.close()
+
     def get_job(self, job_id: str) -> StoredApplicationJob:
         with self.connect() as connection:
             row = connection.execute(
@@ -268,8 +389,22 @@ class ApplicationStore:
                 connection.commit()
                 return None
             if expected_job_id is not None and row["job_id"] != expected_job_id:
-                connection.commit()
-                return None
+                # A deliberate pair workflow may finish its reference before the next
+                # redacted upload. The transaction above still excludes every worker.
+                row = connection.execute(
+                    """SELECT r.job_id FROM application_jobs r
+                       JOIN document_pairs p ON p.reference_version_id=r.document_version_id
+                           AND p.project_id=r.project_id
+                       JOIN application_jobs d ON d.document_version_id=p.redacted_version_id
+                           AND d.project_id=p.project_id
+                       WHERE r.job_id=? AND r.role='REFERENCE' AND r.status='ACCEPTED'
+                           AND d.role='REDACTED'
+                           AND d.status IN ('READY','NO_REDACTIONS','UNSUPPORTED','FAILED')
+                       LIMIT 1""", (expected_job_id,),
+                ).fetchone()
+                if row is None:
+                    connection.commit()
+                    return None
             connection.execute(
                 "UPDATE application_jobs SET status='PROCESSING', owner=?, updated_at=? WHERE job_id=?",
                 (owner, now.isoformat(), row["job_id"]),
@@ -335,7 +470,7 @@ class ApplicationStore:
         try:
             connection.execute("BEGIN IMMEDIATE")
             row = connection.execute(
-                """SELECT document_version_id, role, project_id, input_sha256
+                """SELECT document_version_id, role, project_id, input_sha256, protocol_version
                    FROM application_jobs
                    WHERE job_id=? AND status='PROCESSING' AND owner=?""",
                 (job_id, owner),
@@ -344,6 +479,13 @@ class ApplicationStore:
                 raise ValueError("application job is not owned processing work")
             if row["role"] == "REFERENCE" and source_id is not None:
                 raise ValueError("reference jobs cannot bind Task-4 sources")
+            if (
+                row["role"] == "REFERENCE" and status is ProcessingStatus.READY
+                and row["protocol_version"] == WORKER_PROTOCOL_VERSION
+            ):
+                reference = self._reference_source(connection, row["document_version_id"])
+                if reference is None or reference.page_count != page_count:
+                    raise ValueError("READY reference job requires an immutable reference source")
             if row["role"] == "REDACTED" and status is ProcessingStatus.READY:
                 has_sources = connection.execute(
                     "SELECT 1 FROM sqlite_master WHERE type='table' AND name='canonical_sources'"
@@ -406,6 +548,13 @@ class ApplicationStore:
                            WHERE project_id=? AND source_sha256=? AND role='REDACTED'""",
                         (row["project_id"], row["input_sha256"]),
                     ).fetchone()
+                if row["role"] == "REFERENCE":
+                    try:
+                        reference = self._reference_source(connection, row["document_version_id"])
+                    except ValueError:
+                        reference = None
+                    if reference is not None:
+                        source = {"source_id": None}
                 if source is not None:
                     connection.execute(
                         """UPDATE document_versions SET page_count=?, processing_state='READY',

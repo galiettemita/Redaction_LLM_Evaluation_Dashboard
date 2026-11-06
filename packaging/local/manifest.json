@@ -1,28 +1,31 @@
 {
   "schema_version": 1,
-  "package_version": "0.2.0-web008",
-  "api_version": "0.2",
-  "supported_platform": {"system": "Darwin", "machine": "arm64"},
+  "package_version": "0.3.0-experimental",
+  "api_version": "0.3",
+  "supported_platform": {
+    "system": "Darwin",
+    "machine": "arm64"
+  },
   "python_version": "3.12.14",
   "host": "127.0.0.1",
   "default_port": 8765,
   "frontend": {
     "dist_path": "web/dist",
     "assets": {
-      "index.html": {
-        "sha256": "ec263a9100e23363eab5ff019f14c87a83133ff4a3f56b6400242856e539076e",
-        "byte_size": 567,
-        "content_type": "text/html; charset=utf-8"
+      "assets/index-BfjntY5Y.js": {
+        "sha256": "b51e9a86ebf73cfd45eb5db3c5324652872550b333b144a495394070c97cf533",
+        "byte_size": 225482,
+        "content_type": "text/javascript; charset=utf-8"
       },
-      "assets/index-cs0q5swb.css": {
-        "sha256": "f9558242c5506edadbfb433d023544e9ed93642dbfde2629217e100845b55706",
-        "byte_size": 7054,
+      "assets/index-DOfTYw_4.css": {
+        "sha256": "93b1e6178c23c09e35b4b9a84888a4c32f5a1c92cabe6b80611ec792ecd6d1e4",
+        "byte_size": 7483,
         "content_type": "text/css; charset=utf-8"
       },
-      "assets/index-aQq_IaFa.js": {
-        "sha256": "cafc2c373b5e3210a462c16eb67f818d669a7322e8d3a8ac2c9d9f48f72142cc",
-        "byte_size": 218846,
-        "content_type": "text/javascript; charset=utf-8"
+      "index.html": {
+        "sha256": "95ef232ffb8ecc6cef2a6e44ea438dab2811d01bf72b2daecce2cf46180ece7e",
+        "byte_size": 567,
+        "content_type": "text/html; charset=utf-8"
       }
     }
   },
@@ -45,21 +48,21 @@
   },
   "pdf_worker": {
     "lock_path": "packaging/pdf-worker/runtime.lock",
-    "lock_sha256": "de5a1b72ed4a5f20445f0783e92ad47422b48b7455dd6d2fab6406983e3bf820",
+    "lock_sha256": "a5b576688a822aa06385cc788489866673f32dee003d77719af7331bd17c4100",
     "lock_qualified_on_reference_host": true,
     "runtime_qualified": false
   },
   "model_runtime": {
     "lock_path": "packaging/model-runtime/runtime.lock",
-    "lock_sha256": "ad9e94f73623450cb7dd3a976958ab68f208906a1cc1b0ccfe0eb03d92065d8b",
+    "lock_sha256": "879e24053da361a5df978e4064250365ede84ac5d687a0804f6ed5338b4da4a3",
     "lock_qualified_on_reference_host": true,
     "runtime_qualified": false
   },
   "delivery_status": {
     "candidate_distribution_status": "DISTRIBUTABLE",
     "frontend_available": true,
-    "frontend_source_api_version": "0.2",
-    "frontend_bundle_api_version": "0.2",
+    "frontend_source_api_version": "0.3",
+    "frontend_bundle_api_version": "0.3",
     "offline_prerequisite_bundle_available": false,
     "recipient_acceptance": "NOT_RUN",
     "inference_available": false,

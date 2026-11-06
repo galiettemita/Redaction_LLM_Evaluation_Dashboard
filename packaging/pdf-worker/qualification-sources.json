@@ -54,42 +54,180 @@
     }
   },
   "worker_image": {
-    "local_image_id": "sha256:7a78eaf7ef812d354f0abe13f40c6c0a4e3684d94f72002245c5249249bf293b",
-    "manifest_digest": "sha256:cc9988ec0166c840e4d04eb115757aa8d3f7a193355c600725217e20f3115aba",
+    "local_image_id": "sha256:03db44f11ea940fff0c75a94dc393aed73095e8ee71307afb4adc3ef0e290e34",
+    "manifest_digest": "sha256:d90c5ec2c01ad84cc2949354e26f9a7140f23f5095956ea2100031904f9850ab",
     "architecture": "arm64",
     "os": "linux",
-    "size": 170248815,
+    "size": 179907424,
     "user": "65532:65532",
-    "entrypoint": ["python", "-m", "redaction_lab.application.worker_protocol"],
-    "build_policy": "Exact pinned base already present; --pull=never; --network=none; complete hash-locked local wheelhouse.",
+    "entrypoint": [
+      "python",
+      "-m",
+      "redaction_lab.application.worker_protocol"
+    ],
+    "protocol_version": "pdf-worker-v2",
+    "build_policy": "Exact installed v1 image used only as dependency stage; original pinned base; --pull=never --network=none; isolated 38-file source context; COPY --chmod=0555; independent v2 qualification. No downloads.",
+    "dependency_source_image": "sha256:7a78eaf7ef812d354f0abe13f40c6c0a4e3684d94f72002245c5249249bf293b",
+    "source_inventory_sha256": "f11ab0192f3484c5789d4a61b9c302a3be3371985563df899dde1ce8e2d50e76",
+    "installed_inventory": {
+      "usr_local_file_count": 3216,
+      "usr_local_inventory_sha256": "796918201c671074182df724ba7a42fb59f5628bfbb595897c90be5a8653ddc5",
+      "license_file_count": 21,
+      "license_inventory_sha256": "1048df2b689585e6b847f2150e30f59d46f13321fc0552b30877653a400d31b4"
+    },
     "runtime_canaries": {
-      "network_none": "PASS",
-      "host_paths_absent": "PASS",
-      "mounts_empty": "PASS",
-      "read_only_root": "PASS",
-      "capabilities_dropped": "PASS",
-      "no_new_privileges": "PASS",
-      "non_root_uid": "PASS",
-      "pids_memory_cpu_shm_nofile_limits": "PASS",
-      "synthetic_framed_protocol": "PASS"
-    }
+      "adversarial_isolation": "PASS",
+      "covered_reference_excluded": "PASS",
+      "failure_cleanup": "PASS",
+      "redacted_source_excludes_covered_text": "PASS",
+      "reference_page_limit": "PASS",
+      "reference_text_bounds": "PASS",
+      "reference_v2_protocol": "PASS",
+      "signed_quantity_regression": "PASS",
+      "timeout_cleanup": "PASS",
+      "clean_machine_restart": "PASS",
+      "production_application_attestation": "PASS"
+    },
+    "protocol_receipts": {
+      "REDACTED": {
+        "canonical_hash": "940048894e43e1fb1d3a08ecd08f72f96e82f1ef39932e3ee69a8a75fcc8d26b",
+        "input_sha256": "ac2c0f38383ac607abc82c19c9b8f9bb603053d2dcd7eb13a8b8d75e9ab9b144",
+        "reference_hash": null,
+        "status": "PROCESSABLE"
+      },
+      "REFERENCE": {
+        "canonical_hash": null,
+        "input_sha256": "8c797663f3953b1fccf791cfd6adf93080447ca65b4fd6e1e04980e4fb3cdd21",
+        "reference_hash": "84874baed95096b535d43797a450eeff4a576b3333d62bccdab2ffad3e51adfc",
+        "status": "PROCESSABLE"
+      }
+    },
+    "runtime_qualification_scope": "Reference-host synthetic-only engineering qualification; no scientific or recipient-device acceptance.",
+    "interpreter_observation": {
+      "implementation": "CPython",
+      "version": "3.12.16",
+      "inventory_scope": "Interpreter executable and standard-library bytes are covered by the separate /usr/local file/link inventory; not a standalone SBOM component."
+    },
+    "sbom_scope": "55 Alpine OS/APK and installed Python-distribution package entries; package license annotations are incomplete. Separate 21-file license hash inventory does not claim complete license metadata for every component or the interpreter.",
+    "combined_synthetic_acceptance": {
+      "new_image_successful_attempts": 14,
+      "historical_successful_attempts_by_image": {
+        "sha256:f1b8a731643bc0691849d5f82761a7fe9d7f7e658a2c19eb4e94c3e2c6f54b39": 2,
+        "sha256:954ca79b9c06811911b3d68ceb90a3b7ca85bdb509b1e09b5c17ba7c1c603129": 12
+      },
+      "exact_reference_target_scores": [
+        0.0,
+        8.3
+      ],
+      "exact_reference_document_model_score": 4.2,
+      "verified_score": null,
+      "prior_immutable_rows_unchanged": {
+        "attempts": 14,
+        "evaluations": 14,
+        "experimental_summaries": 28
+      },
+      "reference_marker_absent_from_all_28_manifests": true,
+      "mounted_browser_workflow": "PASS"
+    },
+    "last_restart_check_utc": "2026-11-06T00:03:19.416987+00:00"
   },
   "python_dependencies": [
-    ["annotated-types", "0.8.0", "MIT"],
-    ["cffi", "2.1.1", "MIT-0"],
-    ["charset-normalizer", "3.5.2", "MIT"],
-    ["cryptography", "50.0.2", "Apache-2.0 OR BSD-3-Clause"],
-    ["pdfminer-six", "20260107", "MIT"],
-    ["pdfplumber", "0.11.10", "MIT"],
-    ["pillow", "13.0.0", "MIT-CMU"],
-    ["pycparser", "3.11", "BSD-3-Clause"],
-    ["pydantic", "2.14.0", "MIT"],
-    ["pydantic-core", "2.50.0", "MIT"],
-    ["pypdf", "6.21.4", "BSD-3-Clause"],
-    ["pypdfium2", "5.14.0", "BSD-3-Clause AND Apache-2.0 AND bundled component licenses"],
-    ["reportlab", "4.5.1", "BSD-3-Clause-like"],
-    ["typing-extensions", "4.16.0", "PSF-2.0"],
-    ["typing-inspection", "0.4.4", "MIT"]
+    [
+      "annotated-types",
+      "0.8.0",
+      "MIT"
+    ],
+    [
+      "cffi",
+      "2.1.1",
+      "MIT-0"
+    ],
+    [
+      "charset-normalizer",
+      "3.5.2",
+      "MIT"
+    ],
+    [
+      "cryptography",
+      "50.0.2",
+      "Apache-2.0 OR BSD-3-Clause"
+    ],
+    [
+      "pdfminer-six",
+      "20260107",
+      "MIT"
+    ],
+    [
+      "pdfplumber",
+      "0.11.10",
+      "MIT"
+    ],
+    [
+      "pillow",
+      "13.0.0",
+      "MIT-CMU"
+    ],
+    [
+      "pycparser",
+      "3.11",
+      "BSD-3-Clause"
+    ],
+    [
+      "pydantic",
+      "2.14.0",
+      "MIT"
+    ],
+    [
+      "pydantic-core",
+      "2.50.0",
+      "MIT"
+    ],
+    [
+      "pypdf",
+      "6.21.4",
+      "BSD-3-Clause"
+    ],
+    [
+      "pypdfium2",
+      "5.14.0",
+      "BSD-3-Clause AND Apache-2.0 AND bundled component licenses"
+    ],
+    [
+      "reportlab",
+      "4.5.1",
+      "BSD-3-Clause-like"
+    ],
+    [
+      "typing-extensions",
+      "4.16.0",
+      "PSF-2.0"
+    ],
+    [
+      "typing-inspection",
+      "0.4.4",
+      "MIT"
+    ]
   ],
-  "python_package_advisory_check": "PyPI JSON reported zero known vulnerabilities for every exact version at audited_at. The previous Pillow 12.3.0 and pypdf 6.20.0 pins were rejected and replaced before acquisition."
+  "python_package_advisory_check": "PyPI JSON reported zero known vulnerabilities for every exact version at audited_at. The previous Pillow 12.3.0 and pypdf 6.20.0 pins were rejected and replaced before acquisition.",
+  "requalified_at": "2026-11-05T22:41:34Z",
+  "rebuild_storage": {
+    "initial_free_bytes": 13598306304,
+    "minimum_free_bytes_during_successful_build": 14829076480,
+    "required_reserve_bytes": 8589934592,
+    "projected_incremental_bytes_ceiling": 536870912,
+    "dependency_image_unique_cache_bytes_before": 170329968,
+    "no_downloads": true,
+    "final_review_wave": {
+      "free_bytes_before_build": 14830002176,
+      "minimum_free_bytes_during_build": 14829076480,
+      "pdf_runtime_kib_before_build": 6980060,
+      "model_runtime_kib_before_build": 1557540,
+      "source_kib_before_build": 664,
+      "node_modules_kib_before_build": 51272,
+      "projected_incremental_limit_bytes": 536870912,
+      "minimum_reserve_bytes": 8589934592,
+      "downloads": false
+    }
+  },
+  "v2_dependency_inventory_verification": "Complete /usr/local file/link inventory, all license file hashes, installed Python versions, and APK package/version/license inventory observed inside both exact images and matched; unchanged acquisition/source and advisory observations remain dated audited_at, not a new advisory scan."
 }

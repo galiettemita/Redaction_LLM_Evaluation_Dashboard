@@ -250,3 +250,137 @@ def test_store_rejects_fictional_task4_source_binding(tmp_path: Path) -> None:
             job.job_id, owner="worker", status=ProcessingStatus.READY,
             page_count=1, source_id="fictional-source", reason_code=None,
         )
+
+
+def _reference_work(store):
+    from hashlib import sha256
+    from redaction_lab.application.worker_protocol import WorkerResponse, WORKER_PROTOCOL_VERSION
+    upload = store.register_upload(project_id="project", role=DocumentRole.REFERENCE,
+                                   artifact_key="reference.pdf", sha256="c" * 64, byte_size=12)
+    job = store.claim_next(owner="worker", now=datetime.now(UTC))
+    response = WorkerResponse(protocol_version=WORKER_PROTOCOL_VERSION, request_nonce="a" * 32,
+                              project_id="project", role=DocumentRole.REFERENCE,
+                              input_sha256="c" * 64, status="PROCESSABLE", page_count=1,
+                              reference_text="isolated reference", reference_hash=sha256(b"isolated reference").hexdigest(),
+                              reference_canonicalizer_version="safe-exact-visible-text-v1")
+    store.record_runtime(job.job_id, owner="worker", request_nonce=response.request_nonce,
+                         protocol_version=response.protocol_version, image_digest="sha256:" + "d" * 64,
+                         page_count=1)
+    return upload, job, response
+
+
+def test_reference_source_is_immutable_bound_and_recoverable_without_task4(tmp_path):
+    store = _store(tmp_path)
+    upload, job, response = _reference_work(store)
+    assert store.reference_source(upload.version_id) is None
+    source = store.record_reference_source(job.job_id, owner="worker", response=response)
+    assert source.version_id == upload.version_id
+    assert source.canonical_text == "isolated reference"
+    assert source.provenance == "USER_SUPPLIED_EXPERIMENTAL"
+    assert store.record_reference_source(job.job_id, owner="worker", response=response) == source
+    assert store.recover_interrupted(now=datetime.now(UTC)) == (job.job_id,)
+    reopened = _store(tmp_path)
+    assert reopened.reference_source(upload.version_id) == source
+    assert reopened.get_job(job.job_id).status is ProcessingStatus.READY
+    assert reopened.get_version(upload.version_id).source_id is None
+    with store.connect() as connection:
+        assert not connection.execute("SELECT 1 FROM sqlite_master WHERE name='canonical_sources'").fetchone()
+        for sql in ("UPDATE reference_sources SET canonical_text='tampered'", "DELETE FROM reference_sources"):
+            with pytest.raises(sqlite3.IntegrityError, match="immutable"):
+                connection.execute(sql)
+
+
+def test_reference_source_rejects_wrong_binding_and_missing_ready_evidence(tmp_path):
+    store = _store(tmp_path)
+    upload, job, response = _reference_work(store)
+    for field, value in (("request_nonce", "b" * 32), ("project_id", "other"),
+                         ("input_sha256", "e" * 64), ("page_count", 2)):
+        with pytest.raises(ValueError, match="binding"):
+            store.record_reference_source(job.job_id, owner="worker", response=response.model_copy(update={field: value}))
+    with pytest.raises(ValueError, match="reference source"):
+        store.complete_job(job.job_id, owner="worker", status=ProcessingStatus.READY,
+                           page_count=1, source_id=None, reason_code=None)
+    store.recover_interrupted(now=datetime.now(UTC))
+    assert store.get_job(job.job_id).status is ProcessingStatus.FAILED
+    assert store.reference_source(upload.version_id) is None
+
+
+def test_reference_source_read_rejects_tampering_even_after_sql_guards_removed(tmp_path):
+    store = _store(tmp_path)
+    upload, job, response = _reference_work(store)
+    store.record_reference_source(job.job_id, owner="worker", response=response)
+    with store.connect() as connection:
+        connection.execute("DROP TRIGGER reference_sources_no_update")
+        connection.execute("UPDATE reference_sources SET canonical_text='tampered'")
+    with pytest.raises(ValueError):
+        store.reference_source(upload.version_id)
+    store.recover_interrupted(now=datetime.now(UTC))
+    assert store.get_job(job.job_id).status is ProcessingStatus.FAILED
+
+
+def test_pair_lookup_preserves_untrusted_reference_binding(tmp_path):
+    store = _store(tmp_path)
+    redacted = store.register_upload(project_id="project", role=DocumentRole.REDACTED,
+                                     artifact_key="redacted.pdf", sha256="a" * 64, byte_size=10)
+    reference = store.register_upload(project_id="project", role=DocumentRole.REFERENCE,
+                                      artifact_key="reference.pdf", sha256="b" * 64, byte_size=10)
+    pair = store.create_pair(project_id="project", redacted_version_id=redacted.version_id,
+                              reference_version_id=reference.version_id)
+    assert store.get_pair(pair.pair_id) == pair
+    assert store.pairs_for_redacted(redacted.version_id) == (pair,)
+    assert not pair.truth_trusted
+    with pytest.raises(KeyError):
+        store.get_pair("missing")
+
+
+def test_reference_source_sql_replace_cannot_overwrite_committed_evidence(tmp_path):
+    store = _store(tmp_path)
+    _, job, response = _reference_work(store)
+    store.record_reference_source(job.job_id, owner="worker", response=response)
+    with store.connect() as connection:
+        with pytest.raises(sqlite3.IntegrityError, match="immutable"):
+            connection.execute("INSERT OR REPLACE INTO reference_sources SELECT * FROM reference_sources")
+
+
+def _paired_queue(store):
+    redacted = store.register_upload(project_id='paired', role=DocumentRole.REDACTED,
+        artifact_key='redacted', sha256='a'*64, byte_size=10)
+    reference = store.register_upload(project_id='paired', role=DocumentRole.REFERENCE,
+        artifact_key='reference', sha256='b'*64, byte_size=10)
+    store.create_pair(project_id='paired', redacted_version_id=redacted.version_id, reference_version_id=reference.version_id)
+    later = store.register_upload(project_id='paired', role=DocumentRole.REDACTED,
+        artifact_key='later', sha256='c'*64, byte_size=10)
+    return redacted, reference, later
+
+
+def test_explicit_paired_reference_can_precede_later_redacted_only_after_terminal_pair(tmp_path):
+    store = _store(tmp_path)
+    redacted, reference, later = _paired_queue(store)
+    now = datetime.now(UTC)
+    assert store.claim_next(owner='worker', now=now, expected_job_id=reference.job_id) is None
+    job = store.claim_next(owner='worker', now=now, expected_job_id=redacted.job_id)
+    assert job.job_id == redacted.job_id
+    assert store.claim_next(owner='other', now=now, expected_job_id=reference.job_id) is None
+    store.complete_job(job.job_id, owner='worker', status=ProcessingStatus.NO_REDACTIONS,
+        page_count=1, source_id=None, reason_code='NO_SUPPORTED_TARGETS')
+    claimed = store.claim_next(owner='worker', now=now, expected_job_id=reference.job_id)
+    assert claimed is not None and claimed.job_id == reference.job_id
+    assert store.get_job(later.job_id).status is ProcessingStatus.ACCEPTED
+
+
+def test_explicit_reference_and_normal_redacted_claim_race_has_one_winner(tmp_path):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier
+    store = _store(tmp_path)
+    redacted, reference, later = _paired_queue(store)
+    job = store.claim_next(owner='first', now=datetime.now(UTC))
+    store.complete_job(job.job_id, owner='first', status=ProcessingStatus.NO_REDACTIONS,
+        page_count=1, source_id=None, reason_code='NO_SUPPORTED_TARGETS')
+    barrier = Barrier(2)
+    def claim(expected):
+        barrier.wait()
+        return store.claim_next(owner=str(expected), now=datetime.now(UTC), expected_job_id=expected)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        claims = list(pool.map(claim, (reference.job_id, later.job_id)))
+    assert sum(value is not None for value in claims) == 1
+    assert sum(store.get_job(key).status is ProcessingStatus.PROCESSING for key in (reference.job_id, later.job_id)) == 1

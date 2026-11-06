@@ -465,3 +465,38 @@ def test_run_identity_binds_canonical_and_ordered_target_provenance(
         observed.append(changed.run_id)
 
     assert len(set(observed + [baseline.run_id])) == len(variants) + 1
+
+
+def test_new_runs_use_prompt_v2_and_terminal_v04_runs_remain_readable(tmp_path, monkeypatch):
+    app_store, run_store, version_id, source = _ready_source(tmp_path)
+    service = PredictionService(app_store)
+    adapter = RecordingAdapter(run_store)
+    with monkeypatch.context() as old:
+        old.setattr(prediction_service, 'PROMPT_VERSION', 'prompt-v1')
+        old.setattr(prediction_service, 'RUN_VERSION', 'run-v0.4')
+        old.setattr(prediction_service, 'SERVICE_ID', 'application-prediction-service-v0.4')
+        _, legacy = service._run_definition(version_id, model_config_id=adapter.model_config_id,
+            model_manifest_digest='sha256:'+'a'*64)
+    ids = [run_store.enqueue(source.source_id, target.target_id, legacy) for target in source.targets]
+    for job_id in ids:
+        asyncio.run(run_job_once(run_store, adapter, job_id))
+    before = service.results(version_id)
+    assert len(before) == 2
+    assert asyncio.run(service.run(version_id)) == tuple(ids)
+    assert service.results(version_id) == before
+    _, fresh = service._run_definition(version_id, model_config_id=adapter.model_config_id,
+        model_manifest_digest='sha256:'+'a'*64)
+    assert fresh.prompt_version == 'prompt-v2'
+    assert fresh.run_id != legacy.run_id
+
+
+def test_progress_counts_frozen_intents_and_in_doubt_without_dispatch(tmp_path, monkeypatch):
+    app_store, run_store, version_id, _ = _ready_source(tmp_path)
+    service = PredictionService(app_store)
+    assert service.progress(version_id) == {'total': 0, 'pending': 0, 'running': 0, 'terminal': 0}
+    adapter = RecordingAdapter(run_store, crash=True)
+    monkeypatch.setattr(prediction_service.InferenceRuntime, 'verified', lambda self: _verified(adapter))
+    with pytest.raises(RuntimeError):
+        asyncio.run(service.run(version_id))
+    assert service.progress(version_id) == {'total': 2, 'pending': 1, 'running': 0, 'terminal': 1}
+    assert len(adapter.manifests) == 1

@@ -760,3 +760,106 @@ def test_authoritative_comparison_rejects_mixed_v2_and_v3_semantics() -> None:
 
     with pytest.raises(SummaryCompatibilityError, match="summary_schema_version"):
         assert_comparable_summaries(v2, v3)
+
+
+def _experimental_cells(tmp_path):
+    from dataclasses import replace
+    from test_evaluation_store import _experimental_inputs, PROJECT_ID
+    from redaction_lab.evaluator import evaluate_experimental_attempt
+    from redaction_lab.contracts import ExperimentalSummaryCell
+    inputs, mapping = _experimental_inputs(tmp_path)
+    resolved = inputs[1].resolve_attempt(inputs[5].attempt_id, project_id=PROJECT_ID)
+    exact = evaluate_experimental_attempt(resolved, mapping, created_at=NOW)
+    # Distinct target in the same document, zero lexical overlap but identical
+    # empty critical sets would give 15; here capitalized entities disagree => 0.
+    target = resolved.source.targets[1]
+    second_mapping = mapping.model_copy(update={
+        'mapping_id': 'second-mapping', 'target_id': target.target_id,
+        'target_version': target.target_version, 'exact_revealed_text': 'Qqqq',
+    })
+    second = replace(resolved, job=replace(resolved.job, job_id='second-job'), attempt=resolved.attempt.model_copy(update={
+        'attempt_id': 'second-attempt', 'target_id': target.target_id,
+        'target_version': target.target_version, 'prediction': 'Zzzz',
+    }), manifest=resolved.manifest.model_copy(update={
+        'target_id': target.target_id, 'target_version': target.target_version,
+    }))
+    zero = evaluate_experimental_attempt(second, second_mapping, created_at=NOW)
+    assert zero.experimental_score == 0.0
+    return ExperimentalSummaryCell.from_evaluation(exact), ExperimentalSummaryCell.from_evaluation(zero)
+
+
+def test_experimental_document_equal_target_mean_and_counts(tmp_path):
+    from redaction_lab.summary import build_experimental_summary
+    from redaction_lab.contracts import ExperimentalSummaryCell
+    exact, zero = _experimental_cells(tmp_path)
+    base = {**exact.model_dump(), 'evaluation': None}
+    pending = ExperimentalSummaryCell.model_validate({**base, 'intent_id': 'pending',
+        'target_id': 'pending-target', 'target_version': 'pending-v1', 'mapping': None, 'status': 'PENDING'})
+    timeout = ExperimentalSummaryCell.model_validate({**base, 'intent_id': 'timeout',
+        'target_id': 'timeout-target', 'target_version': 'timeout-v1', 'mapping': None, 'status': 'IN_DOUBT'})
+    summary = build_experimental_summary((exact, zero, pending, timeout), summary_level='DOCUMENT',
+        excluded_candidate_ids=('unsupported-a', 'unsupported-a'))
+    assert summary.experimental_score == 50.0
+    assert summary.denominator == 2
+    assert summary.counts.model_dump() == {'requested': 4, 'eligible': 2, 'scored': 2,
+        'unknown': 2, 'excluded': 1, 'technical_failures': 1}
+    assert summary.verified_score is None
+    reordered = build_experimental_summary((timeout, zero, exact, pending), summary_level='DOCUMENT',
+        excluded_candidate_ids=('unsupported-a',))
+    assert reordered == summary
+
+
+def test_experimental_model_equal_document_mean_not_pooled_targets(tmp_path):
+    from redaction_lab.summary import build_experimental_summary, build_experimental_model_summary
+    from redaction_lab.contracts import ExperimentalSummaryCell
+    exact, zero = _experimental_cells(tmp_path)
+    first = build_experimental_summary((exact, zero), summary_level='DOCUMENT')
+    # Same immutable evidence cannot be silently reassigned to a document.
+    # A second isolated source uses a distinct source and target snapshot.
+    payload = exact.model_dump()
+    payload['document_version_id'] = 'document-b'
+    payload['intent_id'] = 'intent-b'
+    payload['evaluation']['redacted_document_version_id'] = 'document-b'
+    payload['evaluation']['mapping']['redacted_document_version_id'] = 'document-b'
+    payload['evaluation']['evaluation_id'] = 'evaluation-b'
+    payload['mapping']['redacted_document_version_id'] = 'document-b'
+    second_cell = ExperimentalSummaryCell.model_validate(payload)
+    second = build_experimental_summary((second_cell,), summary_level='DOCUMENT')
+    model = build_experimental_model_summary((first, second))
+    assert model.experimental_score == 75.0  # (50 + 100)/2, not (100+0+100)/3
+    assert model.denominator == 2
+    assert model.document_count == 2
+    assert model.counts.scored == 3
+    assert set(model.member_ids) == {first.summary_id, second.summary_id}
+
+
+def test_experimental_zero_denominator_and_incompatible_models(tmp_path):
+    from redaction_lab.summary import build_experimental_summary, build_experimental_model_summary
+    from redaction_lab.contracts import ExperimentalSummaryCell
+    exact, _ = _experimental_cells(tmp_path)
+    empty = build_experimental_summary((), summary_level='DOCUMENT', profile=exact.profile,
+        scope_id=exact.document_version_id, excluded_candidate_ids=('unsupported',))
+    assert empty.experimental_score is None
+    assert empty.denominator == 0
+    assert empty.counts.excluded == 1
+    assert empty.score_status.value == 'NONE'
+    assert build_experimental_model_summary((empty,)).experimental_score is None
+    other = ExperimentalSummaryCell.model_validate({**exact.model_dump(), 'evaluation': None,
+        'mapping': None, 'status': 'PENDING', 'profile': {**exact.profile.model_dump(), 'model_id': 'other'}})
+    with pytest.raises(ValueError, match='incompatible'):
+        build_experimental_summary((exact, other), summary_level='DOCUMENT')
+    with pytest.raises(ValueError, match='duplicate'):
+        build_experimental_summary((exact, exact), summary_level='DOCUMENT')
+
+
+@pytest.mark.parametrize('status', ['REFUSED', 'TIMEOUT', 'MALFORMED', 'ERROR', 'IN_DOUBT'])
+def test_experimental_eligible_failures_remain_in_eligible_counts_not_scores(tmp_path, status):
+    from redaction_lab.contracts import ExperimentalSummaryCell
+    from redaction_lab.summary import build_experimental_summary
+    exact, _ = _experimental_cells(tmp_path)
+    failed = ExperimentalSummaryCell.model_validate({**exact.model_dump(), 'evaluation': None, 'status': status})
+    summary = build_experimental_summary((failed,), summary_level='TARGET')
+    assert summary.counts.model_dump() == {'requested': 1, 'eligible': 1, 'scored': 0,
+        'unknown': 0, 'excluded': 0, 'technical_failures': 1}
+    assert summary.experimental_score is None
+    assert summary.denominator == 0

@@ -20,9 +20,9 @@ LOCAL = ROOT / "packaging" / "local"
 HTTP = build_opener(ProxyHandler({}))
 CHROME = Path("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")
 GENUINE_ASSETS = {
-    "/": ("web/dist/index.html", "ec263a9100e23363eab5ff019f14c87a83133ff4a3f56b6400242856e539076e"),
-    "/assets/index-cs0q5swb.css": ("web/dist/assets/index-cs0q5swb.css", "f9558242c5506edadbfb433d023544e9ed93642dbfde2629217e100845b55706"),
-    "/assets/index-aQq_IaFa.js": ("web/dist/assets/index-aQq_IaFa.js", "cafc2c373b5e3210a462c16eb67f818d669a7322e8d3a8ac2c9d9f48f72142cc"),
+    "/assets/index-BfjntY5Y.js": ("web/dist/assets/index-BfjntY5Y.js", "b51e9a86ebf73cfd45eb5db3c5324652872550b333b144a495394070c97cf533"),
+    "/assets/index-DOfTYw_4.css": ("web/dist/assets/index-DOfTYw_4.css", "93b1e6178c23c09e35b4b9a84888a4c32f5a1c92cabe6b80611ec792ecd6d1e4"),
+    "/": ("web/dist/index.html", "95ef232ffb8ecc6cef2a6e44ea438dab2811d01bf72b2daecce2cf46180ece7e"),
 }
 
 
@@ -57,7 +57,7 @@ def package(tmp_path):
 
 def environment(tmp_path, **updates):
     env = os.environ.copy()
-    for key in ("REDACTION_LAB_HOST", "REDACTION_LAB_PORT", "PYTHONPATH", "PYTHONHOME"):
+    for key in (*[key for key in env if key.startswith("REDACTION_LAB_")], "PYTHONPATH", "PYTHONHOME"):
         env.pop(key, None)
     env.update(REDACTION_LAB_PYTHON=sys.executable,
                REDACTION_LAB_HOME=str(tmp_path / "local state"))
@@ -307,7 +307,7 @@ def test_synthetic_loopback_api_upload_fail_closed_and_restart(package, tmp_path
                 connection.sendall(raw)
                 reply = connection.recv(4096)
                 assert reply.split(b"\r\n")[0].split()[1] == b"400"
-        assert health == {"api_version": "0.2", "state": "DEGRADED", "runtime_qualified": False, "mode": "local"}
+        assert health == {"api_version": "0.3", "state": "DEGRADED", "runtime_qualified": False, "mode": "local"}
         status, _ = request(base + "/api/v1/health", headers={"Host": "localhost"})
         assert status == 400
         status, _ = request(base + "/api/v1/health", headers={"Origin": "https://example.org"})
@@ -349,7 +349,7 @@ def test_synthetic_loopback_api_upload_fail_closed_and_restart(package, tmp_path
         process.communicate(timeout=5)
 
 
-def test_existing_chrome_cli_renders_the_genuine_same_origin_application(package, tmp_path):
+def test_existing_chrome_cli_renders_experimental_workspace_against_v03_api(package, tmp_path):
     if not CHROME.is_file():
         pytest.skip("Existing Google Chrome CLI is unavailable")
     with socket.socket() as reservation:
@@ -368,18 +368,14 @@ def test_existing_chrome_cli_renders_the_genuine_same_origin_application(package
         assert "<title>Redaction Lab — local document workspace</title>" in browser.stdout
         assert "Every passage. Clear uncertainty." in browser.stdout
         assert 'id="runtime-title">Local service connected</h2>' in browser.stdout
-        assert "Unqualified work fails closed without a substitute prediction." in browser.stdout
-        assert "No verified or experimental score is available." in browser.stdout
-        assert 'id="demo-title">Experimental text-only demo</h2>' in browser.stdout
-        assert "Plausible guesses are not proven correct." in browser.stdout
-        assert 'id="demo-text"' in browser.stdout
-        assert "Manually entered demo text" in browser.stdout
-        assert "Generate demo candidates" in browser.stdout
-        assert "Clear text and remove results" in browser.stdout
-        assert "Uploaded PDFs and references never fill this field." in browser.stdout
-        # Initial rendering must not invent candidates before manual submission.
-        assert "Unvalidated candidate phrases" not in browser.stdout
-        assert 'class="demo-marker"' not in browser.stdout
+        assert "EXPERIMENTAL — NOT SCIENTIFICALLY VALIDATED" in browser.stdout
+        assert "Verified accuracy remains unknown." in browser.stdout
+        assert "Qwen2.5 1.5B" in browser.stdout
+        assert "select the PDF again" in browser.stdout
+        assert 'id="demo-text"' not in browser.stdout
+        assert "Generate demo candidates" not in browser.stdout
+        assert "Status refresh failed" not in browser.stdout
+        assert "API v0.3" in browser.stdout
     finally:
         process.terminate()
         process.communicate(timeout=5)
@@ -394,4 +390,91 @@ def test_occupied_port_rejects_launch_before_creating_state(package, tmp_path):
         result = run(package, "launch.sh", env)
     assert result.returncode != 0
     assert "STARTUP_FAILED" in result.stderr
+    assert not Path(env["REDACTION_LAB_HOME"]).exists()
+
+
+def gateway_environment(tmp_path, **updates):
+    return environment(tmp_path, REDACTION_LAB_PYTHON=simulated_python(tmp_path),
+        REDACTION_LAB_PORT="8765", REDACTION_LAB_GATEWAY="1",
+        REDACTION_LAB_PUBLIC_HOST="demo.example.invalid",
+        REDACTION_LAB_GATEWAY_USERNAME="synthetic-owner",
+        REDACTION_LAB_GATEWAY_PASSWORD="synthetic-test-password-0123456789", **updates)
+
+
+def test_gateway_check_requires_private_config_and_fixed_application_port(package, tmp_path):
+    env = gateway_environment(tmp_path)
+    result = run(package, "preflight.sh", env)
+    assert result.returncode == 0
+    report = json.loads(result.stdout)
+    assert report["gateway"] == {"enabled": True, "host": "127.0.0.1", "port": 8766}
+    assert "synthetic-owner" not in result.stdout and "demo.example.invalid" not in result.stdout
+    for key, value in [("REDACTION_LAB_GATEWAY_PASSWORD", ""), ("REDACTION_LAB_PORT", "8767"),
+                       ("REDACTION_LAB_GATEWAY", "maybe")]:
+        result = run(package, "preflight.sh", {**env, key: value})
+        assert result.returncode != 0
+        assert json.loads(result.stdout)["error"]["code"] == "GATEWAY_CONFIG_INVALID"
+    assert not Path(env["REDACTION_LAB_HOME"]).exists()
+
+
+def test_gateway_port_is_reserved_before_state_creation(package, tmp_path):
+    with socket.socket() as occupied:
+        occupied.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        occupied.bind(("127.0.0.1", 8766))
+        occupied.listen()
+        env = gateway_environment(tmp_path)
+        result = run(package, "launch.sh", env)
+    assert result.returncode != 0
+    assert "STARTUP_FAILED" in result.stderr
+    assert not Path(env["REDACTION_LAB_HOME"]).exists()
+
+
+def test_gateway_launch_serves_exact_assets_and_shuts_down_both_ports(package, tmp_path):
+    import base64
+    env = gateway_environment(tmp_path)
+    process, base, health = start(package, env)
+    try:
+        token = base64.b64encode(b"synthetic-owner:synthetic-test-password-0123456789").decode()
+        with HTTP.open(Request("http://127.0.0.1:8766/", headers={
+            "Host": "demo.example.invalid", "Authorization": "Basic " + token,
+        }), timeout=3) as response:
+            assert response.read() == (package / "web/dist/index.html").read_bytes()
+            assert response.headers["Strict-Transport-Security"] == "max-age=31536000"
+        status, _ = request("http://127.0.0.1:8766/", headers={"Host": "demo.example.invalid"})
+        assert status == 401
+        assert health["api_version"] == "0.3"
+        body = (b'--synthetic\r\nContent-Disposition: form-data; name="project_id"\r\n\r\nsynthetic-gateway\r\n'
+                b'--synthetic\r\nContent-Disposition: form-data; name="redacted_pdf"; filename="synthetic.pdf"\r\n'
+                b'Content-Type: application/pdf\r\n\r\n%PDF-1.4\nsynthetic-only\r\n--synthetic--\r\n')
+        status, uploaded = request("http://127.0.0.1:8766/api/v1/documents", method="POST", body=body,
+            headers={"Host": "demo.example.invalid", "Authorization": "Basic " + token,
+                "Origin": "https://demo.example.invalid", "Content-Type": "multipart/form-data; boundary=synthetic"})
+        assert status == 201, uploaded
+    finally:
+        process.terminate()
+        stdout, stderr = process.communicate(timeout=5)
+    assert "synthetic-owner" not in stdout + stderr
+    for port in (8765, 8766):
+        with socket.socket() as connection:
+            assert connection.connect_ex(("127.0.0.1", port)) != 0
+
+
+@pytest.mark.parametrize("kind", ["relative", "missing", "symlink", "writable", "empty-inventory"])
+def test_explicit_runtime_root_requires_trusted_complete_artifacts(package, tmp_path, kind):
+    runtime = tmp_path / "runtime"
+    runtime.mkdir(mode=0o700)
+    configured = str(runtime)
+    if kind == "relative":
+        configured = "runtime"
+    elif kind == "missing":
+        configured = str(runtime / "missing")
+    elif kind == "symlink":
+        link = tmp_path / "runtime-link"
+        link.symlink_to(runtime, target_is_directory=True)
+        configured = str(link)
+    elif kind == "writable":
+        runtime.chmod(0o777)
+    env = environment(tmp_path, REDACTION_LAB_PYTHON=simulated_python(tmp_path), REDACTION_LAB_RUNTIME_ROOT=configured)
+    result = run(package, "preflight.sh", env)
+    assert result.returncode != 0
+    assert json.loads(result.stdout)["error"]["code"] == "RUNTIME_FILES_UNVERIFIED"
     assert not Path(env["REDACTION_LAB_HOME"]).exists()
