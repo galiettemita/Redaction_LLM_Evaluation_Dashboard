@@ -4,6 +4,8 @@ This file is the Lead-maintained routing/index record. Each specialist writes a 
 
 ## Initial inbox
 
+| E0073 / RL-LINK-017 Correction 01 | Codex Engineering Lead -> owner / QA / operator | MERGED; DEPLOYED | [Correction handoff](handoffs/RL-LINK-017-lead-20261106T154819Z-93ae727.md): strict bounded browser upload framing, worker source refresh, 979 Python / 56 Node, independent review PASS, PR #17 merge `93ae727`, external no-length synthetic upload and same-attempt restart acceptance. Private link credentials remain out of Git. |
+
 | E0072 / RL-LINK-017 external delivery | Codex Engineering Lead -> owner | MERGED; DEPLOYED EXPERIMENTAL DEMO | [Delivery handoff](handoffs/RL-LINK-017-lead-20261106T002131Z-live.md): PR #13 merge `67a71ab`, external two-layer authentication checks, genuine-Qwen scored synthetic workflow and GET-only reconnect evidence. Private hostname/credentials are delivered out of Git. |
 
 | E0072 / final whole-branch review correction | Reviewers via Lead -> Task 6 implementer -> Lead re-review | CORRECTION READY; NOT-YET-INTEGRATED | [Exact `9aea516` review and correction record](handoffs/RL-EXP-015-final-review-9aea516.md): spaced-sign Important and provenance/checklist Minors addressed in `9e6c01f`; 956 Python / 55 Node, final image `03db44f`, 14 new genuine attempts. Independent exact correction acceptance and external delivery remain open. |

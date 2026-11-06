@@ -1,6 +1,6 @@
 # RL-LINK-017 Correction 01 — Browser chunked upload framing
 
-Task ID / state / single owner: RL-LINK-017 Correction 01 / APPROVED by the owner's 2026-11-06 durable-fix request and RL-OPS-002 / Codex Engineering Lead.
+Task ID / state / single owner: RL-LINK-017 Correction 01 / DEPLOYED after independent review, PR #17 integration and external synthetic acceptance / Codex Engineering Lead.
 
 Objective / non-goals: Correct authenticated browser uploads translated to chunked HTTP/1.1 at the tunnel boundary; preserve the fixed-length application API, exact Host/Origin/authentication, body bounds, reference isolation and immutable evidence. No proxy expansion, parser/model/scoring change, private-data test, dependency addition or paid resource.
 

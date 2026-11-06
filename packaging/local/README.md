@@ -154,8 +154,8 @@ nosniff, no-referrer and denied outer framing.
       on the reference host through a synthetic HTTPS origin mapped to loopback.
 - [x] Independent exact-candidate correction review passed with no Critical or
       Important findings.
-- [ ] Normal integration of the browser-upload correction.
-- [ ] Final authenticated external HTTPS acceptance and owner delivery.
+- [x] Browser-upload correction integrated through PR #17.
+- [x] Final authenticated external HTTPS synthetic acceptance and owner delivery.
 - [ ] Offline prerequisite/runtime bundle and clean second-device acceptance.
 - [ ] Scientific model roster, private-data authority and scoring validation.
 
