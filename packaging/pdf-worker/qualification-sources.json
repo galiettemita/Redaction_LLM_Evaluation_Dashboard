@@ -67,11 +67,11 @@
     }
   },
   "worker_image": {
-    "local_image_id": "sha256:e3b0add32b136443b470dbc2cadd5b7ddb4a3342da7b9cdb2589cd7094c7ce99",
-    "manifest_digest": "sha256:728d263a36523051ee9db9ad7af1e72c051c57152aaade9409b33646bf067363",
+    "local_image_id": "sha256:98599c2e1694c94d1f458b2c3b5cf458c121b2da3987eca6a52d2e7a445b4af4",
+    "manifest_digest": "sha256:8339a623e1d6f495dbce9b7b1afd2bcdd4b9575ac090c6f338a5d34a8e38424d",
     "architecture": "arm64",
     "os": "linux",
-    "size": 246710253,
+    "size": 246711274,
     "user": "65532:65532",
     "entrypoint": [
       "python",
@@ -81,7 +81,7 @@
     "protocol_version": "pdf-worker-v3",
     "build_policy": "Exact pinned OCR/Python dependency image; --pull=never --network=none; isolated source context; COPY --chmod=0555; independent qualification. No source-build downloads.",
     "dependency_source_image": "sha256:698f1a601c9f0465ac425a81790cb68d5d978430ad73207feb579e200a11c3ff",
-    "source_inventory_sha256": "b53dee3976cb0ef457508f1dd60adca1c0546b45f8c0ef740f0ed3cc4750805d",
+    "source_inventory_sha256": "1a735cf0a4d7515a9efa128af8c46ea4727516682b24eec26cf77ae679699964",
     "installed_inventory": {
       "usr_local_file_count": 3216,
       "usr_local_inventory_sha256": "796918201c671074182df724ba7a42fb59f5628bfbb595897c90be5a8653ddc5",
@@ -167,7 +167,7 @@
       }
     },
     "current_image_application_acceptance": {
-      "image_digest": "sha256:e3b0add32b136443b470dbc2cadd5b7ddb4a3342da7b9cdb2589cd7094c7ce99",
+      "image_digest": "sha256:98599c2e1694c94d1f458b2c3b5cf458c121b2da3987eca6a52d2e7a445b4af4",
       "status": "PENDING_POST_REVIEW_ACCEPTANCE",
       "scope": "Synthetic reference-host acceptance only; not scientific or recipient-device validation."
     }

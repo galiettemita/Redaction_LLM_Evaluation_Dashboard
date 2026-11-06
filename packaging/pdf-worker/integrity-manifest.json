@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-11-06T17:46:36Z",
+  "generated_at": "2026-11-06T17:55:47Z",
   "architecture": "linux/arm64",
   "artifacts": {
     "podman_installer": {
@@ -18,11 +18,11 @@
       "sha256": "5642cb13b1fc85462dec7ad9d954623a57fe1e65981e1508dff894942eaa8694"
     },
     "worker_image_id": {
-      "size": 246710253,
-      "sha256": "e3b0add32b136443b470dbc2cadd5b7ddb4a3342da7b9cdb2589cd7094c7ce99"
+      "size": 246711274,
+      "sha256": "98599c2e1694c94d1f458b2c3b5cf458c121b2da3987eca6a52d2e7a445b4af4"
     },
     "worker_image_manifest": {
-      "sha256": "728d263a36523051ee9db9ad7af1e72c051c57152aaade9409b33646bf067363"
+      "sha256": "8339a623e1d6f495dbce9b7b1afd2bcdd4b9575ac090c6f338a5d34a8e38424d"
     }
   },
   "wheelhouse": [
@@ -248,8 +248,8 @@
       "sha256": "8d220744936393635731052cf91eede69051c0d2470b2cade8e1ee9301285a27"
     },
     "src/redaction_lab/raster_analysis.py": {
-      "byte_size": 23645,
-      "sha256": "6ceae2bec3a8ada2bf23a6f383fc639cdf2acee9c42c8935c40e02d5680e9cec"
+      "byte_size": 25019,
+      "sha256": "2a04fa366ab93309351a60a71b05bbd14a0d0e6ee9a539ae6b2bcdd92f9da02d"
     },
     "src/redaction_lab/reference.py": {
       "byte_size": 50111,
@@ -283,5 +283,5 @@
     "license_file_count": 21,
     "license_inventory_sha256": "1048df2b689585e6b847f2150e30f59d46f13321fc0552b30877653a400d31b4"
   },
-  "source_inventory_sha256": "b53dee3976cb0ef457508f1dd60adca1c0546b45f8c0ef740f0ed3cc4750805d"
+  "source_inventory_sha256": "1a735cf0a4d7515a9efa128af8c46ea4727516682b24eec26cf77ae679699964"
 }

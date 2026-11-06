@@ -182,22 +182,45 @@ class PdfiumRasterRenderer:
         ]
         if len(image_calls) != 1 or str(image_calls[0][1][0]) != image_name:
             raise _RasterFailure("UNSAFE_RASTER_PDF")
-        image_index = image_calls[0][0]
-        transforms = [
-            tuple(float(value) for value in operands)
-            for operands, operator in operations[:image_index]
-            if operator == b"cm"
-        ]
-        if any(len(transform) != 6 for transform in transforms):
+        identity = (1.0, 0.0, 0.0, 1.0, 0.0, 0.0)
+
+        def concatenate(
+            current: tuple[float, float, float, float, float, float],
+            added: tuple[float, float, float, float, float, float],
+        ) -> tuple[float, float, float, float, float, float]:
+            a, b, c, d, e, f = current
+            g, h, i, j, k, l = added
+            return (
+                a * g + c * h,
+                b * g + d * h,
+                a * i + c * j,
+                b * i + d * j,
+                a * k + c * l + e,
+                b * k + d * l + f,
+            )
+
+        current = identity
+        stack: list[tuple[float, float, float, float, float, float]] = []
+        image_transform = None
+        for operands, operator in operations:
+            if operator == b"q":
+                stack.append(current)
+            elif operator == b"Q":
+                if not stack:
+                    raise _RasterFailure("UNSAFE_RASTER_PDF")
+                current = stack.pop()
+            elif operator == b"cm":
+                if len(operands) != 6:
+                    raise _RasterFailure("UNSAFE_RASTER_PDF")
+                transform = tuple(float(value) for value in operands)
+                if not all(isfinite(value) for value in transform):
+                    raise _RasterFailure("UNSAFE_RASTER_PDF")
+                current = concatenate(current, transform)  # type: ignore[arg-type]
+            elif operator == b"Do":
+                image_transform = current
+        if stack or image_transform is None:
             raise _RasterFailure("UNSAFE_RASTER_PDF")
-        non_identity = [
-            transform
-            for transform in transforms
-            if transform != (1.0, 0.0, 0.0, 1.0, 0.0, 0.0)
-        ]
-        if len(non_identity) != 1:
-            raise _RasterFailure("UNSAFE_RASTER_PDF")
-        a, b, c, d, e, f = non_identity[0]
+        a, b, c, d, e, f = image_transform
         if not all(isfinite(value) for value in (a, b, c, d, e, f)) or b or c or a <= 0 or d <= 0:
             raise _RasterFailure("UNSAFE_RASTER_PDF")
         crop = tuple(float(value) for value in page.cropbox)
@@ -217,12 +240,19 @@ class PdfiumRasterRenderer:
             b"Tj", b"TJ", b"Tw", b"Tz", b"TL", b"Ts", b"T*", b"'", b'"',
         }
         in_text = False
+        text_render_mode = 0
         for _operands, operator in operations:
             if operator == b"BT":
                 if in_text:
                     raise _RasterFailure("UNSAFE_RASTER_PDF")
                 in_text = True
             if operator not in (allowed_inside_text if in_text else allowed_outside_text):
+                raise _RasterFailure("UNSAFE_RASTER_PDF")
+            if operator == b"Tr":
+                if len(_operands) != 1 or int(_operands[0]) != 3:
+                    raise _RasterFailure("UNSAFE_RASTER_PDF")
+                text_render_mode = 3
+            if operator in {b"Tj", b"TJ", b"'", b'"'} and text_render_mode != 3:
                 raise _RasterFailure("UNSAFE_RASTER_PDF")
             if operator == b"ET":
                 if not in_text:

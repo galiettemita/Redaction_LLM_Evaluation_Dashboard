@@ -7,6 +7,7 @@ from PIL import Image, ImageDraw
 from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen.canvas import Canvas
 from pypdf import PdfReader, PdfWriter
+from pypdf.generic import DecodedStreamObject
 
 from redaction_lab.ocr import OcrPage, OcrWord
 from redaction_lab.raster_analysis import (
@@ -424,6 +425,50 @@ def test_small_image_placement_cannot_masquerade_as_a_scanned_page() -> None:
     output = BytesIO()
     canvas = Canvas(output, pagesize=(400, 300), invariant=1)
     canvas.drawImage(ImageReader(image), 10, 10, width=20, height=20)
+    canvas.save()
+    ocr = QueueOcr([])
+
+    result = analyze_reference_scan(
+        output.getvalue(), ocr_engine=ocr, renderer=PdfiumRasterRenderer()
+    )
+
+    assert result.status is RasterStatus.UNSUPPORTED
+    assert result.reason_code == "UNSAFE_RASTER_PDF"
+    assert ocr.calls == 0
+
+
+def test_restored_fake_transform_cannot_authorize_a_tiny_image() -> None:
+    image = Image.new("RGB", (1, 1), "black")
+    source = BytesIO()
+    canvas = Canvas(source, pagesize=(400, 300), invariant=1)
+    canvas.drawImage(ImageReader(image), 0, 0, width=1, height=1)
+    canvas.save()
+    reader = PdfReader(BytesIO(source.getvalue()))
+    original = reader.pages[0].get_contents().get_data()
+    replacement = DecodedStreamObject()
+    replacement.set_data(b"q 400 0 0 300 0 0 cm Q\n" + original)
+    output = BytesIO()
+    writer = PdfWriter()
+    writer.add_page(reader.pages[0])
+    writer.pages[0].replace_contents(replacement)
+    writer.write(output)
+    ocr = QueueOcr([])
+
+    result = analyze_reference_scan(
+        output.getvalue(), ocr_engine=ocr, renderer=PdfiumRasterRenderer()
+    )
+
+    assert result.status is RasterStatus.UNSUPPORTED
+    assert result.reason_code == "UNSAFE_RASTER_PDF"
+    assert ocr.calls == 0
+
+
+def test_painting_text_overlay_is_rejected_before_ocr() -> None:
+    image = Image.new("RGB", (400, 300), "white")
+    output = BytesIO()
+    canvas = Canvas(output, pagesize=(400, 300), invariant=1)
+    canvas.drawImage(ImageReader(image), 0, 0, width=400, height=300)
+    canvas.drawString(20, 20, "painted overlay")
     canvas.save()
     ocr = QueueOcr([])
 
