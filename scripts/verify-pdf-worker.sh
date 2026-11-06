@@ -81,6 +81,7 @@ nonce = secrets.token_hex(16)
 command = list(client._command(nonce))
 probe = """
 import os,json,socket,resource
+from io import BytesIO
 from pathlib import Path
 status=Path('/proc/self/status').read_text()
 assert os.getuid()==65532
@@ -102,18 +103,29 @@ assert Path('/sys/fs/cgroup/pids.max').read_text().strip()=='32'
 assert resource.getrlimit(resource.RLIMIT_NOFILE)==(64,64)
 assert Path('/sys/fs/cgroup/cpu.max').read_text().split()[0]!='max'
 from redaction_lab.experimental_scoring import score_text_agreement
+from redaction_lab.ocr import TesseractOcrEngine
+from reportlab.pdfgen.canvas import Canvas
+import pypdfium2 as pdfium
+ocr_pdf=BytesIO();ocr_canvas=Canvas(ocr_pdf,pagesize=(612,792),invariant=1)
+ocr_canvas.setFont('Helvetica',20);ocr_canvas.drawString(72,700,'Visible OCR qualification text')
+ocr_canvas.save()
+ocr_page=pdfium.PdfDocument(ocr_pdf.getvalue())[0]
+ocr_words=TesseractOcrEngine().recognize(ocr_page.render(scale=200/72).to_pil()).words
+assert any(word.text.casefold()=='visible' and word.confidence>=60 for word in ocr_words)
 for reference in ('Temperature was - 5 degrees.', 'Temperature was − 5 degrees.'):
  evidence=score_text_agreement(reference, 'Temperature was + 5 degrees.')
  assert evidence.experimental_score==60.0 and evidence.applied_caps==(60.0,)
  assert not evidence.subscores.normalized_exact_match and evidence.verified_score is None
-print(json.dumps({'isolation':'PASS'}))
+print(json.dumps({'isolation':'PASS','ocr_runtime':'PASS'}))
 """
 try:
     # Same runtime flags, replace only the executable entrypoint for the canary.
     command[-1:-1] = ['--entrypoint', 'python']
     code, output, _ = runner.run(tuple(command) + ('-c', probe), input_bytes=b'', timeout_seconds=15)
     assert code == 0, 'isolated policy probe failed'
-    assert json.loads(output)['isolation'] == 'PASS'
+    probe_result = json.loads(output)
+    assert probe_result['isolation'] == 'PASS'
+    assert probe_result['ocr_runtime'] == 'PASS'
     # Oversized framing is rejected with bounded output, and --rm cleans failure.
     client._verify_runtime()
     code, output, _ = runner.run(client._command(secrets.token_hex(16)),
@@ -141,5 +153,6 @@ print(json.dumps({'protocol_version': WORKER_PROTOCOL_VERSION, 'image_digest': p
     'reference_v2_protocol': 'PASS', 'redacted_source_excludes_covered_text': 'PASS',
     'reference_text_bounds': 'PASS', 'adversarial_isolation': 'PASS', 'signed_quantity_regression': 'PASS', 'failure_cleanup': 'PASS',
     'timeout_cleanup': 'PASS', 'covered_reference_excluded': 'PASS', 'reference_page_limit': 'PASS',
+    'ocr_runtime': 'PASS',
     'receipts': receipts}, sort_keys=True))
 PY

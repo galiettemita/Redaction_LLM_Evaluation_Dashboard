@@ -46,6 +46,8 @@ The owner delegated implementation choices and asked for autonomous completion, 
 
 Create `redaction_lab.document_analysis` as the worker-facing router. It exposes role-specific analysis results and a backend registry. The vector backend remains the first choice for documents it supports. Only explicit raster-eligible vector dispositions (`IMAGE_OR_ANNOTATION_CONTENT`, `NONDEFAULT_PAGE_BOUNDARY`, or `NO_VISIBLE_TEXT`) may fall through to the raster backend. Parser corruption, encryption, unsafe graphics, rotation, and other security dispositions never fall through.
 
+Fallback also requires a separate whole-document raster safety preflight. Every page—not merely the first page rejected by the vector detector—must be unrotated, annotation/action-free, bounded, and composed as one full-page image with only permitted text overlay operations. Form XObjects, multiple unrelated images, embedded actions/files, unsafe graphics, or a mixed page that cannot be classified fail closed before OCR.
+
 Each result carries its own `detector_version`, `canonicalizer_version`, analysis method, canonical text/hash, bounded target observations, and reason code. Adding another OCR engine later means registering a new versioned backend; it does not require changing API routes, storage tables, prediction adapters, evaluation code, or UI.
 
 ### OCR engine boundary
@@ -63,13 +65,15 @@ Create `redaction_lab.raster_analysis`:
 5. Treat each connected physical region as one immutable target. Separate horizontal bars remain separate targets, consistent with DEC-007.
 6. Remove OCR words intersecting a target and insert one marker at the target's reading-order position. Low-confidence or ambiguous pages fail closed; they never silently omit a target.
 
-The reference role runs the same renderer and OCR engine but never target detection. Its line-preserving OCR text is stored only in the existing reference-source/evaluation channel.
+The reference role runs the same renderer and OCR engine and an independent residual-occlusion check, but never prediction-target detection. Any text-like black region that may still hide reference content rejects that reference as partial/uncertain so every affected score remains null. Its line-preserving OCR text is stored only when all pages pass this completeness check, in the existing reference-source/evaluation channel.
 
 ### Provenance and compatibility
 
 Keep the current vector detector/canonicalizer versions. Add raster-specific versions and let `PredictionSourceMaterial` carry the selected pair. Worker target observations gain a strict analysis-method value. Prediction-source identity and validation derive from stored material versions rather than today's global constants, so old vector sources remain valid and new raster sources cannot masquerade as vector evidence.
 
 The internal PDF worker protocol is bumped because its observation schema and qualified runtime change. The public API remains v0.3. Historical attempts and failed jobs remain immutable; the corrected acceptance uses a new project/version.
+
+An additive database migration expands reference-source protocol/canonicalizer constraints without rewriting historical rows. Stored records are validated against the protocol and canonicalizer they were created with, so v2/vector references remain readable after v3/OCR ships and new combinations remain allowlisted.
 
 ### Error behavior
 
@@ -81,6 +85,8 @@ The internal PDF worker protocol is bumped because its observation schema and qu
 ## Testing and acceptance
 
 - TDD unit tests for the parser diagnostic allowlist, OCR parsing/bounds, connected-component geometry, text-flow validation, canonical marker invariants, backend routing, provenance, and legacy vector compatibility.
+- Coordinate tests convert top-origin rendered pixels through the effective rendered page boundary into the existing bottom-origin normalized target convention, cover nondefault crop boxes and multiple targets/pages, and prove worker markers bind to the same host-derived target IDs.
+- Reference tests reject a partially revealed scan with readable words on both sides of a residual black bar and keep every evaluation null.
 - Synthetic scanned PDFs built from generated text images; no private source files in tests.
 - Security tests for no reference channel in prediction material, no OCR stderr/content leakage, subprocess environment/timeout/output bounds, and unchanged container isolation.
 - Full Python, Node, typecheck, build, audit, source-integrity, SBOM, and worker qualification suites.

@@ -18,7 +18,7 @@ sys.path.insert(0, str(root / 'src'))
 from redaction_lab.application.inference_runtime import InferenceRuntime
 from redaction_lab.application.isolation import RuntimePolicy, SubprocessPodmanRunner
 
-source_image = 'sha256:7a78eaf7ef812d354f0abe13f40c6c0a4e3684d94f72002245c5249249bf293b'
+source_image = 'sha256:698f1a601c9f0465ac425a81790cb68d5d978430ad73207feb579e200a11c3ff'
 lock = InferenceRuntime._read_lock(root / 'packaging/pdf-worker/runtime.lock')
 runtime = InferenceRuntime._resolve_locked_path('runtime/pdf-worker')
 policy = RuntimePolicy(str(runtime / 'podman/bin/podman'), lock['podman_executable_sha256'],

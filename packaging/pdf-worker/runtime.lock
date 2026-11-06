@@ -9,7 +9,10 @@
   "machine_name": "redaction-lab-pdf-v1",
   "machine_image_digest": "sha256:633971788fcfe7df04f49da53f06c98b28933c5df2f684d57c2f9831411cac77",
   "base_image_digest": "sha256:5642cb13b1fc85462dec7ad9d954623a57fe1e65981e1508dff894942eaa8694",
-  "image_digest": "sha256:b4e126e3b710050ec2c425a8e2ff322d74cda4f1cdfed282bb62e50ef0574a3a",
+  "ocr_dependency_image_digest": "sha256:698f1a601c9f0465ac425a81790cb68d5d978430ad73207feb579e200a11c3ff",
+  "ocr_engine_version": "5.5.2",
+  "ocr_language": "eng",
+  "image_digest": "sha256:34893717ed476aaf6082a6d3cf0649c6de75e356121a2d67674769dc42dc63d5",
   "python_version": "3.12.16",
   "timeout_seconds": 60,
   "runtime_verified": true

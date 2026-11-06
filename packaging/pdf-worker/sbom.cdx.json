@@ -2,23 +2,23 @@
   "bomFormat": "CycloneDX",
   "specVersion": "1.5",
   "serialNumber": "urn:uuid:2c90bfa1-7d6f-4003-8281-fb87fbfc8072",
-  "version": 2,
+  "version": 3,
   "metadata": {
     "timestamp": "2026-11-06T15:33:34Z",
     "component": {
       "type": "container",
       "name": "redaction-lab-pdf-worker",
-      "version": "sha256:b4e126e3b710050ec2c425a8e2ff322d74cda4f1cdfed282bb62e50ef0574a3a",
+      "version": "sha256:34893717ed476aaf6082a6d3cf0649c6de75e356121a2d67674769dc42dc63d5",
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "b4e126e3b710050ec2c425a8e2ff322d74cda4f1cdfed282bb62e50ef0574a3a"
+          "content": "34893717ed476aaf6082a6d3cf0649c6de75e356121a2d67674769dc42dc63d5"
         }
       ],
       "properties": [
         {
           "name": "redaction-lab:image-manifest-digest",
-          "value": "sha256:873a9a3727020ffbea7590569f888f9fe4bec6ec3bf470f0cfb0c116d5fe16e1"
+          "value": "sha256:d32200c92611ea59ba02953556bb1c82ba18f25a633f28a8d0d76fb0c86c1626"
         },
         {
           "name": "redaction-lab:base-image-digest",
@@ -34,7 +34,7 @@
         },
         {
           "name": "redaction-lab:dependency-source-image",
-          "value": "sha256:7a78eaf7ef812d354f0abe13f40c6c0a4e3684d94f72002245c5249249bf293b"
+          "value": "sha256:698f1a601c9f0465ac425a81790cb68d5d978430ad73207feb579e200a11c3ff"
         },
         {
           "name": "redaction-lab:installed-dependency-inventory-sha256",
@@ -46,11 +46,11 @@
         },
         {
           "name": "redaction-lab:source-inventory-sha256",
-          "value": "ae10cdb098b4af29d33e27aaef23be6a9b746edc11223e9ff739ad2e404fac29"
+          "value": "9501eccc53d49e5de8bb3670a6e77d9beb348132d618dd03201d9d3a4f39b73a"
         },
         {
           "name": "redaction-lab:sbom-scope",
-          "value": "55 Alpine OS/APK and installed Python-distribution package entries; package license annotations are incomplete. Separate 21-file license hash inventory does not claim complete license metadata for every component or the interpreter. CPython 3.12.16 is observed separately in qualification-sources.json and the complete /usr/local file/link inventory."
+          "value": "95 Alpine OS/APK and installed Python-distribution entries; package license annotations are incomplete. Tesseract 5.5.2, English trained data 5.5.2, and Leptonica 1.87.0-r0 are included. The complete /usr/local file/link inventory remains separately qualified."
         }
       ]
     }
@@ -66,7 +66,7 @@
       "type": "library",
       "name": ".python-rundeps",
       "version": "20261026.225657",
-      "purl": "pkg:apk/alpine/.python-rundeps@20261026.225657?arch=aarch64"
+      "purl": "pkg:apk/alpine/.python-rundeps@20261026.225657?arch=noarch"
     },
     {
       "type": "library",
@@ -100,6 +100,12 @@
     },
     {
       "type": "library",
+      "name": "brotli-libs",
+      "version": "1.2.1-r0",
+      "purl": "pkg:apk/alpine/brotli-libs@1.2.1-r0?arch=aarch64"
+    },
+    {
+      "type": "library",
       "name": "busybox",
       "version": "1.37.0-r31",
       "purl": "pkg:apk/alpine/busybox@1.37.0-r31?arch=aarch64"
@@ -112,15 +118,39 @@
     },
     {
       "type": "library",
-      "name": "ca-certificates",
-      "version": "20261020-r0",
-      "purl": "pkg:apk/alpine/ca-certificates@20261020-r0?arch=aarch64"
+      "name": "ca-certificates-20261020-r0 aarch64 {ca-certificates} (MPL",
+      "version": "2.0",
+      "purl": "pkg:apk/alpine/ca-certificates-20261020-r0 aarch64 {ca-certificates} (MPL@2.0?arch=AND"
     },
     {
       "type": "library",
-      "name": "ca-certificates-bundle",
-      "version": "20261020-r0",
-      "purl": "pkg:apk/alpine/ca-certificates-bundle@20261020-r0?arch=aarch64"
+      "name": "ca-certificates-bundle-20261020-r0 aarch64 {ca-certificates} (MPL",
+      "version": "2.0",
+      "purl": "pkg:apk/alpine/ca-certificates-bundle-20261020-r0 aarch64 {ca-certificates} (MPL@2.0?arch=AND"
+    },
+    {
+      "type": "library",
+      "name": "cairo-1.18.4-r1 aarch64 {cairo} (LGPL",
+      "version": "2.1-or-later",
+      "purl": "pkg:apk/alpine/cairo-1.18.4-r1 aarch64 {cairo} (LGPL@2.1-or-later?arch=OR"
+    },
+    {
+      "type": "library",
+      "name": "fontconfig",
+      "version": "2.17.1-r1",
+      "purl": "pkg:apk/alpine/fontconfig@2.17.1-r1?arch=aarch64"
+    },
+    {
+      "type": "library",
+      "name": "freetype",
+      "version": "2.14.3-r0",
+      "purl": "pkg:apk/alpine/freetype@2.14.3-r0?arch=aarch64"
+    },
+    {
+      "type": "library",
+      "name": "fribidi",
+      "version": "1.0.16-r3",
+      "purl": "pkg:apk/alpine/fribidi@1.0.16-r3?arch=aarch64"
     },
     {
       "type": "library",
@@ -130,9 +160,45 @@
     },
     {
       "type": "library",
-      "name": "keyutils-libs",
-      "version": "1.6.3-r4",
-      "purl": "pkg:apk/alpine/keyutils-libs@1.6.3-r4?arch=aarch64"
+      "name": "giflib",
+      "version": "5.2.2-r2",
+      "purl": "pkg:apk/alpine/giflib@5.2.2-r2?arch=aarch64"
+    },
+    {
+      "type": "library",
+      "name": "glib",
+      "version": "2.88.1-r1",
+      "purl": "pkg:apk/alpine/glib@2.88.1-r1?arch=aarch64"
+    },
+    {
+      "type": "library",
+      "name": "graphite2-1.3.14-r6 aarch64 {graphite2} (LGPL",
+      "version": "2.1-or-later",
+      "purl": "pkg:apk/alpine/graphite2-1.3.14-r6 aarch64 {graphite2} (LGPL@2.1-or-later?arch=OR"
+    },
+    {
+      "type": "library",
+      "name": "harfbuzz",
+      "version": "13.2.1-r0",
+      "purl": "pkg:apk/alpine/harfbuzz@13.2.1-r0?arch=aarch64"
+    },
+    {
+      "type": "library",
+      "name": "icu-data-en",
+      "version": "78.1-r0",
+      "purl": "pkg:apk/alpine/icu-data-en@78.1-r0?arch=aarch64"
+    },
+    {
+      "type": "library",
+      "name": "icu-libs",
+      "version": "78.1-r0",
+      "purl": "pkg:apk/alpine/icu-libs@78.1-r0?arch=aarch64"
+    },
+    {
+      "type": "library",
+      "name": "keyutils-libs-1.6.3-r4 aarch64 {keyutils} (GPL",
+      "version": "2.0-or-later",
+      "purl": "pkg:apk/alpine/keyutils-libs-1.6.3-r4 aarch64 {keyutils} (GPL@2.0-or-later?arch=AND"
     },
     {
       "type": "library",
@@ -148,9 +214,27 @@
     },
     {
       "type": "library",
+      "name": "leptonica",
+      "version": "1.87.0-r0",
+      "purl": "pkg:apk/alpine/leptonica@1.87.0-r0?arch=aarch64"
+    },
+    {
+      "type": "library",
       "name": "libapk",
       "version": "3.0.8-r0",
       "purl": "pkg:apk/alpine/libapk@3.0.8-r0?arch=aarch64"
+    },
+    {
+      "type": "library",
+      "name": "libblkid",
+      "version": "2.42.3-r1",
+      "purl": "pkg:apk/alpine/libblkid@2.42.3-r1?arch=aarch64"
+    },
+    {
+      "type": "library",
+      "name": "libbsd",
+      "version": "0.12.2-r0",
+      "purl": "pkg:apk/alpine/libbsd@0.12.2-r0?arch=aarch64"
     },
     {
       "type": "library",
@@ -160,9 +244,9 @@
     },
     {
       "type": "library",
-      "name": "libcom_err",
-      "version": "1.47.4-r0",
-      "purl": "pkg:apk/alpine/libcom_err@1.47.4-r0?arch=aarch64"
+      "name": "libcom_err-1.47.4-r0 aarch64 {e2fsprogs} (GPL-2.0-or-later AND LGPL-2.0-or-later AND BSD",
+      "version": "3-Clause",
+      "purl": "pkg:apk/alpine/libcom_err-1.47.4-r0 aarch64 {e2fsprogs} (GPL-2.0-or-later AND LGPL-2.0-or-later AND BSD@3-Clause?arch=AND"
     },
     {
       "type": "library",
@@ -172,15 +256,57 @@
     },
     {
       "type": "library",
+      "name": "libeconf",
+      "version": "0.8.3-r0",
+      "purl": "pkg:apk/alpine/libeconf@0.8.3-r0?arch=aarch64"
+    },
+    {
+      "type": "library",
+      "name": "libexpat",
+      "version": "2.10.0-r0",
+      "purl": "pkg:apk/alpine/libexpat@2.10.0-r0?arch=aarch64"
+    },
+    {
+      "type": "library",
       "name": "libffi",
       "version": "3.5.2-r1",
       "purl": "pkg:apk/alpine/libffi@3.5.2-r1?arch=aarch64"
     },
     {
       "type": "library",
+      "name": "libgcc-15.2.0-r5 aarch64 {gcc} (GPL",
+      "version": "2.0-or-later",
+      "purl": "pkg:apk/alpine/libgcc-15.2.0-r5 aarch64 {gcc} (GPL@2.0-or-later?arch=AND"
+    },
+    {
+      "type": "library",
+      "name": "libgomp-15.2.0-r5 aarch64 {gcc} (GPL",
+      "version": "2.0-or-later",
+      "purl": "pkg:apk/alpine/libgomp-15.2.0-r5 aarch64 {gcc} (GPL@2.0-or-later?arch=AND"
+    },
+    {
+      "type": "library",
       "name": "libintl",
       "version": "1.0-r0",
       "purl": "pkg:apk/alpine/libintl@1.0-r0?arch=aarch64"
+    },
+    {
+      "type": "library",
+      "name": "libjpeg-turbo-3.1.3-r0 aarch64 {libjpeg-turbo} (BSD",
+      "version": "3-Clause",
+      "purl": "pkg:apk/alpine/libjpeg-turbo-3.1.3-r0 aarch64 {libjpeg-turbo} (BSD@3-Clause?arch=AND"
+    },
+    {
+      "type": "library",
+      "name": "libmd-1.2.0-r0 aarch64 {libmd} (BSD-3-Clause AND BSD",
+      "version": "2-Clause",
+      "purl": "pkg:apk/alpine/libmd-1.2.0-r0 aarch64 {libmd} (BSD-3-Clause AND BSD@2-Clause?arch=AND"
+    },
+    {
+      "type": "library",
+      "name": "libmount",
+      "version": "2.42.3-r1",
+      "purl": "pkg:apk/alpine/libmount@2.42.3-r1?arch=aarch64"
     },
     {
       "type": "library",
@@ -202,9 +328,27 @@
     },
     {
       "type": "library",
+      "name": "libpng",
+      "version": "1.6.59-r0",
+      "purl": "pkg:apk/alpine/libpng@1.6.59-r0?arch=aarch64"
+    },
+    {
+      "type": "library",
+      "name": "libsharpyuv",
+      "version": "1.6.0-r0",
+      "purl": "pkg:apk/alpine/libsharpyuv@1.6.0-r0?arch=aarch64"
+    },
+    {
+      "type": "library",
       "name": "libssl3",
       "version": "3.5.9-r0",
       "purl": "pkg:apk/alpine/libssl3@3.5.9-r0?arch=aarch64"
+    },
+    {
+      "type": "library",
+      "name": "libstdc++-15.2.0-r5 aarch64 {gcc} (GPL",
+      "version": "2.0-or-later",
+      "purl": "pkg:apk/alpine/libstdc++-15.2.0-r5 aarch64 {gcc} (GPL@2.0-or-later?arch=AND"
     },
     {
       "type": "library",
@@ -232,21 +376,93 @@
     },
     {
       "type": "library",
+      "name": "libwebp",
+      "version": "1.6.0-r0",
+      "purl": "pkg:apk/alpine/libwebp@1.6.0-r0?arch=aarch64"
+    },
+    {
+      "type": "library",
+      "name": "libwebpmux",
+      "version": "1.6.0-r0",
+      "purl": "pkg:apk/alpine/libwebpmux@1.6.0-r0?arch=aarch64"
+    },
+    {
+      "type": "library",
+      "name": "libx11",
+      "version": "1.8.14-r0",
+      "purl": "pkg:apk/alpine/libx11@1.8.14-r0?arch=aarch64"
+    },
+    {
+      "type": "library",
+      "name": "libxau",
+      "version": "1.0.12-r0",
+      "purl": "pkg:apk/alpine/libxau@1.0.12-r0?arch=aarch64"
+    },
+    {
+      "type": "library",
+      "name": "libxcb",
+      "version": "1.17.0-r2",
+      "purl": "pkg:apk/alpine/libxcb@1.17.0-r2?arch=aarch64"
+    },
+    {
+      "type": "library",
+      "name": "libxdmcp",
+      "version": "1.1.5-r1",
+      "purl": "pkg:apk/alpine/libxdmcp@1.1.5-r1?arch=aarch64"
+    },
+    {
+      "type": "library",
+      "name": "libxext",
+      "version": "1.3.7-r0",
+      "purl": "pkg:apk/alpine/libxext@1.3.7-r0?arch=aarch64"
+    },
+    {
+      "type": "library",
+      "name": "libxft",
+      "version": "2.3.9-r0",
+      "purl": "pkg:apk/alpine/libxft@2.3.9-r0?arch=aarch64"
+    },
+    {
+      "type": "library",
+      "name": "libxrender",
+      "version": "0.9.13-r0",
+      "purl": "pkg:apk/alpine/libxrender@0.9.13-r0?arch=aarch64"
+    },
+    {
+      "type": "library",
       "name": "musl",
       "version": "1.2.6-r3",
       "purl": "pkg:apk/alpine/musl@1.2.6-r3?arch=aarch64"
     },
     {
       "type": "library",
-      "name": "musl-utils",
-      "version": "1.2.6-r3",
-      "purl": "pkg:apk/alpine/musl-utils@1.2.6-r3?arch=aarch64"
+      "name": "musl-utils-1.2.6-r3 aarch64 {musl} (MIT AND BSD",
+      "version": "2-Clause",
+      "purl": "pkg:apk/alpine/musl-utils-1.2.6-r3 aarch64 {musl} (MIT AND BSD@2-Clause?arch=AND"
     },
     {
       "type": "library",
       "name": "ncurses-terminfo-base",
       "version": "6.6_p20260516-r0",
       "purl": "pkg:apk/alpine/ncurses-terminfo-base@6.6_p20260516-r0?arch=aarch64"
+    },
+    {
+      "type": "library",
+      "name": "pango",
+      "version": "1.57.1-r0",
+      "purl": "pkg:apk/alpine/pango@1.57.1-r0?arch=aarch64"
+    },
+    {
+      "type": "library",
+      "name": "pcre2",
+      "version": "10.49-r0",
+      "purl": "pkg:apk/alpine/pcre2@10.49-r0?arch=aarch64"
+    },
+    {
+      "type": "library",
+      "name": "pixman",
+      "version": "0.46.4-r0",
+      "purl": "pkg:apk/alpine/pixman@0.46.4-r0?arch=aarch64"
     },
     {
       "type": "library",
@@ -274,21 +490,45 @@
     },
     {
       "type": "library",
+      "name": "tesseract-ocr",
+      "version": "5.5.2-r0",
+      "purl": "pkg:apk/alpine/tesseract-ocr@5.5.2-r0?arch=aarch64"
+    },
+    {
+      "type": "library",
+      "name": "tesseract-ocr-data-eng",
+      "version": "5.5.2-r0",
+      "purl": "pkg:apk/alpine/tesseract-ocr-data-eng@5.5.2-r0?arch=aarch64"
+    },
+    {
+      "type": "library",
+      "name": "tiff",
+      "version": "4.7.2-r0",
+      "purl": "pkg:apk/alpine/tiff@4.7.2-r0?arch=aarch64"
+    },
+    {
+      "type": "library",
       "name": "tzdata",
       "version": "2026e-r0",
       "purl": "pkg:apk/alpine/tzdata@2026e-r0?arch=aarch64"
     },
     {
       "type": "library",
-      "name": "xz-libs",
-      "version": "5.8.4-r0",
-      "purl": "pkg:apk/alpine/xz-libs@5.8.4-r0?arch=aarch64"
+      "name": "xz-libs-5.8.4-r0 aarch64 {xz} (GPL",
+      "version": "2.0-or-later",
+      "purl": "pkg:apk/alpine/xz-libs-5.8.4-r0 aarch64 {xz} (GPL@2.0-or-later?arch=AND"
     },
     {
       "type": "library",
       "name": "zlib",
       "version": "1.3.2-r1",
       "purl": "pkg:apk/alpine/zlib@1.3.2-r1?arch=aarch64"
+    },
+    {
+      "type": "library",
+      "name": "zstd-libs-1.5.7-r2 aarch64 {zstd} (BSD",
+      "version": "3-Clause",
+      "purl": "pkg:apk/alpine/zstd-libs-1.5.7-r2 aarch64 {zstd} (BSD@3-Clause?arch=OR"
     },
     {
       "type": "library",

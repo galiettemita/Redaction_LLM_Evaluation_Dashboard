@@ -53,12 +53,25 @@
       "unknown": 1
     }
   },
-  "worker_image": {
-    "local_image_id": "sha256:b4e126e3b710050ec2c425a8e2ff322d74cda4f1cdfed282bb62e50ef0574a3a",
-    "manifest_digest": "sha256:873a9a3727020ffbea7590569f888f9fe4bec6ec3bf470f0cfb0c116d5fe16e1",
+  "ocr_dependency_image": {
+    "local_image_id": "sha256:698f1a601c9f0465ac425a81790cb68d5d978430ad73207feb579e200a11c3ff",
+    "manifest_digest": "sha256:f54b1857d154b03a20d5eedc5212ff990c3d4906e48cab7da0561b5051a7d7e7",
     "architecture": "arm64",
     "os": "linux",
-    "size": 179912035,
+    "size": 246027552,
+    "build_policy": "Pinned Python dependency image plus pinned Alpine 3.24 packages; one authorized networked dependency build; all application source rebuilds remain --pull=never --network=none.",
+    "packages": {
+      "leptonica": "1.87.0-r0",
+      "tesseract-ocr": "5.5.2-r0",
+      "tesseract-ocr-data-eng": "5.5.2-r0"
+    }
+  },
+  "worker_image": {
+    "local_image_id": "sha256:34893717ed476aaf6082a6d3cf0649c6de75e356121a2d67674769dc42dc63d5",
+    "manifest_digest": "sha256:d32200c92611ea59ba02953556bb1c82ba18f25a633f28a8d0d76fb0c86c1626",
+    "architecture": "arm64",
+    "os": "linux",
+    "size": 246666218,
     "user": "65532:65532",
     "entrypoint": [
       "python",
@@ -66,9 +79,9 @@
       "redaction_lab.application.worker_protocol"
     ],
     "protocol_version": "pdf-worker-v2",
-    "build_policy": "Exact installed v1 image used only as dependency stage; original pinned base; --pull=never --network=none; isolated 38-file source context; COPY --chmod=0555; independent v2 qualification. No downloads.",
-    "dependency_source_image": "sha256:7a78eaf7ef812d354f0abe13f40c6c0a4e3684d94f72002245c5249249bf293b",
-    "source_inventory_sha256": "ae10cdb098b4af29d33e27aaef23be6a9b746edc11223e9ff739ad2e404fac29",
+    "build_policy": "Exact pinned OCR/Python dependency image; --pull=never --network=none; isolated source context; COPY --chmod=0555; independent qualification. No source-build downloads.",
+    "dependency_source_image": "sha256:698f1a601c9f0465ac425a81790cb68d5d978430ad73207feb579e200a11c3ff",
+    "source_inventory_sha256": "9501eccc53d49e5de8bb3670a6e77d9beb348132d618dd03201d9d3a4f39b73a",
     "installed_inventory": {
       "usr_local_file_count": 3216,
       "usr_local_inventory_sha256": "796918201c671074182df724ba7a42fb59f5628bfbb595897c90be5a8653ddc5",
@@ -83,6 +96,7 @@
       "reference_page_limit": "PASS",
       "reference_text_bounds": "PASS",
       "reference_v2_protocol": "PASS",
+      "ocr_runtime": "PASS",
       "signed_quantity_regression": "PASS",
       "timeout_cleanup": "PASS"
     },
@@ -106,7 +120,7 @@
       "version": "3.12.16",
       "inventory_scope": "Interpreter executable and standard-library bytes are covered by the separate /usr/local file/link inventory; not a standalone SBOM component."
     },
-    "sbom_scope": "55 Alpine OS/APK and installed Python-distribution package entries; package license annotations are incomplete. Separate 21-file license hash inventory does not claim complete license metadata for every component or the interpreter.",
+    "sbom_scope": "95 Alpine OS/APK and installed Python-distribution package entries; package license annotations are incomplete. Tesseract, English trained data and Leptonica are included; the separate file inventories cover installed bytes.",
     "historical_application_acceptance": {
       "historical_successful_attempts_by_image": {
         "sha256:f1b8a731643bc0691849d5f82761a7fe9d7f7e658a2c19eb4e94c3e2c6f54b39": 2,

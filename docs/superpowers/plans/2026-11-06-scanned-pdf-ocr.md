@@ -26,6 +26,7 @@
 - White exemption labels must not split one black physical rectangle, while separated bars remain separate targets; Task 2 adds component tests.
 - Reference OCR must never affect redacted targets, canonical text, hashes, or prompts; Tasks 3 and 4 add differential leakage tests.
 - Historical vector sources must reopen and validate after raster versions ship; Task 4 adds legacy-record tests.
+- A scan on an early page must not mask a prohibited structure on a later page; Task 2 adds whole-document safety-preflight tests.
 
 ---
 
@@ -44,12 +45,12 @@
 - Produces: `OcrWord`, `OcrPage`, `OcrFailure`, `OcrEngine.recognize(image) -> OcrPage`, and `TesseractOcrEngine` with fixed bounded subprocess behavior.
 - Produces: a digest-pinned dependency image containing Tesseract 5.5.2 and English trained data, followed by offline source-only rebuilds.
 
-- [ ] Write failing tests for valid TSV parsing, malformed/unbounded output, timeout/nonzero exit, confidence data, sanitized errors, and exact dependency/SBOM pins.
-- [ ] Run the focused tests and verify failures are due to missing OCR interfaces and image metadata.
-- [ ] Implement the immutable OCR records and injectable subprocess runner; keep document bytes on stdin/stdout and suppress stderr.
-- [ ] Build the pinned OCR dependency image once, record exact package/image hashes, and restore offline source rebuild behavior.
-- [ ] Run OCR/security tests and a real synthetic Tesseract container probe; verify no text appears in logs.
-- [ ] Commit the independently testable OCR/runtime boundary.
+- [x] Write failing tests for valid TSV parsing, malformed/unbounded output, timeout/nonzero exit, confidence data, sanitized errors, and exact dependency/SBOM pins.
+- [x] Run the focused tests and verify failures are due to missing OCR interfaces and image metadata.
+- [x] Implement the immutable OCR records and injectable subprocess runner; keep document bytes on stdin/stdout and suppress stderr.
+- [x] Build the pinned OCR dependency image once, record exact package/image hashes, and restore offline source rebuild behavior.
+- [x] Run OCR/security tests and a real synthetic Tesseract container probe; verify no text appears in logs.
+- [x] Commit the independently testable OCR/runtime boundary.
 
 ### Task 2: Bounded raster scan analysis
 
@@ -62,6 +63,7 @@
 - Produces: `RasterTargetObservation`, `RasterRedactedAnalysis`, `RasterReferenceAnalysis`, `analyze_redacted_scan(...)`, and `analyze_reference_scan(...)` with explicit reason codes and raster detector/canonicalizer versions.
 
 - [ ] Write failing tests using generated scan images for component separation/union, text-flow adjacency, marker order, OCR-word removal inside targets, low confidence, image-dominant/whole-page rejection, pixel/page/target limits, deterministic hashes, and reference line text.
+- [ ] Add failing tests for whole-document safety preflight, residual black regions in a partially revealed reference, top-origin pixel to bottom-origin normalized coordinates, effective crop boundaries, and multiple targets across pages.
 - [ ] Run focused tests and verify the missing raster API is the failure.
 - [ ] Implement page-streamed pypdfium2 rendering, run-length union components, conservative geometry/text-flow validation, and canonical line reconstruction.
 - [ ] Run focused tests; refactor only after all raster tests pass.
@@ -91,13 +93,15 @@
 **Files:**
 - Modify: `src/redaction_lab/prediction_source.py`
 - Modify: `tests/test_prediction_source.py`
-- Modify: persistence tests only if needed to prove historical reopen behavior
+- Create: additive application migration for reference protocol/canonicalizer compatibility
+- Modify: `src/redaction_lab/application/application_store.py`
+- Modify: migration and application-store tests proving historical and new reference records reopen
 
 **Interfaces:**
 - Consumes: worker material with vector or raster version/method.
 - Produces: target/source identities validated against their stored backend versions while preserving existing vector records.
 
-- [ ] Write failing tests for raster material construction, forged method/version combinations, canonical marker binding, and a serialized legacy vector source reopening unchanged.
+- [ ] Write failing tests for raster material construction, forged method/version combinations, canonical marker binding, a serialized legacy vector source reopening unchanged, v2 reference rows reopening, v3 OCR rows persisting, and unallowlisted protocol/canonicalizer pairs being rejected.
 - [ ] Run tests and verify expected failures.
 - [ ] Implement an explicit allowed backend-version registry and version-derived source/target validation.
 - [ ] Run focused and application persistence tests; commit.
