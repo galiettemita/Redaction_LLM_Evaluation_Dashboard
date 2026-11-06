@@ -84,9 +84,7 @@
       "reference_text_bounds": "PASS",
       "reference_v2_protocol": "PASS",
       "signed_quantity_regression": "PASS",
-      "timeout_cleanup": "PASS",
-      "clean_machine_restart": "PASS",
-      "production_application_attestation": "PASS"
+      "timeout_cleanup": "PASS"
     },
     "protocol_receipts": {
       "REDACTED": {
@@ -109,11 +107,11 @@
       "inventory_scope": "Interpreter executable and standard-library bytes are covered by the separate /usr/local file/link inventory; not a standalone SBOM component."
     },
     "sbom_scope": "55 Alpine OS/APK and installed Python-distribution package entries; package license annotations are incomplete. Separate 21-file license hash inventory does not claim complete license metadata for every component or the interpreter.",
-    "combined_synthetic_acceptance": {
-      "new_image_successful_attempts": 14,
+    "historical_application_acceptance": {
       "historical_successful_attempts_by_image": {
         "sha256:f1b8a731643bc0691849d5f82761a7fe9d7f7e658a2c19eb4e94c3e2c6f54b39": 2,
-        "sha256:954ca79b9c06811911b3d68ceb90a3b7ca85bdb509b1e09b5c17ba7c1c603129": 12
+        "sha256:954ca79b9c06811911b3d68ceb90a3b7ca85bdb509b1e09b5c17ba7c1c603129": 12,
+        "sha256:03db44f11ea940fff0c75a94dc393aed73095e8ee71307afb4adc3ef0e290e34": 14
       },
       "exact_reference_target_scores": [
         0.0,
@@ -129,7 +127,8 @@
       "reference_marker_absent_from_all_28_manifests": true,
       "mounted_browser_workflow": "PASS"
     },
-    "last_restart_check_utc": "2026-11-06T00:03:19.416987+00:00"
+    "current_image_application_acceptance": "PENDING RL-LINK-017 CORRECTION 01 external synthetic acceptance",
+    "last_restart_check_utc": null
   },
   "python_dependencies": [
     [
@@ -212,7 +211,7 @@
   "requalified_at": "2026-11-06T15:33:34Z",
   "rebuild_storage": {
     "initial_free_bytes": 13598306304,
-    "minimum_free_bytes_during_successful_build": 11579224064,
+    "minimum_free_bytes_during_successful_build": 10807799808,
     "required_reserve_bytes": 8589934592,
     "projected_incremental_bytes_ceiling": 536870912,
     "dependency_image_unique_cache_bytes_before": 170329968,
