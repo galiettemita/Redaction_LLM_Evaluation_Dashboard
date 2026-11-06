@@ -177,7 +177,7 @@ export default function App({api}: {api: ReturnType<typeof createApi>}) {
           <form onSubmit={upload}><fieldset disabled={busy}><legend className="visually-hidden">Upload PDF documents</legend>
             <label htmlFor="project">Project ID</label><input id="project" value={project} onChange={e => setProject(e.target.value)} required maxLength={128} pattern="[A-Za-z0-9_-]+" />
             <label htmlFor="redacted">Redacted PDF · required</label><input key={`redacted-${fileEpoch}`} id="redacted" type="file" accept=".pdf,application/pdf" required onChange={e => choose(e.target.files?.[0] ?? null, 'redacted')} />
-            <label htmlFor="reference">Matching reference · optional</label><input key={`reference-${fileEpoch}`} id="reference" type="file" accept=".pdf,application/pdf" onChange={e => choose(e.target.files?.[0] ?? null, 'reference')} />
+            <label htmlFor="reference">Matching reference</label><input key={`reference-${fileEpoch}`} id="reference" type="file" accept=".pdf,application/pdf" onChange={e => choose(e.target.files?.[0] ?? null, 'reference')} />
             <p className="hint">PDF only · 25 MiB per file · up to 100 pages. Use synthetic or explicitly authorized documents.</p>
             <button type="submit" disabled={!redacted || !health}>Upload documents</button>
           </fieldset></form>

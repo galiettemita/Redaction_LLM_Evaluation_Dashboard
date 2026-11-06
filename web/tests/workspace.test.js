@@ -54,6 +54,8 @@ test('workspace omits standalone experimental and service-status banners', async
   assert.doesNotMatch(html, /class="runtime-banner"/);
   assert.doesNotMatch(html, /Refresh status/);
   assert.match(html, /<h2 id="upload-title">Documents<\/h2>/);
+  assert.match(html, /<label for="reference">Matching reference<\/label>/);
+  assert.doesNotMatch(html, /Matching reference · optional/);
 });
 test('result panels render escaped prediction, method, score channels, counts and separate model summaries', async () => {
   const {ResultsPanel} = await components(); assert.equal(typeof ResultsPanel, 'function', 'document results panel is missing');
