@@ -1,4 +1,10 @@
-# E0072 — 2026-11-05 — experimental application ready for final review
+# E0072 — 2026-11-05 local / 2026-11-06 UTC — final review correction wave
+
+Whole-branch review of `9aea516` found whitespace-separated signs could erase numeric contradiction. Correction `9e6c01f` retains ASCII/normalized Unicode signs through whitespace, with literal scorer/evaluator regressions and unchanged stored evidence. Final validation: **956 Python / 55 Node passed**, typecheck/build pass, npm audit zero. Offline image `03db44f` independently requalified including in-container signed-quantity checks and restart; 14 fresh genuine SUCCEEDED attempts and a new mounted Chrome workflow passed. Historical 12 attempts on `954ca79` and two on `f1b8a731` remain distinct and unchanged.
+
+Narrowed SBOM completeness wording: installed package/OS entries, separate CPython3.12.16 observation and file/license inventories; license annotations are incomplete. Reconciled seven local RL-LINK-017 checks and Task 4 combined-canary acceptance, documented planned-but-unchanged tests, and published the durable [review/fix record](handoffs/RL-EXP-015-final-review-9aea516.md). NOT-YET-INTEGRATED: exact correction re-review, integration and actual external HTTPS remain open. No push, merge, downloads or tunnel by this implementer.
+
+## E0072 — 2026-11-05 — experimental application ready for final review
 
 Completion Tasks 1–5 passed scoped reviews on `codex/finish-app`; Task 6 implementation `1630c31` adds an exact-host/HTTPS-origin Basic-auth gateway on loopback, private launch configuration, shared runtime attestation, offline v2 worker qualification and authenticated API-to-UI mapping identity projection. No runtime download or paid resource was used. The new image has independent source/dependency/license inventories, SBOM, protocol/isolation/failure/deadline/restart evidence; prior v1 qualification is not inherited.
 
