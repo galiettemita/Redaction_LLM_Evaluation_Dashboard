@@ -47,6 +47,14 @@ async function components() {
   for (const [name, url] of [['./temporaryPrediction', new URL('../src/temporaryPrediction.ts', import.meta.url).href], ['./api', new URL('../src/api.ts', import.meta.url).href], ['react', import.meta.resolve('react')], ['react/jsx-runtime', import.meta.resolve('react/jsx-runtime')]]) code = code.replaceAll(`from "${name}"`, `from "${url}"`);
   return import('data:text/javascript;base64,' + Buffer.from(code).toString('base64'));
 }
+test('workspace omits standalone experimental and service-status banners', async () => {
+  const {default: App} = await components();
+  const html = renderToStaticMarkup(createElement(App, {api: {}}));
+  assert.doesNotMatch(html, /class="experimental-banner"/);
+  assert.doesNotMatch(html, /class="runtime-banner"/);
+  assert.doesNotMatch(html, /Refresh status/);
+  assert.match(html, /<h2 id="upload-title">Documents<\/h2>/);
+});
 test('result panels render escaped prediction, method, score channels, counts and separate model summaries', async () => {
   const {ResultsPanel} = await components(); assert.equal(typeof ResultsPanel, 'function', 'document results panel is missing');
   const counts = {requested: 2, eligible: 1, scored: 1, unknown: 1, excluded: 3, technical_failures: 1};

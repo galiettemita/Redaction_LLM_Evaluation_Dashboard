@@ -22,13 +22,6 @@ h3 { font-size: 18px; margin: 16px 0 8px; }
 h4 { font-size: 15px; margin: 16px 0 6px; }
 p { margin: 8px 0 14px; }
 .eyebrow { text-transform: uppercase; font-size: 11px; letter-spacing: 1.7px; font-weight: 750; color: #507164; }
-.experimental-banner { padding: 18px 22px; border: 1px solid #d1be8c; border-left: 4px solid #a47920; border-radius: 8px; background: #fff9e9; color: #654b14; }
-.experimental-banner strong { font-size: 13px; letter-spacing: .45px; }
-.experimental-banner p { margin-bottom: 0; font-size: 14px; }
-.runtime-banner { display: flex; justify-content: space-between; align-items: center; gap: 22px; padding: 20px 0; }
-.runtime-banner h2 { font-size: 15px; margin-bottom: 4px; }
-.runtime-banner p { font-size: 13px; color: #52665f; margin: 0; }
-.runtime-banner button { flex-shrink: 0; }
 .notice { color: #315d50; font-size: 14px; margin-bottom: 12px; }
 .error { padding: 18px; border: 1px solid #b75b4f; border-radius: 7px; background: #fff3f0; color: #7c3029; margin-bottom: 18px; }
 .workspace-grid { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 22px; align-items: start; margin-bottom: 24px; }
@@ -92,5 +85,5 @@ blockquote { margin: 8px 0; border-left: 3px solid #a6bcad; }
 footer { text-align: center; padding: 28px 0 10px; color: #627569; font-size: 11px; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 @media (max-width: 900px) { .workspace-grid { grid-template-columns: 1fr; } .intake { display: block; } .summary-grid { grid-template-columns: 1fr; } .pdf-viewer iframe { height: 540px; } }
-@media (max-width: 600px) { main { padding: 24px 14px; } .topbar { padding: 15px; } .local-badge { max-width: 130px; } .panel, .results-panel { padding: 18px; } .viewer-header { align-items: flex-start; flex-direction: column; } .counts { grid-template-columns: repeat(3,minmax(0,1fr)); } .runtime-banner { align-items: flex-start; flex-direction: column; gap: 12px; } .preview-placeholder { min-height: 300px; padding: 20px; } .pdf-viewer iframe { height: 450px; } }
+@media (max-width: 600px) { main { padding: 24px 14px; } .topbar { padding: 15px; } .local-badge { max-width: 130px; } .panel, .results-panel { padding: 18px; } .viewer-header { align-items: flex-start; flex-direction: column; } .counts { grid-template-columns: repeat(3,minmax(0,1fr)); } .preview-placeholder { min-height: 300px; padding: 20px; } .pdf-viewer iframe { height: 450px; } }
 @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto; } }

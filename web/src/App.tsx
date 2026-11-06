@@ -169,10 +169,6 @@ export default function App({api}: {api: ReturnType<typeof createApi>}) {
     <main id="workspace" tabIndex={-1}>
       <div className="intro"><p className="eyebrow">Read the document. Inspect the evidence.</p><h1>Every passage. Clear uncertainty.</h1>
         <p>Compare genuine model predictions with matching revealed text, while keeping uncertainty visible.</p></div>
-      <div className="experimental-banner"><strong>{EXPERIMENTAL_LABEL}</strong><p>One installed local model: Qwen2.5 1.5B. Experimental text agreement is an unvalidated lexical measure. Verified accuracy remains unknown.</p></div>
-      <section className="runtime-banner" aria-labelledby="runtime-title"><div><h2 id="runtime-title">{health ? 'Local service connected' : workspace.readError ? 'Service connection unavailable' : 'Connecting to service'}</h2>
-        <p>{health ? 'Runtime integrity is checked before PDF processing and model inference. Scientific and recipient validation remain pending.' : 'Reconnect reads saved state only.'}</p></div>
-        <button type="button" className="secondary" disabled={busy} onClick={() => void refresh()}>Refresh status</button></section>
       <div role="status" aria-live="polite" className="notice">{busy ? notice || 'Reading the service…' : notice}</div>
       {workspace.actionError ? <div role="alert" className="error"><strong>Action could not finish</strong><p>{workspace.actionError}</p><button type="button" className="secondary" onClick={() => actionError('')}>Dismiss action error</button></div> : null}
       {workspace.readError ? <p role="alert" className="error">Status refresh failed: {workspace.readError}</p> : null}
