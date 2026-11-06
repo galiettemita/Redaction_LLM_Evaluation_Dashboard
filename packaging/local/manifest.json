@@ -12,18 +12,18 @@
   "frontend": {
     "dist_path": "web/dist",
     "assets": {
-      "assets/index-BfjntY5Y.js": {
-        "sha256": "b51e9a86ebf73cfd45eb5db3c5324652872550b333b144a495394070c97cf533",
-        "byte_size": 225482,
+      "assets/index-CwhdmsFa.js": {
+        "sha256": "0805aa67a3932e7f55a5bf9ba86489cf94eab1a048c7631b2953fe76367f0b21",
+        "byte_size": 224664,
         "content_type": "text/javascript; charset=utf-8"
       },
-      "assets/index-DOfTYw_4.css": {
-        "sha256": "93b1e6178c23c09e35b4b9a84888a4c32f5a1c92cabe6b80611ec792ecd6d1e4",
-        "byte_size": 7483,
+      "assets/index-CWOA8Q_f.css": {
+        "sha256": "d3a6ba0d22fb721374ee4e4106dbdd9dbe5350d246e5d6e9f224023bc0e92cd9",
+        "byte_size": 6903,
         "content_type": "text/css; charset=utf-8"
       },
       "index.html": {
-        "sha256": "95ef232ffb8ecc6cef2a6e44ea438dab2811d01bf72b2daecce2cf46180ece7e",
+        "sha256": "38bf202bb6e2d14b5af4be0cec88d5dd0261c98f2e4219d210c235a08f8e0e3f",
         "byte_size": 567,
         "content_type": "text/html; charset=utf-8"
       }

@@ -20,9 +20,9 @@ LOCAL = ROOT / "packaging" / "local"
 HTTP = build_opener(ProxyHandler({}))
 CHROME = Path("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")
 GENUINE_ASSETS = {
-    "/assets/index-BfjntY5Y.js": ("web/dist/assets/index-BfjntY5Y.js", "b51e9a86ebf73cfd45eb5db3c5324652872550b333b144a495394070c97cf533"),
-    "/assets/index-DOfTYw_4.css": ("web/dist/assets/index-DOfTYw_4.css", "93b1e6178c23c09e35b4b9a84888a4c32f5a1c92cabe6b80611ec792ecd6d1e4"),
-    "/": ("web/dist/index.html", "95ef232ffb8ecc6cef2a6e44ea438dab2811d01bf72b2daecce2cf46180ece7e"),
+    "/assets/index-CwhdmsFa.js": ("web/dist/assets/index-CwhdmsFa.js", "0805aa67a3932e7f55a5bf9ba86489cf94eab1a048c7631b2953fe76367f0b21"),
+    "/assets/index-CWOA8Q_f.css": ("web/dist/assets/index-CWOA8Q_f.css", "d3a6ba0d22fb721374ee4e4106dbdd9dbe5350d246e5d6e9f224023bc0e92cd9"),
+    "/": ("web/dist/index.html", "38bf202bb6e2d14b5af4be0cec88d5dd0261c98f2e4219d210c235a08f8e0e3f"),
 }
 
 
@@ -367,10 +367,13 @@ def test_existing_chrome_cli_renders_experimental_workspace_against_v03_api(pack
         assert browser.returncode == 0, browser.stderr
         assert "<title>Redaction Lab — local document workspace</title>" in browser.stdout
         assert "Every passage. Clear uncertainty." in browser.stdout
-        assert 'id="runtime-title">Local service connected</h2>' in browser.stdout
-        assert "EXPERIMENTAL — NOT SCIENTIFICALLY VALIDATED" in browser.stdout
-        assert "Verified accuracy remains unknown." in browser.stdout
-        assert "Qwen2.5 1.5B" in browser.stdout
+        assert 'id="runtime-title"' not in browser.stdout
+        assert 'class="experimental-banner"' not in browser.stdout
+        assert 'class="runtime-banner"' not in browser.stdout
+        assert 'id="upload-title">Documents</h2>' in browser.stdout
+        assert "EXPERIMENTAL — NOT SCIENTIFICALLY VALIDATED" not in browser.stdout
+        assert "Verified accuracy remains unknown." not in browser.stdout
+        assert "Qwen2.5 1.5B" not in browser.stdout
         assert "select the PDF again" in browser.stdout
         assert 'id="demo-text"' not in browser.stdout
         assert "Generate demo candidates" not in browser.stdout
